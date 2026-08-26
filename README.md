@@ -39,20 +39,19 @@ Migration `003_shop_profiles_and_platform_admin.sql` creates **Sebu3D** as the f
 
 ## Initial usernames
 
-Run the following once from a private administrator terminal after migrations 001–005. Get the service-role key from the Supabase project settings and never place it in `.env`, the mobile application or any `EXPO_PUBLIC` variable.
+Run the following once from a private administrator terminal after migrations 001–007. Get the service-role key from the Supabase project settings and never place it in `.env`, the mobile application or any `EXPO_PUBLIC` variable.
 
 ```powershell
 $env:SUPABASE_URL='YOUR-SUPABASE-URL'
 $env:SUPABASE_SERVICE_ROLE_KEY='YOUR-SERVICE-ROLE-KEY'
+$env:MIK_OWNER_PASSWORD='CHOOSE-A-PRIVATE-PASSWORD'
+$env:MIK_SEBU_PASSWORD='CHOOSE-A-DIFFERENT-PRIVATE-PASSWORD'
 npm run setup:accounts
 ```
 
-This creates or refreshes these requested prototype logins:
+This creates or refreshes the requested `Owner` and `sebu3d` logins. Passwords are deliberately supplied privately through environment variables and are never stored in the repository.
 
-- Owner: username `Owner`, starting password `123456`
-- Sebu3D: username `sebu3d`, starting password `123456`
-
-Username entry is case-insensitive. The Mik Owner can see every active shop and create a shop together with its username and starting password. Each shop uses one shared team login: the same shop account handles cashier sales, product creation, photos, prices and stock. It sees only its connected shop. Change both starting passwords before any public launch because `123456` is easy to guess.
+Username entry is case-insensitive. The Mik Owner can see every active shop and create a shop together with its username and starting password. Each shop uses one shared team login: the same shop account handles cashier sales, product creation, photos, prices and stock. It sees only its connected shop.
 
 ## Important data note
 

@@ -259,7 +259,7 @@ function PlatformAdmin() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("123456");
+  const [password, setPassword] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -292,7 +292,7 @@ function PlatformAdmin() {
     if (error) return Alert.alert("Profile not created", error.message);
     setName("");
     setUsername("");
-    setPassword("123456");
+    setPassword("");
     setShowForm(false);
     await load();
     Alert.alert(
