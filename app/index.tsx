@@ -780,6 +780,7 @@ function SaleScreen({
   const [payment, setPayment] = useState<PaymentMethod>("cash");
   const [gcashReceived, setGcashReceived] = useState(false);
   const [paymentReference, setPaymentReference] = useState("");
+  const [cashReceived, setCashReceived] = useState("");
   const [review, setReview] = useState(false);
   const [saving, setSaving] = useState(false);
   const categoryName = (id: string | null) =>
@@ -790,6 +791,11 @@ function SaleScreen({
       p.name.toLowerCase().includes(search.toLowerCase()),
   );
   const total = cart.reduce((n, x) => n + x.quantity * x.unitPrice, 0);
+  const cashAmount = Number(cashReceived);
+  const cashIsEnough =
+    payment !== "cash" ||
+    (cashReceived.trim() !== "" && Number.isFinite(cashAmount) && cashAmount >= total);
+  const changeDue = payment === "cash" && cashIsEnough ? cashAmount - total : 0;
   const count = cart.reduce((n, x) => n + x.quantity, 0);
   const cartKey = (
     productId: string,
@@ -860,6 +866,11 @@ function SaleScreen({
     );
   const complete = async () => {
     if (!cart.length) return;
+    if (payment === "cash" && !cashIsEnough)
+      return Alert.alert(
+        "Not enough cash",
+        `The customer still needs to give ${peso(Math.max(0, total - (Number.isFinite(cashAmount) ? cashAmount : 0)))}.`,
+      );
     if (payment === "gcash" && !gcashReceived)
       return Alert.alert(
         "Check GCash first",
@@ -900,10 +911,11 @@ function SaleScreen({
     setPayment("cash");
     setGcashReceived(false);
     setPaymentReference("");
+    setCashReceived("");
     await onSaved();
     Alert.alert(
       "Sale completed",
-      `Receipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? "Cash" : "GCash — received"}.`,
+      `Receipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? `Cash\nChange: ${peso(changeDue)}` : "GCash — received"}.`,
     );
   };
   if (review)
@@ -975,9 +987,56 @@ function SaleScreen({
               label="GCash"
               icon="phone-portrait-outline"
               selected={payment === "gcash"}
-              onPress={() => setPayment("gcash")}
+              onPress={() => {
+                setPayment("gcash");
+                setCashReceived("");
+              }}
             />
           </View>
+          {payment === "cash" ? (
+            <View style={s.cashCalculator}>
+              <View style={s.gcashHeading}>
+                <View style={s.cashIcon}>
+                  <Ionicons name="cash-outline" size={27} color={C.accent} />
+                </View>
+                <View style={s.flex}>
+                  <Text style={s.rowTitle}>Cash received</Text>
+                  <Text style={s.rowHelp}>Enter how much the customer gave you.</Text>
+                </View>
+              </View>
+              <TextInput
+                accessibilityLabel="Cash received"
+                style={s.cashInput}
+                value={cashReceived}
+                onChangeText={setCashReceived}
+                placeholder="₱0"
+                keyboardType="decimal-pad"
+              />
+              <View style={s.quickCashRow}>
+                {[100, 200, 500, 1000].map((amount) => (
+                  <Pressable key={amount} style={s.quickCash} onPress={() => setCashReceived(String(amount))}>
+                    <Text style={s.quickCashText}>₱{amount}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={[s.changeBox, cashReceived.trim() !== "" && !cashIsEnough && s.changeBoxShort]}>
+                <Text style={s.totalLabel}>
+                  {cashReceived.trim() === ""
+                    ? "Change to give"
+                    : cashIsEnough
+                      ? "CHANGE TO GIVE"
+                      : "MORE CASH NEEDED"}
+                </Text>
+                <Text style={[s.changeValue, cashReceived.trim() !== "" && !cashIsEnough && s.low]}>
+                  {cashReceived.trim() === ""
+                    ? "—"
+                    : cashIsEnough
+                      ? peso(changeDue)
+                      : peso(Math.max(0, total - (Number.isFinite(cashAmount) ? cashAmount : 0)))}
+                </Text>
+              </View>
+            </View>
+          ) : null}
           {payment === "gcash" ? (
             <View style={s.gcashCheck}>
               <View style={s.gcashHeading}>
@@ -1028,12 +1087,17 @@ function SaleScreen({
                 ? "Saving sale…"
                 : payment === "gcash" && !gcashReceived
                   ? "Confirm GCash payment above"
+                  : payment === "cash" && !cashIsEnough
+                    ? "Enter cash received"
                   : `Complete sale · ${peso(total)}`
             }
             icon="checkmark-circle-outline"
             onPress={complete}
             disabled={
-              saving || !cart.length || (payment === "gcash" && !gcashReceived)
+              saving ||
+              !cart.length ||
+              (payment === "gcash" && !gcashReceived) ||
+              (payment === "cash" && !cashIsEnough)
             }
           />
           <Text style={s.safe}>
@@ -3592,6 +3656,53 @@ const s = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: C.white,
   },
+  cashCalculator: {
+    marginTop: 12,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: C.accentSoft,
+    borderRadius: 22,
+    backgroundColor: C.white,
+  },
+  cashIcon: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: C.accentSoft,
+  },
+  cashInput: {
+    minHeight: 68,
+    marginTop: 14,
+    paddingHorizontal: 18,
+    borderWidth: 2,
+    borderColor: C.accent,
+    borderRadius: 19,
+    backgroundColor: C.cream,
+    color: C.ink,
+    fontSize: 28,
+    fontWeight: "900",
+  },
+  quickCashRow: { marginTop: 10, flexDirection: "row", gap: 8 },
+  quickCash: {
+    minHeight: 46,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: C.accentSoft,
+  },
+  quickCashText: { color: C.accentDark, fontSize: 15, fontWeight: "900" },
+  changeBox: {
+    marginTop: 14,
+    padding: 16,
+    alignItems: "center",
+    borderRadius: 18,
+    backgroundColor: C.accentSoft,
+  },
+  changeBoxShort: { backgroundColor: C.redSoft },
+  changeValue: { marginTop: 4, color: C.accentDark, fontSize: 34, fontWeight: "900" },
   gcashHeading: { flexDirection: "row", alignItems: "center", gap: 11 },
   gcashIcon: {
     width: 48,
