@@ -417,7 +417,7 @@ function ShopApp({ session }: { session: Session }) {
         supabase
           .from("products")
           .select(
-            "id,business_id,name,regular_price,sale_price,image_url,variant_label,low_stock_threshold,category_id,active,inventory_levels(quantity_on_hand,needs_stock_count,location_id),product_variants(id,name,price_override,active,variant_inventory_levels(quantity_on_hand,location_id))",
+            "id,business_id,name,regular_price,sale_price,image_url,variant_label,letters_required,low_stock_threshold,category_id,active,inventory_levels(quantity_on_hand,needs_stock_count,location_id),product_variants(id,name,price_override,active,variant_inventory_levels(quantity_on_hand,location_id)),alphabet_style:alphabet_styles!products_alphabet_style_id_fkey(id,name,alphabet_letter_inventory(letter,quantity_on_hand,needs_stock_count,location_id))",
           )
           .eq("business_id", businessId)
           .eq("active", true)
@@ -437,7 +437,7 @@ function ShopApp({ session }: { session: Session }) {
         supabase
           .from("sales")
           .select(
-            "id,receipt_number,payment_method,total,status,created_at,payment_confirmed_at,payment_reference,sale_items(product_name,variant_name,quantity)",
+            "id,receipt_number,payment_method,total,status,created_at,payment_confirmed_at,payment_reference,sale_items(product_name,variant_name,selected_letters,quantity)",
           )
           .eq("location_id", selectedLocationId)
           .gte("created_at", start.toISOString())
@@ -454,6 +454,20 @@ function ShopApp({ session }: { session: Session }) {
           return {
             ...p,
             variants,
+            letters_required: p.letters_required ?? 0,
+            alphabet_style: p.alphabet_style
+              ? {
+                  id: p.alphabet_style.id,
+                  name: p.alphabet_style.name,
+                  letters: (p.alphabet_style.alphabet_letter_inventory ?? [])
+                    .map((letter: any) => ({
+                      letter: letter.letter,
+                      quantity_on_hand: letter.quantity_on_hand ?? 0,
+                      needs_stock_count: letter.needs_stock_count ?? true,
+                    }))
+                    .sort((a: any, b: any) => a.letter.localeCompare(b.letter)),
+                }
+              : null,
             quantity_on_hand: variants.length
               ? variants.reduce((sum, v) => sum + v.quantity_on_hand, 0)
               : (p.inventory_levels?.[0]?.quantity_on_hand ?? 0),
@@ -718,6 +732,7 @@ function SaleScreen({
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [choosing, setChoosing] = useState<Product | null>(null);
+  const [chosenLetters, setChosenLetters] = useState<string[]>([]);
   const [payment, setPayment] = useState<PaymentMethod>("cash");
   const [gcashReceived, setGcashReceived] = useState(false);
   const [paymentReference, setPaymentReference] = useState("");
@@ -732,9 +747,21 @@ function SaleScreen({
   );
   const total = cart.reduce((n, x) => n + x.quantity * x.unitPrice, 0);
   const count = cart.reduce((n, x) => n + x.quantity, 0);
-  const cartKey = (productId: string, variantId?: string | null) =>
-    `${productId}:${variantId ?? "main"}`;
-  const add = (p: Product, variant: ProductVariant | null = null) => {
+  const cartKey = (
+    productId: string,
+    variantId?: string | null,
+    letters: string[] = [],
+  ) => `${productId}:${variantId ?? "main"}:${letters.join("")}`;
+  const add = (
+    p: Product,
+    variant: ProductVariant | null = null,
+    selectedLetters: string[] = [],
+  ) => {
+    if (p.letters_required > 0 && selectedLetters.length !== p.letters_required) {
+      setChoosing(p);
+      setChosenLetters([]);
+      return;
+    }
     if (p.variants.length && !variant) {
       setChoosing(p);
       return;
@@ -748,27 +775,31 @@ function SaleScreen({
         "Out of stock",
         "There are no items available to sell.",
       );
-    const key = cartKey(p.id, variant?.id);
+    const key = cartKey(p.id, variant?.id, selectedLetters);
     setCart((old) => {
       const found = old.find(
-        (x) => cartKey(x.product.id, x.variant?.id) === key,
+        (x) => cartKey(x.product.id, x.variant?.id, x.selectedLetters) === key,
       );
       if (found)
         return found.quantity >= available
           ? old
           : old.map((x) =>
-              cartKey(x.product.id, x.variant?.id) === key
+              cartKey(x.product.id, x.variant?.id, x.selectedLetters) === key
                 ? { ...x, quantity: x.quantity + 1 }
                 : x,
             );
-      return [...old, { product: p, variant, quantity: 1, unitPrice: price }];
+      return [
+        ...old,
+        { product: p, variant, selectedLetters, quantity: 1, unitPrice: price },
+      ];
     });
     setChoosing(null);
+    setChosenLetters([]);
   };
   const change = (key: string, n: number) =>
     setCart((old) =>
       old.flatMap((x) =>
-        cartKey(x.product.id, x.variant?.id) !== key
+        cartKey(x.product.id, x.variant?.id, x.selectedLetters) !== key
           ? [x]
           : x.quantity + n <= 0
             ? []
@@ -798,6 +829,7 @@ function SaleScreen({
         p_items: cart.map((x) => ({
           product_id: x.product.id,
           variant_id: x.variant?.id ?? null,
+          selected_letters: x.selectedLetters,
           quantity: x.quantity,
         })),
         p_payment_method: payment,
@@ -837,7 +869,11 @@ function SaleScreen({
         <ScrollView contentContainerStyle={s.scroll}>
           <Step number="2">Check quantity, then choose payment.</Step>
           {cart.map((x) => {
-            const key = cartKey(x.product.id, x.variant?.id);
+            const key = cartKey(
+              x.product.id,
+              x.variant?.id,
+              x.selectedLetters,
+            );
             return (
               <View key={key} style={s.cartRow}>
                 {x.product.image_url ? (
@@ -855,6 +891,11 @@ function SaleScreen({
                   {x.variant ? (
                     <Text style={s.variantChosen}>
                       {x.product.variant_label ?? "Choice"}: {x.variant.name}
+                    </Text>
+                  ) : null}
+                  {x.selectedLetters.length ? (
+                    <Text style={s.variantChosen}>
+                      {x.product.alphabet_style?.name ?? "Letters"}: {x.selectedLetters.join(" · ")}
                     </Text>
                   ) : null}
                   <Text style={s.rowHelp}>{peso(x.unitPrice)} each</Text>
@@ -1037,7 +1078,12 @@ function SaleScreen({
               <Text style={s.productPrice}>
                 {price === null ? "No price" : peso(price)}
               </Text>
-              {item.variants.length ? (
+              {item.letters_required > 0 ? (
+                <Text style={s.variantHint}>
+                  Choose {item.letters_required} letter
+                  {item.letters_required === 1 ? "" : "s"} · {item.alphabet_style?.name}
+                </Text>
+              ) : item.variants.length ? (
                 <Text style={s.variantHint}>
                   Choose {item.variant_label ?? "option"}
                 </Text>
@@ -1075,20 +1121,57 @@ function SaleScreen({
             <View style={s.variantHeader}>
               <View style={s.flex}>
                 <Text style={s.variantKicker}>
-                  CHOOSE {choosing?.variant_label?.toUpperCase() ?? "OPTION"}
+                  {choosing?.letters_required
+                    ? `CHOOSE ${choosing.letters_required} LETTER${choosing.letters_required === 1 ? "" : "S"}`
+                    : `CHOOSE ${choosing?.variant_label?.toUpperCase() ?? "OPTION"}`}
                 </Text>
                 <Text style={s.variantTitle}>{choosing?.name}</Text>
+                {choosing?.letters_required ? (
+                  <Text style={s.variantChosen}>
+                    {choosing.alphabet_style?.name ?? "Alphabet"}: {chosenLetters.length ? chosenLetters.join(" · ") : "Tap letters below"}
+                  </Text>
+                ) : null}
               </View>
               <Pressable
                 accessibilityLabel="Close choices"
                 style={s.guideClose}
-                onPress={() => setChoosing(null)}
+                onPress={() => {
+                  setChoosing(null);
+                  setChosenLetters([]);
+                }}
               >
                 <Ionicons name="close" size={24} color={C.muted} />
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={s.variantGrid}>
-              {choosing?.variants.map((variant) => {
+              {choosing?.letters_required
+                ? choosing.alphabet_style?.letters.map((item) => {
+                    const alreadyChosen = chosenLetters.filter(
+                      (letter) => letter === item.letter,
+                    ).length;
+                    const unavailable =
+                      item.needs_stock_count ||
+                      item.quantity_on_hand <= alreadyChosen ||
+                      chosenLetters.length >= choosing.letters_required;
+                    return (
+                      <Pressable
+                        key={item.letter}
+                        style={[s.variantButton, unavailable && s.disabled]}
+                        disabled={unavailable}
+                        onPress={() =>
+                          setChosenLetters((old) => [...old, item.letter])
+                        }
+                      >
+                        <Text style={s.variantButtonText}>{item.letter}</Text>
+                        <Text style={[s.variantStock, unavailable && s.low]}>
+                          {item.needs_stock_count
+                            ? "Count stock"
+                            : `${item.quantity_on_hand} left`}
+                        </Text>
+                      </Pressable>
+                    );
+                  })
+                : choosing?.variants.map((variant) => {
                 const unavailable = variant.quantity_on_hand <= 0;
                 return (
                   <Pressable
@@ -1104,6 +1187,32 @@ function SaleScreen({
                   </Pressable>
                 );
               })}
+              {choosing?.letters_required ? (
+                <View style={s.totalBox}>
+                  <Text style={s.totalLabel}>
+                    {chosenLetters.length} of {choosing.letters_required} selected
+                  </Text>
+                  <View style={s.choiceRow}>
+                    <Pressable
+                      style={s.alphabetButton}
+                      disabled={!chosenLetters.length}
+                      onPress={() => setChosenLetters((old) => old.slice(0, -1))}
+                    >
+                      <Text style={s.alphabetText}>Undo last</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        s.reviewButton,
+                        chosenLetters.length !== choosing.letters_required && s.disabled,
+                      ]}
+                      disabled={chosenLetters.length !== choosing.letters_required}
+                      onPress={() => add(choosing, null, chosenLetters)}
+                    >
+                      <Text style={s.reviewText}>Add to sale</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
             </ScrollView>
           </View>
         </SafeAreaView>
@@ -1150,7 +1259,9 @@ function Dashboard({
     .forEach((item) => {
       const name = item.variant_name
         ? `${item.product_name} · ${item.variant_name}`
-        : item.product_name;
+        : item.selected_letters?.length
+          ? `${item.product_name} · ${item.selected_letters.join("")}`
+          : item.product_name;
       map.set(name, (map.get(name) ?? 0) + Number(item.quantity));
     });
   const sold = [...map]
@@ -1235,6 +1346,9 @@ function Dashboard({
                 >
                   {item.quantity} × {item.product_name}
                   {item.variant_name ? ` · ${item.variant_name}` : ""}
+                  {item.selected_letters?.length
+                    ? ` · ${item.selected_letters.join("")}`
+                    : ""}
                 </Text>
               ))}
             </View>
@@ -1732,6 +1846,7 @@ function Inventory({
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
     null,
   );
+  const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [quantity, setQuantity] = useState("");
   const [mode, setMode] = useState<"stock_in" | "damage">("stock_in");
   const categoryName = (id: string | null) =>
@@ -1748,7 +1863,16 @@ function Inventory({
         "Check quantity",
         "Enter a whole number greater than zero.",
       );
-    const { error } = selectedVariant
+    const { error } = selectedLetter && selected.alphabet_style
+      ? await supabase.rpc("record_alphabet_inventory_movement", {
+          p_location_id: locationId,
+          p_style_id: selected.alphabet_style.id,
+          p_letter: selectedLetter,
+          p_type: mode,
+          p_quantity: amount,
+          p_note: mode === "damage" ? "Damaged alphabet letter" : "Alphabet stock added",
+        })
+      : selectedVariant
       ? await supabase.rpc("record_variant_inventory_movement", {
           p_location_id: locationId,
           p_variant_id: selectedVariant.id,
@@ -1767,6 +1891,7 @@ function Inventory({
     if (error) return Alert.alert("Stock not saved", error.message);
     setSelected(null);
     setSelectedVariant(null);
+    setSelectedLetter(null);
     setQuantity("");
     await onSaved();
     Alert.alert(
@@ -1776,6 +1901,31 @@ function Inventory({
         : `${amount} added to stock.`,
     );
   };
+  if (
+    selected?.name.startsWith("Extra Alphabet -") &&
+    selected.alphabet_style &&
+    !selectedLetter
+  )
+    return (
+      <View style={s.flex}>
+        <Back title={`Choose ${selected.alphabet_style.name} letter`} onPress={() => setSelected(null)} />
+        <FlatList
+          data={selected.alphabet_style.letters}
+          keyExtractor={(item) => item.letter}
+          contentContainerStyle={s.list}
+          renderItem={({ item }) => (
+            <Pressable style={s.listRow} onPress={() => setSelectedLetter(item.letter)}>
+              <View style={s.variantLetter}><Text style={s.variantLetterText}>{item.letter}</Text></View>
+              <View style={s.flex}>
+                <Text style={s.rowTitle}>Letter {item.letter}</Text>
+                <Text style={s.rowHelp}>{item.needs_stock_count ? "Stock count needed" : `${item.quantity_on_hand} currently in stock`}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={22} color={C.teal} />
+            </Pressable>
+          )}
+        />
+      </View>
+    );
   if (selected && selected.variants.length && !selectedVariant)
     return (
       <View style={s.flex}>
@@ -1817,6 +1967,7 @@ function Inventory({
           title="Update stock"
           onPress={() => {
             if (selectedVariant) setSelectedVariant(null);
+            else if (selectedLetter) setSelectedLetter(null);
             else setSelected(null);
           }}
         />
@@ -1838,11 +1989,17 @@ function Inventory({
                 <Text style={s.variantChosen}>
                   {selected.variant_label ?? "Choice"}: {selectedVariant.name}
                 </Text>
+              ) : selectedLetter ? (
+                <Text style={s.variantChosen}>
+                  {selected.alphabet_style?.name} letter {selectedLetter}
+                </Text>
               ) : null}
             </View>
           </View>
           <Text style={s.stockBig}>
-            {selectedVariant?.quantity_on_hand ?? selected.quantity_on_hand}
+            {selectedLetter
+              ? (selected.alphabet_style?.letters.find((item) => item.letter === selectedLetter)?.quantity_on_hand ?? 0)
+              : (selectedVariant?.quantity_on_hand ?? selected.quantity_on_hand)}
           </Text>
           <Text style={s.stockLabel}>currently in stock</Text>
           <Text style={s.section}>What happened?</Text>

@@ -19,6 +19,16 @@ export interface ProductVariant {
   quantity_on_hand: number;
   active: boolean;
 }
+export interface AlphabetLetter {
+  letter: string;
+  quantity_on_hand: number;
+  needs_stock_count: boolean;
+}
+export interface AlphabetStyle {
+  id: string;
+  name: string;
+  letters: AlphabetLetter[];
+}
 export interface Product {
   id: string;
   business_id: string;
@@ -27,6 +37,8 @@ export interface Product {
   sale_price: number | null;
   image_url: string | null;
   variant_label: string | null;
+  letters_required: number;
+  alphabet_style: AlphabetStyle | null;
   variants: ProductVariant[];
   quantity_on_hand: number;
   low_stock_threshold: number;
@@ -39,6 +51,7 @@ export interface CartItem {
   variant: ProductVariant | null;
   quantity: number;
   unitPrice: number;
+  selectedLetters: string[];
 }
 export interface Profile {
   id: string;
@@ -58,6 +71,7 @@ export interface SaleItemSummary {
   product_name: string;
   variant_name: string | null;
   quantity: number;
+  selected_letters: string[] | null;
 }
 export interface Sale {
   id: string;

@@ -19,6 +19,7 @@ type Period = "daily" | "weekly" | "monthly";
 type SaleItem = {
   product_name: string;
   variant_name: string | null;
+  selected_letters: string[] | null;
   quantity: number;
   unit_price: number;
   line_total: number;
@@ -192,7 +193,7 @@ export function ReportsScreen({
       supabase
         .from("sales")
         .select(
-          "id,receipt_number,payment_method,total,status,created_at,voided_at,payment_confirmed_at,payment_reference,staff:profiles!sales_created_by_fkey(display_name),sale_items(product_name,variant_name,quantity,unit_price,line_total)",
+          "id,receipt_number,payment_method,total,status,created_at,voided_at,payment_confirmed_at,payment_reference,staff:profiles!sales_created_by_fkey(display_name),sale_items(product_name,variant_name,selected_letters,quantity,unit_price,line_total)",
         )
         .eq("location_id", locationId)
         .gte("created_at", start)
@@ -248,7 +249,9 @@ export function ReportsScreen({
       .forEach((i) => {
         const displayName = i.variant_name
           ? `${i.product_name} · ${i.variant_name}`
-          : i.product_name;
+          : i.selected_letters?.length
+            ? `${i.product_name} · ${i.selected_letters.join("")}`
+            : i.product_name;
         const old = map.get(displayName) ?? {
           name: displayName,
           units: 0,
@@ -261,6 +264,15 @@ export function ReportsScreen({
     return [...map.values()].sort(
       (a, b) => b.units - a.units || b.revenue - a.revenue,
     );
+  }, [completed]);
+  const popularLetters = useMemo(() => {
+    const map = new Map<string, number>();
+    completed.flatMap((sale) => sale.sale_items).forEach((item) => {
+      item.selected_letters?.forEach((letter) =>
+        map.set(letter, (map.get(letter) ?? 0) + Number(item.quantity)),
+      );
+    });
+    return [...map].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [completed]);
   const daily = useMemo(() => {
     const rows = [];
@@ -312,6 +324,7 @@ export function ReportsScreen({
           "Staff",
           "Product",
           "Variant",
+          "Selected Letters",
           "Quantity",
           "Unit Price",
           "Line Total",
@@ -334,6 +347,7 @@ export function ReportsScreen({
               s.staff?.display_name ?? "",
               i.product_name,
               i.variant_name ?? "",
+              i.selected_letters?.join("") ?? "",
               i.quantity,
               i.unit_price,
               i.line_total,
@@ -352,6 +366,7 @@ export function ReportsScreen({
                   minute: "2-digit",
                 }),
                 s.staff?.display_name ?? "",
+                "",
                 "",
                 "",
                 0,
@@ -520,6 +535,18 @@ export function ReportsScreen({
           ) : (
             <Text style={s.empty}>No product sales in this period.</Text>
           )}
+          {popularLetters.length ? (
+            <>
+              <Text style={s.section}>Letters to make more of</Text>
+              {popularLetters.slice(0, 10).map(([letter, units], index) => (
+                <View key={letter} style={s.row}>
+                  <Text style={s.rank}>{index + 1}</Text>
+                  <Text style={s.rowName}>Letter {letter}</Text>
+                  <Text style={s.rowValue}>{units} used</Text>
+                </View>
+              ))}
+            </>
+          ) : null}
           <Pressable style={s.export} onPress={exportCsv}>
             <Ionicons name="download-outline" size={23} color="#FFF" />
             <Text style={s.exportText}>Export for Excel</Text>
@@ -538,7 +565,7 @@ export function ReportsScreen({
                     {sale.sale_items
                       .map(
                         (i) =>
-                          `${i.product_name}${i.variant_name ? ` · ${i.variant_name}` : ""} × ${i.quantity}`,
+                          `${i.product_name}${i.variant_name ? ` · ${i.variant_name}` : ""}${i.selected_letters?.length ? ` · ${i.selected_letters.join("")}` : ""} × ${i.quantity}`,
                       )
                       .join(", ")}
                   </Text>
