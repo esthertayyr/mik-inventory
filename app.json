@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Mik",
+    "slug": "mik",
+    "version": "0.1.0",
+    "icon": "./assets/mik-app-icon.png",
+    "orientation": "portrait",
+    "scheme": "mik",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Mik to choose product photos for this shop."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "icon": "./assets/mik-app-icon.png",
+      "bundleIdentifier": "com.esther.mik"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/mik-app-icon.png",
+        "backgroundColor": "#F7FAFF"
+      },
+      "package": "com.esther.mik"
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/mik-app-icon.png",
+      "output": "single"
+    }
+  }
+}
