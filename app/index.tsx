@@ -260,6 +260,7 @@ function PlatformAdmin() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [openShop, setOpenShop] = useState<AdminShop | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -300,6 +301,13 @@ function PlatformAdmin() {
       `${clean} can now log in to this shop.`,
     );
   };
+  if (openShop)
+    return (
+      <ShopApp
+        adminBusiness={openShop}
+        onAdminExit={() => setOpenShop(null)}
+      />
+    );
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -387,6 +395,14 @@ function PlatformAdmin() {
               <View style={s.statusPill}>
                 <Text style={s.statusText}>ACTIVE</Text>
               </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${shop.name}`}
+                style={s.adminSignout}
+                onPress={() => setOpenShop(shop)}
+              >
+                <Ionicons name="enter-outline" size={22} color={C.green} />
+              </Pressable>
             </View>
           ))
         )}
@@ -395,7 +411,15 @@ function PlatformAdmin() {
   );
 }
 
-function ShopApp({ session }: { session: Session }) {
+function ShopApp({
+  session,
+  adminBusiness,
+  onAdminExit,
+}: {
+  session?: Session;
+  adminBusiness?: AdminShop;
+  onAdminExit?: () => void;
+}) {
   const [screen, setScreen] = useState<Screen>("sale");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
@@ -484,6 +508,21 @@ function ShopApp({ session }: { session: Session }) {
   );
   const initialize = useCallback(async () => {
     setLoading(true);
+    if (adminBusiness) {
+      setProfile({ id: "platform-admin", display_name: "Owner" });
+      const b = { id: adminBusiness.id, name: adminBusiness.name, role: "owner" } as Business;
+      setBusiness(b);
+      const { data: ld } = await supabase.from("locations").select("id,business_id,name").eq("business_id", b.id).eq("active", true).order("name");
+      const list = (ld ?? []) as Location[];
+      const first = list[0]?.id ?? "";
+      setLocations(list);
+      setLocationId(first);
+      if (first) await loadData(b.id, first);
+      setNeedsSetup(false);
+      setLoading(false);
+      return;
+    }
+    if (!session) return;
     const [{ data: p }, { data: m }] = await Promise.all([
       supabase
         .from("profiles")
@@ -521,22 +560,22 @@ function ShopApp({ session }: { session: Session }) {
     if (first) await loadData(b.id, first);
     setNeedsSetup(false);
     setLoading(false);
-  }, [loadData, session.user.id]);
+  }, [adminBusiness, loadData, session]);
   useEffect(() => {
     initialize();
   }, [initialize]);
   useEffect(() => {
     if (loading || needsSetup || !business) return;
-    const key = `mik-guide-v1-${session.user.id}`;
+    const key = `mik-guide-v1-${session?.user.id ?? "platform-admin"}`;
     AsyncStorage.getItem(key)
       .then((seen) => {
         if (seen !== "done") setGuideOpen(true);
       })
       .catch(() => setGuideOpen(true));
-  }, [business, loading, needsSetup, session.user.id]);
+  }, [business, loading, needsSetup, session?.user.id]);
   const closeGuide = async () => {
     setGuideOpen(false);
-    await AsyncStorage.setItem(`mik-guide-v1-${session.user.id}`, "done").catch(
+    await AsyncStorage.setItem(`mik-guide-v1-${session?.user.id ?? "platform-admin"}`, "done").catch(
       () => undefined,
     );
   };
@@ -621,6 +660,11 @@ function ShopApp({ session }: { session: Session }) {
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
       <View style={s.top}>
+        {onAdminExit ? (
+          <Pressable accessibilityLabel="Back to all shops" style={s.backButton} onPress={onAdminExit}>
+            <Ionicons name="arrow-back" size={23} color={C.ink} />
+          </Pressable>
+        ) : null}
         <Image
           source={require("../assets/mik-app-icon.png")}
           style={s.shopLogo}

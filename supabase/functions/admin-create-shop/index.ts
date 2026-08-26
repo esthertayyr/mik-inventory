@@ -62,6 +62,13 @@ Deno.serve(async (request: Request) => {
     if (profileError) throw profileError;
     const { error: membershipError } = await admin.from('business_memberships').insert({ user_id: created.user.id, business_id: businessId, role: 'owner', default_location_id: location.id });
     if (membershipError) throw membershipError;
+    const { error: adminMembershipError } = await admin.from('business_memberships').upsert({
+      user_id: authData.user.id,
+      business_id: businessId,
+      role: 'owner',
+      default_location_id: location.id,
+    });
+    if (adminMembershipError) throw adminMembershipError;
 
     return reply({ shopId: businessId, username });
   } catch (error) {
