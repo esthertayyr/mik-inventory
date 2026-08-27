@@ -1483,22 +1483,22 @@ function SaleScreen({
                   </Pressable>
                 );
               })}
-              {choosing?.letters_required ? (
-                <View style={s.letterFooter}>
-                  <Text style={s.letterCount}>
-                    {chosenLetters.length} of {choosing.letters_required} selected
-                  </Text>
-                  <Pressable
-                    style={[s.letterAddButton, chosenLetters.length !== choosing.letters_required && s.disabled]}
-                    disabled={chosenLetters.length !== choosing.letters_required}
-                    onPress={() => add(choosing, null, chosenLetters)}
-                  >
-                    <Ionicons name="cart-outline" size={24} color={C.white} />
-                    <Text style={s.letterAddText}>Add to sale</Text>
-                  </Pressable>
-                </View>
-              ) : null}
             </ScrollView>
+            {choosing?.letters_required ? (
+              <View style={s.letterFooter}>
+                <Text style={s.letterCount}>
+                  {chosenLetters.length} of {choosing.letters_required} selected
+                </Text>
+                <Pressable
+                  style={[s.letterAddButton, chosenLetters.length !== choosing.letters_required && s.disabled]}
+                  disabled={chosenLetters.length !== choosing.letters_required}
+                  onPress={() => add(choosing, null, chosenLetters)}
+                >
+                  <Ionicons name="cart-outline" size={24} color={C.white} />
+                  <Text style={s.letterAddText}>Add to sale</Text>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         </SafeAreaView>
       </Modal>
@@ -3352,7 +3352,7 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  disabled: { opacity: 0.48 },
+  disabled: { opacity: 0.78 },
   productOn: {
     borderWidth: 2.5,
     borderColor: C.green,
@@ -4190,10 +4190,10 @@ const s = StyleSheet.create({
   designStock: { marginTop: 3, color: C.muted, fontSize: 14, fontWeight: "700" },
   letterFooter: {
     width: "100%",
-    marginTop: 8,
-    paddingTop: 16,
+    padding: 16,
     borderTopWidth: 1,
     borderTopColor: C.border,
+    backgroundColor: C.white,
   },
   letterCount: {
     color: C.ink,
