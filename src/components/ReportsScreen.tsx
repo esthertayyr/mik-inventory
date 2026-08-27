@@ -578,8 +578,8 @@ export function ReportsScreen({
           {sales.length ? (
             sales.map((sale) => (
               <View key={sale.id} style={s.sale}>
-                <View>
-                  <Text style={s.rowName}>SALE-{sale.receipt_number}</Text>
+                <View style={s.saleMain}>
+                  <Text style={s.saleName}>SALE-{sale.receipt_number}</Text>
                   <Text style={s.rowSmall}>
                     {new Date(sale.created_at).toLocaleString("en-PH")} ·{" "}
                     {publicShopName(sale.staff?.display_name) || "Staff"}
@@ -809,14 +809,25 @@ const s = StyleSheet.create({
   },
   exportText: { color: "#FFF", fontSize: 15, fontWeight: "900" },
   sale: {
+    width: "100%",
+    minHeight: 104,
     padding: 13,
     backgroundColor: "#FFF",
     borderBottomWidth: 1,
     borderColor: "#EEEAE3",
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 10,
   },
-  saleRight: { alignItems: "flex-end", maxWidth: "35%" },
+  saleMain: { flex: 1, minWidth: 0, paddingRight: 6 },
+  saleName: { fontSize: 15, fontWeight: "900", color: "#16283A" },
+  saleRight: {
+    minWidth: 112,
+    maxWidth: "38%",
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
   error: {
     padding: 14,
     color: "#8E3049",
