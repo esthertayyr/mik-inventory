@@ -1332,7 +1332,7 @@ function SaleScreen({
                 ]}
               >
                 {item.needs_stock_count
-                  ? "Stock count needed"
+                  ? "? left"
                   : item.quantity_on_hand <= 0
                     ? "Out of stock"
                     : `${item.quantity_on_hand} in stock`}
@@ -1478,7 +1478,7 @@ function SaleScreen({
                           {selected
                             ? "Selected"
                             : item.needs_stock_count
-                            ? "Count stock"
+                            ? "? left"
                             : `${item.quantity_on_hand} left`}
                         </Text>
                       </Pressable>
