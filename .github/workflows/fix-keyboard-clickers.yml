@@ -1,0 +1,78 @@
+name: Fix keyboard clicker sales
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-keyboard-clickers.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch keyboard clicker stock handling
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('app/index.tsx')
+          text = path.read_text()
+
+          old = '''  const cartKey = (\n    productId: string,\n    variantId?: string | null,\n    letters: string[] = [],\n  ) => `${productId}:${variantId ?? "main"}:${letters.join("")}`;\n'''
+          new = old + '''  const alphabetAvailability = (p: Product, letters: string[]) => {\n    if (p.letters_required <= 0 || !p.alphabet_style || letters.length !== p.letters_required)\n      return null;\n    const counts = new Map<string, number>();\n    letters.forEach((letter) => counts.set(letter, (counts.get(letter) ?? 0) + 1));\n    const limits = [...counts].map(([letter, needed]) => {\n      const stock = p.alphabet_style?.letters.find((item) => item.letter === letter);\n      if (!stock || stock.needs_stock_count) return 0;\n      return Math.floor(stock.quantity_on_hand / needed);\n    });\n    return limits.length ? Math.min(...limits) : 0;\n  };\n'''
+          if old not in text:
+            raise SystemExit('cartKey anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''    const price = variant?.price_override ?? p.sale_price ?? p.regular_price;\n    const available = variant?.quantity_on_hand ?? p.quantity_on_hand;\n'''
+          new = '''    const price = variant?.price_override ?? p.sale_price ?? p.regular_price;\n    const available =\n      alphabetAvailability(p, selectedLetters) ??\n      variant?.quantity_on_hand ??\n      p.quantity_on_hand;\n'''
+          if old not in text:
+            raise SystemExit('add availability anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''                  quantity: Math.min(\n                    x.variant?.quantity_on_hand ?? x.product.quantity_on_hand,\n                    x.quantity + n,\n                  ),\n'''
+          new = '''                  quantity: Math.min(\n                    alphabetAvailability(x.product, x.selectedLetters) ??\n                      x.variant?.quantity_on_hand ??\n                      x.product.quantity_on_hand,\n                    x.quantity + n,\n                  ),\n'''
+          if old not in text:
+            raise SystemExit('cart quantity anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''          const unavailable = item.quantity_on_hand <= 0 || price === null;\n'''
+          new = '''          const unavailable =\n            price === null ||\n            (item.letters_required <= 0 && item.quantity_on_hand <= 0);\n'''
+          if old not in text:
+            raise SystemExit('product card availability anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''                {item.needs_stock_count\n                  ? "? left"\n                  : item.quantity_on_hand <= 0\n                    ? "Out of stock"\n                    : `${item.quantity_on_hand} left`}\n'''
+          new = '''                {item.letters_required > 0\n                  ? "Choose letters"\n                  : item.needs_stock_count\n                    ? "? left"\n                    : item.quantity_on_hand <= 0\n                      ? "Out of stock"\n                      : `${item.quantity_on_hand} left`}\n'''
+          if old not in text:
+            raise SystemExit('stock label anchor not found')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text)
+
+          migration = Path('supabase/migrations/013_alphabet_products_use_letter_stock.sql')
+          migration.write_text(r'''-- Alphabet-based keyboard clickers are constrained by their selected letter stock.
+-- Keep their legacy product inventory row non-blocking so the checkout RPC does not
+-- reject a valid letter selection because an unrelated product counter is zero.
+
+update public.inventory_levels il
+set quantity_on_hand = greatest(il.quantity_on_hand, 1000000),
+    needs_stock_count = false,
+    updated_at = now()
+from public.products p
+where p.id = il.product_id
+  and p.letters_required > 0
+  and p.alphabet_style_id is not null;
+''')
+
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/index.tsx supabase/migrations/013_alphabet_products_use_letter_stock.sql
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix 5 and 6 slot keyboard clicker sales"
+          git push
