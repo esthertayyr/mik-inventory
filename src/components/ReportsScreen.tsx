@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -176,6 +178,9 @@ export function ReportsScreen({
   const [damage, setDamage] = useState<DamageRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [voidTarget, setVoidTarget] = useState<SaleRecord | null>(null);
+  const [managerPasscode, setManagerPasscode] = useState("");
+  const [voiding, setVoiding] = useState(false);
   const range = useMemo(
     () => bounds(period, offset, exactDate),
     [period, offset, exactDate],
@@ -408,6 +413,21 @@ export function ReportsScreen({
       );
     }
   };
+  const confirmVoid = async () => {
+    if (!voidTarget || !/^\d{4,8}$/.test(managerPasscode))
+      return Alert.alert("Enter the manager passcode", "Use the 4 to 8 digit shop passcode.");
+    setVoiding(true);
+    const { error: voidError } = await supabase.rpc("void_sale_with_passcode", {
+      p_sale_id: voidTarget.id,
+      p_passcode: managerPasscode,
+    });
+    setVoiding(false);
+    if (voidError) return Alert.alert("Sale not corrected", voidError.message);
+    setVoidTarget(null);
+    setManagerPasscode("");
+    await load();
+    Alert.alert("Sale removed from totals", "The original entry remains in the history as cancelled and its stock was restored.");
+  };
 
   return (
     <ScrollView contentContainerStyle={s.page}>
@@ -576,6 +596,12 @@ export function ReportsScreen({
                     {sale.payment_method.toUpperCase()} ·{" "}
                     {sale.status.toUpperCase()}
                   </Text>
+                  {sale.status === "completed" ? (
+                    <Pressable style={s.voidButton} onPress={() => setVoidTarget(sale)}>
+                      <Ionicons name="create-outline" size={17} color="#B84457" />
+                      <Text style={s.voidText}>Correct sale</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
             ))
@@ -584,6 +610,17 @@ export function ReportsScreen({
           )}
         </>
       )}
+      <Modal visible={!!voidTarget} transparent animationType="fade" onRequestClose={() => setVoidTarget(null)}>
+        <View style={s.modalShade}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Correct this sale?</Text>
+            <Text style={s.modalHelp}>SALE-{voidTarget?.receipt_number} will be marked cancelled, removed from totals, and its stock restored. It will not be permanently deleted.</Text>
+            <TextInput style={s.passcodeInput} value={managerPasscode} onChangeText={setManagerPasscode} keyboardType="number-pad" secureTextEntry maxLength={8} placeholder="Manager passcode" />
+            <Pressable style={s.confirmVoid} onPress={confirmVoid} disabled={voiding}><Text style={s.confirmVoidText}>{voiding ? "Correcting…" : "Confirm correction"}</Text></Pressable>
+            <Pressable style={s.cancelVoid} onPress={() => { setVoidTarget(null); setManagerPasscode(""); }}><Text style={s.cancelVoidText}>Keep sale</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -599,9 +636,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 const s = StyleSheet.create({
   page: { paddingBottom: 32 },
   title: { fontSize: 28, fontWeight: "900", color: "#24324A", marginTop: 16 },
-  tabs: { flexDirection: "row", gap: 8, marginTop: 10 },
+  tabs: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
   tab: {
     flex: 1,
+    minWidth: 88,
     minHeight: 50,
     justifyContent: "center",
     borderRadius: 17,
@@ -611,6 +649,17 @@ const s = StyleSheet.create({
   tabOn: { backgroundColor: "#5577F6" },
   tabText: { fontSize: 13, fontWeight: "900", color: "#68758B" },
   tabTextOn: { color: "#FFF" },
+  voidButton: { marginTop: 8, minHeight: 38, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 12, backgroundColor: "#FFE8EC" },
+  voidText: { color: "#B84457", fontSize: 12, fontWeight: "900" },
+  modalShade: { flex: 1, padding: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(24,35,52,0.48)" },
+  modalCard: { width: "100%", maxWidth: 420, padding: 22, borderRadius: 26, backgroundColor: "#FFF" },
+  modalTitle: { color: "#24324A", fontSize: 23, fontWeight: "900" },
+  modalHelp: { marginTop: 7, color: "#68758B", fontSize: 15, lineHeight: 22 },
+  passcodeInput: { minHeight: 56, marginTop: 16, paddingHorizontal: 16, borderWidth: 1.5, borderColor: "#DDE3F0", borderRadius: 17, color: "#24324A", fontSize: 20, textAlign: "center", letterSpacing: 4 },
+  confirmVoid: { minHeight: 54, marginTop: 12, alignItems: "center", justifyContent: "center", borderRadius: 17, backgroundColor: "#C94F62" },
+  confirmVoidText: { color: "#FFF", fontSize: 16, fontWeight: "900" },
+  cancelVoid: { minHeight: 48, alignItems: "center", justifyContent: "center" },
+  cancelVoidText: { color: "#68758B", fontSize: 15, fontWeight: "800" },
   dateTools: { marginTop: 10, flexDirection: "row", gap: 8 },
   chooseDate: {
     flex: 1,

@@ -11,9 +11,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFonts } from "expo-font";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { StatusBar } from "expo-status-bar";
@@ -101,6 +103,16 @@ function productIcon(name: string, category = ""): Icon {
   if (n.includes("fidget")) return "sync";
   return categoryIcon(category);
 }
+function placeholderImage(name: string) {
+  const value = name.toLowerCase();
+  if (value.includes("keyboard") || value.includes("clicker"))
+    return require("../assets/product-placeholders/keyboard-clicker.png");
+  if (value.includes("dragon"))
+    return require("../assets/product-placeholders/rainbow-dragon.png");
+  if (value.includes("starfish"))
+    return require("../assets/product-placeholders/starfish-fidget.png");
+  return null;
+}
 const ownerNav: {
   id: Screen;
   label: string;
@@ -139,12 +151,15 @@ const ownerNav: {
 ];
 
 export default function Home() {
+  const [iconsReady] = useFonts(Ionicons.font);
   const [session, setSession] = useState<Session | null>(null);
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => data.subscription.unsubscribe();
   }, []);
+  if (!iconsReady)
+    return <SafeAreaView style={s.loading}><ActivityIndicator size="large" color={C.green} /></SafeAreaView>;
   return session ? <SignedIn session={session} /> : <Login />;
 }
 
@@ -772,6 +787,8 @@ function SaleScreen({
   locationId: string;
   onSaved: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  const productColumns = width >= 980 ? 4 : width >= 700 ? 3 : 2;
   const [category, setCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -1109,8 +1126,9 @@ function SaleScreen({
   return (
     <View style={s.flex}>
       <FlatList
+        key={`products-${productColumns}`}
         data={filtered}
-        numColumns={2}
+        numColumns={productColumns}
         keyExtractor={(p) => p.id}
         columnWrapperStyle={s.productRow}
         contentContainerStyle={[
@@ -1164,9 +1182,9 @@ function SaleScreen({
               onPress={() => add(item)}
             >
               <View style={s.productVisual}>
-                {item.image_url ? (
+                {item.image_url || placeholderImage(item.name) ? (
                   <Image
-                    source={{ uri: item.image_url }}
+                    source={item.image_url ? { uri: item.image_url } : placeholderImage(item.name)}
                     style={s.productCardImage}
                   />
                 ) : (
@@ -1518,6 +1536,10 @@ function Products({
   const [pickedUri, setPickedUri] = useState<string | null>(null);
   const [pickedMime, setPickedMime] = useState("image/jpeg");
   const [saving, setSaving] = useState(false);
+  const [managingCategories, setManagingCategories] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryBusy, setCategoryBusy] = useState(false);
   const category = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? "Other";
   const reset = () => {
@@ -1607,6 +1629,29 @@ function Products({
       ).join(", "),
     );
   };
+  const saveCategory = async () => {
+    const clean = categoryName.trim();
+    if (!clean) return Alert.alert("Enter a category name");
+    setCategoryBusy(true);
+    const result = editingCategory
+      ? await supabase.from("categories").update({ name: clean }).eq("id", editingCategory.id)
+      : await supabase.from("categories").insert({ business_id: businessId, name: clean });
+    setCategoryBusy(false);
+    if (result.error) return Alert.alert("Category not saved", result.error.message);
+    setCategoryName("");
+    setEditingCategory(null);
+    await onSaved();
+  };
+  const deleteCategory = (item: Category) =>
+    Alert.alert("Remove this category?", `Products in ${item.name} will remain available and can be moved to another category.`, [
+      { text: "Keep it", style: "cancel" },
+      { text: "Remove category", style: "destructive", onPress: async () => {
+        const { error } = await supabase.from("categories").update({ active: false }).eq("id", item.id);
+        if (error) return Alert.alert("Category not removed", error.message);
+        if (categoryId === item.id) setCategoryId(null);
+        await onSaved();
+      } },
+    ]);
   const save = async () => {
     const cleanName = name.trim();
     const prices = numbers();
@@ -1722,6 +1767,7 @@ function Products({
   };
   if (selected || creating) {
     const image = pickedUri ?? selected?.image_url ?? null;
+    const placeholder = selected ? placeholderImage(selected.name) : null;
     return (
       <ScrollView contentContainerStyle={s.scroll}>
         <Back
@@ -1730,8 +1776,8 @@ function Products({
         />
         <View style={s.editCard}>
           <View style={s.productPhoto}>
-            {image ? (
-              <Image source={{ uri: image }} style={s.productPhotoImage} />
+            {image || placeholder ? (
+              <Image source={image ? { uri: image } : placeholder} style={s.productPhotoImage} />
             ) : (
               <View style={s.missingPhoto}>
                 <Text style={s.missingPhotoText}>PRODUCT PHOTO NEEDED</Text>
@@ -1751,6 +1797,10 @@ function Products({
             placeholder="Example: Blue keychain"
           />
           <Label>Category</Label>
+          <Pressable style={s.manageCategoryButton} onPress={() => setManagingCategories(true)}>
+            <Ionicons name="settings-outline" size={20} color={C.dark} />
+            <Text style={s.manageCategoryText}>Add or manage categories</Text>
+          </Pressable>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1889,6 +1939,28 @@ function Products({
       </ScrollView>
     );
   }
+  if (managingCategories) {
+    return (
+      <ScrollView contentContainerStyle={s.scroll}>
+        <Back title="Product categories" onPress={() => { setManagingCategories(false); setEditingCategory(null); setCategoryName(""); }} />
+        <View style={s.editCard}>
+          <Text style={s.rowTitle}>{editingCategory ? "Rename category" : "Add a category"}</Text>
+          <TextInput style={s.input} value={categoryName} onChangeText={setCategoryName} placeholder="Example: Keychains" />
+          <BigButton label={categoryBusy ? "Saving…" : editingCategory ? "Save category name" : "Add category"} icon="add-circle-outline" onPress={saveCategory} disabled={categoryBusy} />
+          {editingCategory ? <Pressable style={s.cancelCategory} onPress={() => { setEditingCategory(null); setCategoryName(""); }}><Text style={s.cancelCategoryText}>Cancel rename</Text></Pressable> : null}
+        </View>
+        <Text style={[s.rowTitle, { marginTop: 20 }]}>Current categories</Text>
+        {categories.map((item) => (
+          <View key={item.id} style={s.categoryManageRow}>
+            <View style={s.categoryManageIcon}><Ionicons name={categoryIcon(item.name)} size={22} color={C.dark} /></View>
+            <Text style={[s.rowTitle, s.flex]}>{item.name}</Text>
+            <Pressable accessibilityLabel={`Rename ${item.name}`} style={s.smallAction} onPress={() => { setEditingCategory(item); setCategoryName(item.name); }}><Ionicons name="pencil-outline" size={21} color={C.dark} /></Pressable>
+            <Pressable accessibilityLabel={`Remove ${item.name}`} style={[s.smallAction, s.smallActionDanger]} onPress={() => deleteCategory(item)}><Ionicons name="trash-outline" size={21} color={C.red} /></Pressable>
+          </View>
+        ))}
+      </ScrollView>
+    );
+  }
   return (
     <View style={s.flex}>
       <Back title="Products" onPress={onBack} />
@@ -1897,6 +1969,10 @@ function Products({
         icon="add-circle-outline"
         onPress={startCreate}
       />
+      <Pressable style={s.manageCategoryButton} onPress={() => setManagingCategories(true)}>
+        <Ionicons name="albums-outline" size={20} color={C.dark} />
+        <Text style={s.manageCategoryText}>Add, rename or remove categories</Text>
+      </Pressable>
       <Search value={search} onChange={setSearch} />
       <FlatList
         data={products.filter((p) =>
@@ -1906,8 +1982,8 @@ function Products({
         contentContainerStyle={s.list}
         renderItem={({ item }) => (
           <Pressable style={s.listRow} onPress={() => open(item)}>
-            {item.image_url ? (
-              <Image source={{ uri: item.image_url }} style={s.listImage} />
+            {item.image_url || placeholderImage(item.name) ? (
+              <Image source={item.image_url ? { uri: item.image_url } : placeholderImage(item.name)} style={s.listImage} />
             ) : (
               <View style={s.listMissingPhoto}>
                 <Text style={s.listMissingText}>PHOTO{`\n`}NEEDED</Text>
@@ -2833,7 +2909,7 @@ const s = StyleSheet.create({
   content: {
     flex: 1,
     width: "100%",
-    maxWidth: 900,
+    maxWidth: 1180,
     alignSelf: "center",
     paddingHorizontal: 16,
   },
@@ -2845,6 +2921,9 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: C.border,
     backgroundColor: C.white,
+    width: "100%",
+    maxWidth: 1180,
+    alignSelf: "center",
   },
   navItem: {
     flex: 1,
@@ -3008,7 +3087,7 @@ const s = StyleSheet.create({
     backgroundColor: "#FCFDFF",
   },
   productVisual: {
-    height: 104,
+    aspectRatio: 1,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
@@ -3016,7 +3095,7 @@ const s = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: "#EEF2F7",
   },
-  productCardImage: { width: "100%", height: "100%" },
+  productCardImage: { width: "100%", height: "100%", resizeMode: "cover" },
   missingPhoto: {
     width: "100%",
     height: "100%",
@@ -3330,14 +3409,16 @@ const s = StyleSheet.create({
   },
   productPhoto: {
     width: "100%",
-    height: 190,
+    maxWidth: 420,
+    aspectRatio: 1,
+    alignSelf: "center",
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 22,
     backgroundColor: "#EEF2F7",
   },
-  productPhotoImage: { width: "100%", height: "100%" },
+  productPhotoImage: { width: "100%", height: "100%", resizeMode: "cover" },
   priceInput: {
     minHeight: 60,
     paddingHorizontal: 16,
@@ -3378,7 +3459,15 @@ const s = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: C.accentSoft,
   },
-  listImage: { width: 52, height: 52, borderRadius: 14 },
+  listImage: { width: 58, height: 58, borderRadius: 16, resizeMode: "cover" },
+  manageCategoryButton: { minHeight: 48, marginTop: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 16, backgroundColor: C.soft },
+  manageCategoryText: { color: C.dark, fontSize: 14, fontWeight: "800" },
+  categoryManageRow: { minHeight: 72, marginTop: 9, padding: 10, flexDirection: "row", alignItems: "center", gap: 9, borderWidth: 1, borderColor: C.border, borderRadius: 18, backgroundColor: C.white },
+  categoryManageIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: C.soft },
+  smallAction: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: C.soft },
+  smallActionDanger: { backgroundColor: C.redSoft },
+  cancelCategory: { minHeight: 44, alignItems: "center", justifyContent: "center" },
+  cancelCategoryText: { color: C.muted, fontSize: 14, fontWeight: "800" },
   listMissingPhoto: {
     width: 52,
     height: 52,
