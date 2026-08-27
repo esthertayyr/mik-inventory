@@ -177,7 +177,6 @@ function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
-  const [saleInProgress, setSaleInProgress] = useState(false);
   const signIn = async () => {
     const clean = username.trim().toLowerCase();
     if (!clean || !password) {
@@ -465,6 +464,7 @@ function ShopApp({
   const [loading, setLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [saleInProgress, setSaleInProgress] = useState(false);
   const loadData = useCallback(
     async (businessId: string, selectedLocationId: string) => {
       const start = new Date();
