@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFonts } from "expo-font";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { StatusBar } from "expo-status-bar";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/src/lib/supabase";
@@ -1308,20 +1309,19 @@ function SaleScreen({
                     : peso(price)}
               </Text>
               {item.letters_required > 0 ? (
-                <Text style={s.variantHint}>
-                  Choose {item.letters_required} letter
-                  {item.letters_required === 1 ? "" : "s"} · {item.alphabet_style?.name}
+                <Text style={s.variantHint} numberOfLines={1}>
+                  {item.letters_required} letter{item.letters_required === 1 ? "" : "s"}
                 </Text>
               ) : item.variants.length ? (
-                <Text style={s.variantHint}>
+                <Text style={s.variantHint} numberOfLines={1}>
                   {item.name === "Extra Alphabet"
-                    ? "Choose design, then A–Z"
+                    ? "Design + letter"
                     : `Choose ${item.variant_label ?? "option"}`}
                 </Text>
               ) : null}
               {item.sale_price !== null && item.regular_price !== null ? (
                 <Text style={s.saleLine}>
-                  Normal price{" "}
+                  Was{" "}
                   <Text style={s.oldPrice}>{peso(item.regular_price)}</Text>
                 </Text>
               ) : null}
@@ -1335,7 +1335,7 @@ function SaleScreen({
                   ? "? left"
                   : item.quantity_on_hand <= 0
                     ? "Out of stock"
-                    : `${item.quantity_on_hand} in stock`}
+                    : `${item.quantity_on_hand} left`}
               </Text>
             </Pressable>
           );
@@ -1780,18 +1780,28 @@ function Products({
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.72,
+      quality: 1,
     });
     if (!result.canceled) {
-      setPickedUri(result.assets[0].uri);
-      setPickedMime(result.assets[0].mimeType ?? "image/jpeg");
+      const asset = result.assets[0];
+      const resized = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [
+          asset.width >= asset.height
+            ? { resize: { width: 1000 } }
+            : { resize: { height: 1000 } },
+        ],
+        { compress: 0.78, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      setPickedUri(resized.uri);
+      setPickedMime("image/jpeg");
     }
   };
   const uploadImage = async (productId: string, uri: string) => {
     const response = await fetch(uri);
     if (!response.ok) throw new Error("Photo could not be read");
     const bytes = await response.arrayBuffer();
-    const path = `${businessId}/${productId}/main`;
+    const path = `${businessId}/${productId}/main.jpg`;
     const { error } = await supabase.storage
       .from("product-images")
       .upload(path, bytes, { contentType: pickedMime, upsert: true });
@@ -3408,12 +3418,12 @@ const s = StyleSheet.create({
   productCard: {
     flexGrow: 0,
     flexShrink: 0,
-    minHeight: 208,
+    minHeight: 196,
     marginBottom: 11,
-    padding: 13,
+    padding: 10,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 26,
+    borderRadius: 22,
     backgroundColor: C.white,
     shadowColor: "#403A33",
     shadowOpacity: 0.06,
@@ -3432,11 +3442,11 @@ const s = StyleSheet.create({
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 22,
-    marginBottom: 10,
+    borderRadius: 18,
+    marginBottom: 7,
     backgroundColor: "#F0EDE7",
   },
-  productCardImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  productCardImage: { width: "100%", height: "100%", resizeMode: "contain" },
   missingPhoto: {
     width: "100%",
     height: "100%",
@@ -3484,22 +3494,22 @@ const s = StyleSheet.create({
   },
   badgeText: { color: C.white, fontSize: 16, fontWeight: "900" },
   productName: {
-    minHeight: 42,
+    minHeight: 38,
     color: C.ink,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 19,
     fontWeight: "900",
   },
   productPrice: {
-    marginTop: 5,
+    marginTop: 3,
     color: C.dark,
-    fontSize: 26,
-    lineHeight: 31,
+    fontSize: 24,
+    lineHeight: 29,
     fontWeight: "900",
   },
-  saleLine: { marginTop: 5, color: C.red, fontSize: 14, lineHeight: 19, fontWeight: "900" },
+  saleLine: { marginTop: 3, color: C.red, fontSize: 13, lineHeight: 18, fontWeight: "900" },
   oldPrice: { color: C.muted, textDecorationLine: "line-through" },
-  stock: { marginTop: 7, color: C.green, fontSize: 15, lineHeight: 20, fontWeight: "900" },
+  stock: { marginTop: 4, color: C.green, fontSize: 14, lineHeight: 19, fontWeight: "900" },
   low: { color: C.orange, fontWeight: "800" },
   basket: {
     position: "absolute",
@@ -3760,7 +3770,7 @@ const s = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: "#EEF2F7",
   },
-  productPhotoImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  productPhotoImage: { width: "100%", height: "100%", resizeMode: "contain" },
   priceInput: {
     minHeight: 60,
     paddingHorizontal: 16,
