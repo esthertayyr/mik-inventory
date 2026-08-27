@@ -2328,31 +2328,47 @@ function Inventory({
         "Check quantity",
         "Enter a whole number greater than zero.",
       );
-    const { error } = selectedLetter && selected.alphabet_style
-      ? await supabase.rpc("record_alphabet_inventory_movement", {
+    let error: { message: string } | null = null;
+    if (selectedLetter && selected.alphabet_style) {
+      const letterResult = await supabase.rpc("record_alphabet_inventory_movement", {
           p_location_id: locationId,
           p_style_id: selected.alphabet_style.id,
           p_letter: selectedLetter,
           p_type: mode,
           p_quantity: amount,
           p_note: mode === "damage" ? "Damaged alphabet letter" : "Alphabet stock added",
-        })
-      : selectedVariant
-      ? await supabase.rpc("record_variant_inventory_movement", {
+        });
+      error = letterResult.error;
+      if (!error && selected.name.startsWith("Extra Alphabet -")) {
+        const totalResult = await supabase.rpc("record_inventory_movement", {
+          p_location_id: locationId,
+          p_product_id: selected.id,
+          p_type: mode,
+          p_quantity: amount,
+          p_note: mode === "damage" ? "Damaged alphabet total" : "Alphabet total stock added",
+        });
+        error = totalResult.error;
+      }
+    } else if (selectedVariant) {
+      const variantResult = await supabase.rpc("record_variant_inventory_movement", {
           p_location_id: locationId,
           p_variant_id: selectedVariant.id,
           p_type: mode,
           p_quantity: amount,
           p_note:
             mode === "damage" ? "Damaged product choice" : "Choice stock added",
-        })
-      : await supabase.rpc("record_inventory_movement", {
+        });
+      error = variantResult.error;
+    } else {
+      const productResult = await supabase.rpc("record_inventory_movement", {
           p_location_id: locationId,
           p_product_id: selected.id,
           p_type: mode,
           p_quantity: amount,
           p_note: mode === "damage" ? "Damaged product" : "Stock added",
         });
+      error = productResult.error;
+    }
     if (error) return Alert.alert("Stock not saved", error.message);
     setSelected(null);
     setSelectedVariant(null);
