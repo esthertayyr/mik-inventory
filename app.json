@@ -25,7 +25,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/mik-app-icon.png",
-        "backgroundColor": "#F7FAFF"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.esther.mik"
     },

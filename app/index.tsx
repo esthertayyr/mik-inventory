@@ -800,6 +800,9 @@ function SaleScreen({
   const [cashReceived, setCashReceived] = useState("");
   const [review, setReview] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [recordPastSale, setRecordPastSale] = useState(false);
+  const [pastSaleDate, setPastSaleDate] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [managerPasscode, setManagerPasscode] = useState("");
   const categoryName = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? "Other";
   const filtered = products.filter(
@@ -883,6 +886,10 @@ function SaleScreen({
     );
   const complete = async () => {
     if (!cart.length) return;
+    if (recordPastSale && !/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate))
+      return Alert.alert("Check the sale date", "Enter the date as YYYY-MM-DD, for example 2026-08-20.");
+    if (recordPastSale && !/^\d{4,8}$/.test(managerPasscode))
+      return Alert.alert("Enter the manager passcode", "Use the 4 to 8 digit shop passcode.");
     if (payment === "cash" && !cashIsEnough)
       return Alert.alert(
         "Not enough cash",
@@ -894,9 +901,7 @@ function SaleScreen({
         "Confirm that the payment appeared in the shop’s GCash account.",
       );
     setSaving(true);
-    const { data, error } = await supabase.rpc(
-      "create_confirmed_sale_with_choices",
-      {
+    const saleParams = {
         p_location_id: locationId,
         p_items: cart.map((x) => ({
           product_id: x.product.id,
@@ -908,13 +913,21 @@ function SaleScreen({
         p_payment_received: payment === "cash" || gcashReceived,
         p_payment_reference:
           payment === "gcash" ? paymentReference.trim() : null,
-      },
-    );
+      };
+    const { data, error } = recordPastSale
+      ? await supabase.rpc("create_backdated_sale_with_choices", {
+          ...saleParams,
+          p_sale_date: pastSaleDate,
+          p_passcode: managerPasscode,
+        })
+      : await supabase.rpc("create_confirmed_sale_with_choices", saleParams);
     if (error) {
       setSaving(false);
       return Alert.alert(
         "Sale not saved",
-        "Please check the stock and try again.",
+        error.message.includes("passcode") || error.message.includes("date")
+          ? error.message
+          : "Please check the stock and try again.",
       );
     }
     const { data: saved } = await supabase
@@ -929,6 +942,9 @@ function SaleScreen({
     setGcashReceived(false);
     setPaymentReference("");
     setCashReceived("");
+    setRecordPastSale(false);
+    setPastSaleDate(new Date().toLocaleDateString("en-CA"));
+    setManagerPasscode("");
     await onSaved();
     Alert.alert(
       "Sale completed",
@@ -1098,6 +1114,25 @@ function SaleScreen({
               />
             </View>
           ) : null}
+          <View style={s.pastSaleCard}>
+            <Pressable style={s.pastSaleTop} onPress={() => setRecordPastSale((value) => !value)}>
+              <View style={s.pastSaleIcon}><Ionicons name="calendar-outline" size={22} color={C.dark} /></View>
+              <View style={s.flex}>
+                <Text style={s.rowTitle}>Was this sale from an earlier day?</Text>
+                <Text style={s.rowHelp}>Use this only when a sale was missed.</Text>
+              </View>
+              <Ionicons name={recordPastSale ? "checkmark-circle" : "ellipse-outline"} size={27} color={recordPastSale ? C.accent : C.muted} />
+            </Pressable>
+            {recordPastSale ? (
+              <View style={s.pastSaleFields}>
+                <Label>Original sale date</Label>
+                <TextInput style={s.input} value={pastSaleDate} onChangeText={setPastSaleDate} placeholder="YYYY-MM-DD" maxLength={10} />
+                <Label>Manager passcode</Label>
+                <TextInput style={s.input} value={managerPasscode} onChangeText={setManagerPasscode} placeholder="4 to 8 numbers" keyboardType="number-pad" secureTextEntry maxLength={8} />
+                <Text style={s.rowHelp}>The entry will show on this date and be labelled as entered later.</Text>
+              </View>
+            ) : null}
+          </View>
           <BigButton
             label={
               saving
@@ -1106,7 +1141,7 @@ function SaleScreen({
                   ? "Confirm GCash payment above"
                   : payment === "cash" && !cashIsEnough
                     ? "Enter cash received"
-                  : `Complete sale · ${peso(total)}`
+                  : `${recordPastSale ? "Record past sale" : "Complete sale"} · ${peso(total)}`
             }
             icon="checkmark-circle-outline"
             onPress={complete}
@@ -1114,7 +1149,8 @@ function SaleScreen({
               saving ||
               !cart.length ||
               (payment === "gcash" && !gcashReceived) ||
-              (payment === "cash" && !cashIsEnough)
+              (payment === "cash" && !cashIsEnough) ||
+              (recordPastSale && (!/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate) || !/^\d{4,8}$/.test(managerPasscode)))
             }
           />
           <Text style={s.safe}>
@@ -3753,6 +3789,10 @@ const s = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: C.white,
   },
+  pastSaleCard: { marginTop: 14, padding: 14, borderWidth: 1, borderColor: C.border, borderRadius: 20, backgroundColor: C.white },
+  pastSaleTop: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 10 },
+  pastSaleIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: C.soft },
+  pastSaleFields: { marginTop: 6, paddingTop: 4, borderTopWidth: 1, borderTopColor: C.border },
   cashIcon: {
     width: 48,
     height: 48,
