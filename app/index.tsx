@@ -2108,7 +2108,7 @@ function Products({
                 </>
               ) : null}
             </View>
-          ) : hasChoices ? (
+          ) : !creating && hasChoices ? (
             <View style={s.choiceSetup}>
               <Text style={s.rowTitle}>{choiceLabel} choices</Text>
               <View style={s.choicePills}>
