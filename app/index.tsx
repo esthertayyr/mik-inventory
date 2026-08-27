@@ -1012,38 +1012,43 @@ function SaleScreen({
             );
             return (
               <View key={key} style={s.cartRow}>
-                {x.product.image_url ? (
-                  <Image
-                    source={{ uri: x.product.image_url }}
-                    style={s.miniProductImage}
-                  />
-                ) : (
-                  <View style={s.miniMissingPhoto}>
-                    <Text style={s.miniMissingText}>NO PHOTO</Text>
+                <View style={s.cartProductTop}>
+                  {x.product.image_url ? (
+                    <Image
+                      source={{ uri: x.product.image_url }}
+                      style={s.miniProductImage}
+                    />
+                  ) : (
+                    <View style={s.miniMissingPhoto}>
+                      <Text style={s.miniMissingText}>NO PHOTO</Text>
+                    </View>
+                  )}
+                  <View style={s.flex}>
+                    <Text style={s.rowTitle} numberOfLines={2}>{x.product.name}</Text>
+                    {x.variant ? (
+                      <Text style={s.variantChosen} numberOfLines={1}>
+                        {x.product.variant_label ?? "Choice"}: {x.variant.name}
+                      </Text>
+                    ) : null}
+                    {x.selectedLetters.length ? (
+                      <Text style={s.variantChosen} numberOfLines={1}>
+                        {x.product.alphabet_style?.name ?? "Letters"}: {x.selectedLetters.join(" · ")}
+                      </Text>
+                    ) : null}
+                    <Text style={s.rowHelp}>{peso(x.unitPrice)} each</Text>
                   </View>
-                )}
-                <View style={s.flex}>
-                  <Text style={s.rowTitle}>{x.product.name}</Text>
-                  {x.variant ? (
-                    <Text style={s.variantChosen}>
-                      {x.product.variant_label ?? "Choice"}: {x.variant.name}
-                    </Text>
-                  ) : null}
-                  {x.selectedLetters.length ? (
-                    <Text style={s.variantChosen}>
-                      {x.product.alphabet_style?.name ?? "Letters"}: {x.selectedLetters.join(" · ")}
-                    </Text>
-                  ) : null}
-                  <Text style={s.rowHelp}>{peso(x.unitPrice)} each</Text>
+                  <Text style={s.lineTotal}>
+                    {peso(x.quantity * x.unitPrice)}
+                  </Text>
                 </View>
-                <Quantity
-                  value={x.quantity}
-                  minus={() => change(key, -1)}
-                  plus={() => change(key, 1)}
-                />
-                <Text style={s.lineTotal}>
-                  {peso(x.quantity * x.unitPrice)}
-                </Text>
+                <View style={s.cartProductBottom}>
+                  <Text style={s.quantityLabel}>Quantity</Text>
+                  <Quantity
+                    value={x.quantity}
+                    minus={() => change(key, -1)}
+                    plus={() => change(key, 1)}
+                  />
+                </View>
               </View>
             );
           })}
@@ -3600,14 +3605,22 @@ const s = StyleSheet.create({
     minHeight: 88,
     marginTop: 10,
     padding: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 19,
     backgroundColor: C.white,
   },
+  cartProductTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  cartProductBottom: {
+    marginTop: 10,
+    paddingTop: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderColor: C.border,
+  },
+  quantityLabel: { color: C.muted, fontSize: 13, fontWeight: "800" },
   rowTitle: { color: C.ink, fontSize: 16, fontWeight: "900" },
   rowHelp: { marginTop: 3, color: C.muted, fontSize: 13, lineHeight: 18 },
   lineTotal: {
@@ -3619,17 +3632,17 @@ const s = StyleSheet.create({
   },
   quantity: { flexDirection: "row", alignItems: "center", gap: 5 },
   qtyButton: {
-    width: 46,
-    height: 46,
+    width: 38,
+    height: 38,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 16,
+    borderRadius: 13,
     backgroundColor: C.soft,
   },
   qtyNumber: {
-    minWidth: 28,
+    minWidth: 30,
     color: C.ink,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "900",
     textAlign: "center",
   },
