@@ -115,7 +115,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex - 1, 1))}
         >
-          <Ionicons name="chevron-back" size={22} color="#FF6B5F" />
+          <Ionicons name="chevron-back" size={22} color="#173B5E" />
         </Pressable>
         <Text style={s.calendarTitle}>
           {new Intl.DateTimeFormat("en-PH", {
@@ -128,7 +128,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex + 1, 1))}
         >
-          <Ionicons name="chevron-forward" size={22} color="#FF6B5F" />
+          <Ionicons name="chevron-forward" size={22} color="#173B5E" />
         </Pressable>
       </View>
       <View style={s.weekRow}>
@@ -460,7 +460,7 @@ export function ReportsScreen({
               setCalendarOpen((v) => !v);
             }}
           >
-            <Ionicons name="calendar-outline" size={21} color="#49B98A" />
+            <Ionicons name="calendar-outline" size={21} color="#4C644F" />
             <Text style={s.chooseDateText}>Choose exact date</Text>
           </Pressable>
           <Pressable
@@ -494,10 +494,10 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v - 1)}
         >
-          <Ionicons name="chevron-back" size={25} color="#FF6B5F" />
+          <Ionicons name="chevron-back" size={25} color="#173B5E" />
         </Pressable>
         <View style={s.periodCenter}>
-          <Ionicons name="calendar-outline" size={19} color="#49B98A" />
+          <Ionicons name="calendar-outline" size={19} color="#4C644F" />
           <Text style={s.periodTitle}>{title}</Text>
         </View>
         <Pressable
@@ -506,11 +506,11 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v + 1)}
         >
-          <Ionicons name="chevron-forward" size={25} color="#FF6B5F" />
+          <Ionicons name="chevron-forward" size={25} color="#173B5E" />
         </Pressable>
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#25785A" />
+        <ActivityIndicator size="large" color="#354838" />
       ) : error ? (
         <Text style={s.error}>{error}</Text>
       ) : (
@@ -635,7 +635,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 const s = StyleSheet.create({
   page: { paddingBottom: 32 },
-  title: { fontSize: 28, fontWeight: "900", color: "#1F1F1D", marginTop: 16 },
+  title: { fontSize: 28, fontWeight: "900", color: "#16283A", marginTop: 16 },
   tabs: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
   tab: {
     flex: 1,
@@ -644,22 +644,22 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 17,
     alignItems: "center",
-    backgroundColor: "#FFF0EC",
+    backgroundColor: "#E7EFF6",
   },
-  tabOn: { backgroundColor: "#FF6B5F" },
-  tabText: { fontSize: 13, fontWeight: "900", color: "#716E68" },
+  tabOn: { backgroundColor: "#173B5E" },
+  tabText: { fontSize: 13, fontWeight: "900", color: "#697582" },
   tabTextOn: { color: "#FFF" },
   voidButton: { marginTop: 8, minHeight: 38, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 12, backgroundColor: "#FFE8EC" },
   voidText: { color: "#B84457", fontSize: 12, fontWeight: "900" },
   modalShade: { flex: 1, padding: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(24,35,52,0.48)" },
   modalCard: { width: "100%", maxWidth: 420, padding: 22, borderRadius: 26, backgroundColor: "#FFF" },
-  modalTitle: { color: "#1F1F1D", fontSize: 23, fontWeight: "900" },
-  modalHelp: { marginTop: 7, color: "#716E68", fontSize: 15, lineHeight: 22 },
-  passcodeInput: { minHeight: 56, marginTop: 16, paddingHorizontal: 16, borderWidth: 1.5, borderColor: "#E7E2DA", borderRadius: 17, color: "#1F1F1D", fontSize: 20, textAlign: "center", letterSpacing: 4 },
-  confirmVoid: { minHeight: 54, marginTop: 12, alignItems: "center", justifyContent: "center", borderRadius: 17, backgroundColor: "#D94D5C" },
+  modalTitle: { color: "#16283A", fontSize: 23, fontWeight: "900" },
+  modalHelp: { marginTop: 7, color: "#697582", fontSize: 15, lineHeight: 22 },
+  passcodeInput: { minHeight: 56, marginTop: 16, paddingHorizontal: 16, borderWidth: 1.5, borderColor: "#DDE2E5", borderRadius: 17, color: "#16283A", fontSize: 20, textAlign: "center", letterSpacing: 4 },
+  confirmVoid: { minHeight: 54, marginTop: 12, alignItems: "center", justifyContent: "center", borderRadius: 17, backgroundColor: "#8E3049" },
   confirmVoidText: { color: "#FFF", fontSize: 16, fontWeight: "900" },
   cancelVoid: { minHeight: 48, alignItems: "center", justifyContent: "center" },
-  cancelVoidText: { color: "#716E68", fontSize: 15, fontWeight: "800" },
+  cancelVoidText: { color: "#697582", fontSize: 15, fontWeight: "800" },
   dateTools: { marginTop: 10, flexDirection: "row", gap: 8 },
   chooseDate: {
     flex: 1,
@@ -670,25 +670,25 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     borderWidth: 1,
-    borderColor: "#E7E2DA",
+    borderColor: "#DDE2E5",
     borderRadius: 17,
     backgroundColor: "#FFF",
   },
-  chooseDateText: { color: "#1F1F1D", fontSize: 14, fontWeight: "800" },
+  chooseDateText: { color: "#16283A", fontSize: 14, fontWeight: "800" },
   todayButton: {
     minWidth: 78,
     minHeight: 50,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 17,
-    backgroundColor: "#E8F7EF",
+    backgroundColor: "#E8EFE8",
   },
-  todayText: { color: "#25785A", fontSize: 14, fontWeight: "900" },
+  todayText: { color: "#354838", fontSize: 14, fontWeight: "900" },
   calendar: {
     marginTop: 10,
     padding: 13,
     borderWidth: 1,
-    borderColor: "#E7E2DA",
+    borderColor: "#DDE2E5",
     borderRadius: 20,
     backgroundColor: "#FFF",
   },
@@ -703,14 +703,14 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
-    backgroundColor: "#FFF0EC",
+    backgroundColor: "#E7EFF6",
   },
-  calendarTitle: { color: "#1F1F1D", fontSize: 16, fontWeight: "900" },
+  calendarTitle: { color: "#16283A", fontSize: 16, fontWeight: "900" },
   weekRow: { marginTop: 9, flexDirection: "row" },
   weekDay: {
     width: "14.2857%",
     textAlign: "center",
-    color: "#716E68",
+    color: "#697582",
     fontSize: 12,
     fontWeight: "900",
   },
@@ -722,8 +722,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 13,
   },
-  dayOn: { backgroundColor: "#FF6B5F" },
-  dayText: { color: "#1F1F1D", fontSize: 14, fontWeight: "800" },
+  dayOn: { backgroundColor: "#173B5E" },
+  dayText: { color: "#16283A", fontSize: 14, fontWeight: "800" },
   dayTextOn: { color: "#FFF" },
   periodNav: {
     flexDirection: "row",
@@ -751,10 +751,10 @@ const s = StyleSheet.create({
     textAlign: "center",
     fontSize: 15,
     fontWeight: "800",
-    color: "#1F1F1D",
+    color: "#16283A",
   },
-  hero: { padding: 22, borderRadius: 28, backgroundColor: "#252422" },
-  heroLabel: { color: "#F6D7D2", fontWeight: "800" },
+  hero: { padding: 22, borderRadius: 28, backgroundColor: "#10283F" },
+  heroLabel: { color: "#DDE8F1", fontWeight: "800" },
   heroValue: { color: "#FFF", fontSize: 34, fontWeight: "900", marginTop: 5 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 9, marginTop: 10 },
   stat: {
@@ -763,19 +763,19 @@ const s = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: "#FFF",
     borderWidth: 1,
-    borderColor: "#E7E2DA",
+    borderColor: "#DDE2E5",
   },
-  statLabel: { fontSize: 13, color: "#716E68", fontWeight: "700" },
+  statLabel: { fontSize: 13, color: "#697582", fontWeight: "700" },
   statValue: {
     fontSize: 20,
-    color: "#1F1F1D",
+    color: "#16283A",
     fontWeight: "900",
     marginTop: 5,
   },
   section: {
     fontSize: 18,
     fontWeight: "900",
-    color: "#1F1F1D",
+    color: "#16283A",
     marginTop: 22,
     marginBottom: 7,
   },
@@ -789,11 +789,11 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#EEEAE3",
   },
-  rank: { width: 22, fontWeight: "900", color: "#FF6B5F" },
-  rowName: { flex: 1, fontSize: 15, fontWeight: "800", color: "#1F1F1D" },
-  rowSmall: { fontSize: 12, color: "#716E68" },
-  rowValue: { fontWeight: "900", color: "#FF6B5F" },
-  empty: { padding: 14, color: "#716E68", backgroundColor: "#FFF" },
+  rank: { width: 22, fontWeight: "900", color: "#173B5E" },
+  rowName: { flex: 1, fontSize: 15, fontWeight: "800", color: "#16283A" },
+  rowSmall: { fontSize: 12, color: "#697582" },
+  rowValue: { fontWeight: "900", color: "#173B5E" },
+  empty: { padding: 14, color: "#697582", backgroundColor: "#FFF" },
   export: {
     minHeight: 60,
     marginTop: 20,
@@ -801,7 +801,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 9,
     borderRadius: 20,
-    backgroundColor: "#FF6B5F",
+    backgroundColor: "#173B5E",
     alignItems: "center",
   },
   exportText: { color: "#FFF", fontSize: 15, fontWeight: "900" },
@@ -816,7 +816,7 @@ const s = StyleSheet.create({
   saleRight: { alignItems: "flex-end", maxWidth: "35%" },
   error: {
     padding: 14,
-    color: "#D94D5C",
+    color: "#8E3049",
     backgroundColor: "#FFE8EC",
     borderRadius: 17,
   },

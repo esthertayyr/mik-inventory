@@ -38,25 +38,25 @@ import type {
 } from "@/src/types";
 
 const C = {
-  ink: "#1F1F1D",
-  muted: "#716E68",
-  green: "#FF6B5F",
-  dark: "#252422",
-  soft: "#FFF0EC",
-  accent: "#49B98A",
-  accentDark: "#25785A",
-  accentSoft: "#E8F7EF",
-  teal: "#388FCA",
-  tealSoft: "#E8F4FB",
-  purple: "#7B68B4",
-  purpleSoft: "#F1ECFA",
-  cream: "#F8F6F1",
+  ink: "#16283A",
+  muted: "#697582",
+  green: "#173B5E",
+  dark: "#10283F",
+  soft: "#E7EFF6",
+  accent: "#4C644F",
+  accentDark: "#354838",
+  accentSoft: "#E8EFE8",
+  teal: "#3B6685",
+  tealSoft: "#E7F0F5",
+  purple: "#79384B",
+  purpleSoft: "#F3E8EB",
+  cream: "#F6F3ED",
   white: "#FFFFFF",
-  border: "#E7E2DA",
-  orange: "#C97932",
-  orangeSoft: "#FFF0DB",
-  red: "#D94D5C",
-  redSoft: "#FFE8EC",
+  border: "#DDE2E5",
+  orange: "#9A6A2F",
+  orangeSoft: "#F5EDDD",
+  red: "#8E3049",
+  redSoft: "#F3E4E8",
 };
 type Icon = keyof typeof Ionicons.glyphMap;
 function categoryIcon(name: string): Icon {
@@ -66,6 +66,14 @@ function categoryIcon(name: string): Icon {
   if (n.includes("keychain")) return "key";
   if (n.includes("home") || n.includes("gift")) return "home";
   return "cube";
+}
+function categoryTone(name: string) {
+  const n = name.toLowerCase();
+  if (n.includes("keyboard")) return { color: "#173B5E", soft: "#E7EFF6" };
+  if (n.includes("fidget")) return { color: "#4C644F", soft: "#E8EFE8" };
+  if (n.includes("keychain")) return { color: "#8E3049", soft: "#F3E4E8" };
+  if (n.includes("home") || n.includes("gift")) return { color: "#684B6B", soft: "#F0E8F1" };
+  return { color: "#3B6685", soft: "#E7F0F5" };
 }
 function productIcon(name: string, category = ""): Icon {
   const n = `${name} ${category}`.toLowerCase();
@@ -1192,6 +1200,7 @@ function SaleScreen({
                   key={c.id}
                   label={c.name}
                   icon={categoryIcon(c.name)}
+                  tone={categoryTone(c.name)}
                   selected={category === c.id}
                   onPress={() => setCategory(c.id)}
                 />
@@ -1847,6 +1856,7 @@ function Products({
                 key={c.id}
                 label={c.name}
                 icon={categoryIcon(c.name)}
+                tone={categoryTone(c.name)}
                 selected={categoryId === c.id}
                 onPress={() => setCategoryId(c.id)}
               />
@@ -1988,7 +1998,7 @@ function Products({
         <Text style={[s.rowTitle, { marginTop: 20 }]}>Current categories</Text>
         {categories.map((item) => (
           <View key={item.id} style={s.categoryManageRow}>
-            <View style={s.categoryManageIcon}><Ionicons name={categoryIcon(item.name)} size={22} color={C.dark} /></View>
+            <View style={[s.categoryManageIcon, { backgroundColor: categoryTone(item.name).soft }]}><Ionicons name={categoryIcon(item.name)} size={22} color={categoryTone(item.name).color} /></View>
             <Text style={[s.rowTitle, s.flex]}>{item.name}</Text>
             <Pressable accessibilityLabel={`Rename ${item.name}`} style={s.smallAction} onPress={() => { setEditingCategory(item); setCategoryName(item.name); }}><Ionicons name="pencil-outline" size={21} color={C.dark} /></Pressable>
             <Pressable accessibilityLabel={`Remove ${item.name}`} style={[s.smallAction, s.smallActionDanger]} onPress={() => deleteCategory(item)}><Ionicons name="trash-outline" size={21} color={C.red} /></Pressable>
@@ -2277,6 +2287,7 @@ function Inventory({
             key={c.id}
             label={c.name}
             icon={categoryIcon(c.name)}
+            tone={categoryTone(c.name)}
             selected={category === c.id}
             onPress={() => setCategory(c.id)}
           />
@@ -2614,18 +2625,27 @@ function Chip({
   icon,
   selected,
   onPress,
+  tone,
 }: {
   label: string;
   icon?: Icon;
   selected: boolean;
   onPress: () => void;
+  tone?: { color: string; soft: string };
 }) {
+  const chipTone = tone ?? { color: C.accent, soft: C.white };
   return (
-    <Pressable style={[s.chip, selected && s.chipOn]} onPress={onPress}>
+    <Pressable
+      style={[
+        s.chip,
+        { borderColor: chipTone.color, backgroundColor: selected ? chipTone.color : chipTone.soft },
+      ]}
+      onPress={onPress}
+    >
       {icon ? (
-        <Ionicons name={icon} size={19} color={selected ? C.white : C.accent} />
+        <Ionicons name={icon} size={19} color={selected ? C.white : chipTone.color} />
       ) : null}
-      <Text style={[s.chipText, selected && s.chipTextOn]}>{label}</Text>
+      <Text style={[s.chipText, { color: selected ? C.white : chipTone.color }]}>{label}</Text>
     </Pressable>
   );
 }
