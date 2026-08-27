@@ -177,6 +177,7 @@ function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
+  const [saleInProgress, setSaleInProgress] = useState(false);
   const signIn = async () => {
     const clean = username.trim().toLowerCase();
     if (!clean || !password) {
@@ -642,6 +643,7 @@ function ShopApp({
         categories={categories}
         locationId={locationId}
         onSaved={reload}
+        onPendingChange={setSaleInProgress}
       />
     );
   else if (screen === "dashboard")
@@ -741,8 +743,20 @@ function ShopApp({
             key={item.id}
             style={s.navItem}
             onPress={() => {
-              setScreen(item.id);
-              if (item.id === "dashboard") void reload();
+              const openScreen = () => {
+                setScreen(item.id);
+                if (item.id === "dashboard") void reload();
+              };
+              if (screen === "sale" && saleInProgress && item.id !== "sale")
+                Alert.alert(
+                  "Keep this unfinished sale?",
+                  "Leaving now will clear the selected products.",
+                  [
+                    { text: "Stay on sale", style: "cancel" },
+                    { text: "Leave and clear", style: "destructive", onPress: () => { setSaleInProgress(false); openScreen(); } },
+                  ],
+                );
+              else openScreen();
             }}
           >
             <View
@@ -803,11 +817,13 @@ function SaleScreen({
   categories,
   locationId,
   onSaved,
+  onPendingChange,
 }: {
   products: Product[];
   categories: Category[];
   locationId: string;
   onSaved: () => void;
+  onPendingChange: (pending: boolean) => void;
 }) {
   const { width } = useWindowDimensions();
   const productColumns = width >= 980 ? 4 : width >= 700 ? 3 : 2;
@@ -826,6 +842,7 @@ function SaleScreen({
   const [recordPastSale, setRecordPastSale] = useState(false);
   const [pastSaleDate, setPastSaleDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [managerPasscode, setManagerPasscode] = useState("");
+  useEffect(() => onPendingChange(cart.length > 0), [cart.length, onPendingChange]);
   const categoryName = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? "Other";
   const filtered = products.filter(
