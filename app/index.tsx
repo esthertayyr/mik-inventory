@@ -38,25 +38,25 @@ import type {
 } from "@/src/types";
 
 const C = {
-  ink: "#16283A",
-  muted: "#697582",
-  green: "#173B5E",
-  dark: "#10283F",
-  soft: "#E7EFF6",
-  accent: "#4C644F",
-  accentDark: "#354838",
-  accentSoft: "#E8EFE8",
-  teal: "#3B6685",
-  tealSoft: "#E7F0F5",
-  purple: "#79384B",
-  purpleSoft: "#F3E8EB",
-  cream: "#F6F3ED",
+  ink: "#101923",
+  muted: "#4F5D68",
+  green: "#123653",
+  dark: "#0C2438",
+  soft: "#F5F7F8",
+  accent: "#354D3E",
+  accentDark: "#263A2E",
+  accentSoft: "#F4F6F4",
+  teal: "#244F6B",
+  tealSoft: "#F3F6F8",
+  purple: "#6F283D",
+  purpleSoft: "#F8F3F5",
+  cream: "#FFFFFF",
   white: "#FFFFFF",
   border: "#DDE2E5",
   orange: "#9A6A2F",
-  orangeSoft: "#F5EDDD",
-  red: "#8E3049",
-  redSoft: "#F3E4E8",
+  orangeSoft: "#FAF7F1",
+  red: "#7A1F39",
+  redSoft: "#FAF3F5",
 };
 type Icon = keyof typeof Ionicons.glyphMap;
 function categoryIcon(name: string): Icon {
@@ -69,11 +69,11 @@ function categoryIcon(name: string): Icon {
 }
 function categoryTone(name: string) {
   const n = name.toLowerCase();
-  if (n.includes("keyboard")) return { color: "#173B5E", soft: "#E7EFF6" };
-  if (n.includes("fidget")) return { color: "#4C644F", soft: "#E8EFE8" };
-  if (n.includes("keychain")) return { color: "#8E3049", soft: "#F3E4E8" };
-  if (n.includes("home") || n.includes("gift")) return { color: "#684B6B", soft: "#F0E8F1" };
-  return { color: "#3B6685", soft: "#E7F0F5" };
+  if (n.includes("keyboard")) return { color: "#123653", soft: "#FFFFFF" };
+  if (n.includes("fidget")) return { color: "#354D3E", soft: "#FFFFFF" };
+  if (n.includes("keychain")) return { color: "#7A1F39", soft: "#FFFFFF" };
+  if (n.includes("home") || n.includes("gift")) return { color: "#533C57", soft: "#FFFFFF" };
+  return { color: "#244F6B", soft: "#FFFFFF" };
 }
 function productIcon(name: string, category = ""): Icon {
   const n = `${name} ${category}`.toLowerCase();
@@ -706,7 +706,11 @@ function ShopApp({
           <Text style={s.shopName} numberOfLines={1}>
             {business?.name}
           </Text>
-          <Text style={s.locationName}>{current?.name ?? "Shop location"}</Text>
+          <Text style={s.locationName}>
+            {(current?.name ?? "Shop location").toLowerCase().includes("sebu")
+              ? "3D Prints"
+              : current?.name ?? "Shop location"}
+          </Text>
         </View>
         <View style={s.ready}>
           <View style={s.dot} />
@@ -812,6 +816,7 @@ function SaleScreen({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [choosing, setChoosing] = useState<Product | null>(null);
   const [chosenLetters, setChosenLetters] = useState<string[]>([]);
+  const [chosenDesign, setChosenDesign] = useState<string | null>(null);
   const [payment, setPayment] = useState<PaymentMethod>("cash");
   const [gcashReceived, setGcashReceived] = useState(false);
   const [paymentReference, setPaymentReference] = useState("");
@@ -828,6 +833,10 @@ function SaleScreen({
       (!category || p.category_id === category) &&
       p.name.toLowerCase().includes(search.toLowerCase()),
   );
+  const choosingCategory = category === null && search.trim() === "";
+  const cardWidth =
+    (Math.min(width, 1180) - 36 - (productColumns - 1) * 11) /
+    productColumns;
   const total = cart.reduce((n, x) => n + x.quantity * x.unitPrice, 0);
   const cashAmount = Number(cashReceived);
   const cashIsEnough =
@@ -883,6 +892,7 @@ function SaleScreen({
     });
     setChoosing(null);
     setChosenLetters([]);
+    setChosenDesign(null);
   };
   const change = (key: string, n: number) =>
     setCart((old) =>
@@ -1078,7 +1088,7 @@ function SaleScreen({
                       ? "CHANGE TO GIVE"
                       : "MORE CASH NEEDED"}
                 </Text>
-                <Text style={[s.changeValue, cashReceived.trim() !== "" && !cashIsEnough && s.low]}>
+                <Text style={s.changeValue}>
                   {cashReceived.trim() === ""
                     ? "—"
                     : cashIsEnough
@@ -1181,7 +1191,7 @@ function SaleScreen({
     <View style={s.flex}>
       <FlatList
         key={`products-${productColumns}`}
-        data={filtered}
+        data={choosingCategory ? [] : filtered}
         numColumns={productColumns}
         keyExtractor={(p) => p.id}
         columnWrapperStyle={s.productRow}
@@ -1191,36 +1201,52 @@ function SaleScreen({
         ]}
         ListHeaderComponent={
           <>
-            <Text style={s.pageTitle}>What are we selling?</Text>
-            <Step number="1">Tap a product photo to add it.</Step>
+            <Text style={s.pageTitle}>
+              {choosingCategory ? "Choose a category" : "Choose a product"}
+            </Text>
+            <Step number="1">
+              {choosingCategory
+                ? "Tap the type of product the customer wants."
+                : "Tap a product photo to add it."}
+            </Step>
             <Search value={search} onChange={setSearch} />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={s.chips}
-            >
-              <Chip
-                label="All products"
-                icon="apps"
-                selected={!category}
-                onPress={() => setCategory(null)}
-              />
-              {categories.map((c) => (
-                <Chip
-                  key={c.id}
-                  label={c.name}
-                  icon={categoryIcon(c.name)}
-                  tone={categoryTone(c.name)}
-                  selected={category === c.id}
-                  onPress={() => setCategory(c.id)}
-                />
-              ))}
-            </ScrollView>
+            {choosingCategory ? (
+              <View style={s.categoryGrid}>
+                {categories.map((c) => {
+                  const tone = categoryTone(c.name);
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${c.name}`}
+                      key={c.id}
+                      style={[s.categoryCard, { backgroundColor: tone.color }]}
+                      onPress={() => setCategory(c.id)}
+                    >
+                      <Ionicons name={categoryIcon(c.name)} size={36} color={C.white} />
+                      <Text style={s.categoryCardText}>{c.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
+                <Chip label="Categories" icon="grid" selected={false} onPress={() => { setCategory(null); setSearch(""); }} />
+                {categories.map((c) => (
+                  <Chip key={c.id} label={c.name} icon={categoryIcon(c.name)} tone={categoryTone(c.name)} selected={category === c.id} onPress={() => setCategory(c.id)} />
+                ))}
+              </ScrollView>
+            )}
           </>
         }
-        ListEmptyComponent={<Empty title="Nothing here yet" />}
+        ListEmptyComponent={choosingCategory ? null : <Empty title="Nothing here yet" />}
         renderItem={({ item }) => {
-          const price = item.sale_price ?? item.regular_price;
+          const variantPrices = item.variants
+            .map((variant) => variant.price_override)
+            .filter((value): value is number => value !== null);
+          const price =
+            item.sale_price ??
+            item.regular_price ??
+            (variantPrices.length ? Math.min(...variantPrices) : null);
           const qty = cart
             .filter((x) => x.product.id === item.id)
             .reduce((sum, x) => sum + x.quantity, 0);
@@ -1231,6 +1257,7 @@ function SaleScreen({
               accessibilityLabel={`Add ${item.name}, ${price === null ? "no price" : peso(price)}`}
               style={[
                 s.productCard,
+                { width: cardWidth },
                 unavailable && s.disabled,
                 qty > 0 && s.productOn,
               ]}
@@ -1257,7 +1284,11 @@ function SaleScreen({
                 {item.name}
               </Text>
               <Text style={s.productPrice}>
-                {price === null ? "No price" : peso(price)}
+                {price === null
+                  ? "No price"
+                  : item.sale_price === null && item.regular_price === null && variantPrices.length
+                    ? `From ${peso(price)}`
+                    : peso(price)}
               </Text>
               {item.letters_required > 0 ? (
                 <Text style={s.variantHint}>
@@ -1266,12 +1297,14 @@ function SaleScreen({
                 </Text>
               ) : item.variants.length ? (
                 <Text style={s.variantHint}>
-                  Choose {item.variant_label ?? "option"}
+                  {item.name === "Extra Alphabet"
+                    ? "Choose design, then A–Z"
+                    : `Choose ${item.variant_label ?? "option"}`}
                 </Text>
               ) : null}
               {item.sale_price !== null && item.regular_price !== null ? (
                 <Text style={s.saleLine}>
-                  SALE{" "}
+                  Normal price{" "}
                   <Text style={s.oldPrice}>{peso(item.regular_price)}</Text>
                 </Text>
               ) : null}
@@ -1302,11 +1335,20 @@ function SaleScreen({
             <View style={s.variantHeader}>
               <View style={s.flex}>
                 <Text style={s.variantKicker}>
-                  {choosing?.letters_required
+                  {choosing?.name === "Extra Alphabet" && choosing.variants.some((variant) => variant.name.includes(" | "))
+                    ? chosenDesign
+                      ? "CHOOSE A LETTER"
+                      : "CHOOSE A DESIGN"
+                    : choosing?.letters_required
                     ? `CHOOSE ${choosing.letters_required} LETTER${choosing.letters_required === 1 ? "" : "S"}`
                     : `CHOOSE ${choosing?.variant_label?.toUpperCase() ?? "OPTION"}`}
                 </Text>
                 <Text style={s.variantTitle}>{choosing?.name}</Text>
+                {choosing?.name === "Extra Alphabet" && chosenDesign ? (
+                  <Pressable onPress={() => setChosenDesign(null)}>
+                    <Text style={s.variantChosen}>← {chosenDesign} · choose A to Z</Text>
+                  </Pressable>
+                ) : null}
                 {choosing?.letters_required ? (
                   <Text style={s.variantChosen}>
                     {choosing.alphabet_style?.name ?? "Alphabet"}: {chosenLetters.length ? chosenLetters.join(" · ") : "Tap letters below"}
@@ -1319,33 +1361,106 @@ function SaleScreen({
                 onPress={() => {
                   setChoosing(null);
                   setChosenLetters([]);
+                  setChosenDesign(null);
                 }}
               >
                 <Ionicons name="close" size={24} color={C.muted} />
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={s.variantGrid}>
-              {choosing?.letters_required
+              {choosing?.name === "Extra Alphabet" &&
+              choosing.variants.some((variant) => variant.name.includes(" | "))
+                ? chosenDesign
+                  ? choosing.variants
+                      .filter((variant) =>
+                        variant.name.startsWith(`${chosenDesign} | `),
+                      )
+                      .map((variant) => {
+                        const unavailable = variant.quantity_on_hand <= 0;
+                        const letter = variant.name.split(" | ")[1];
+                        return (
+                          <Pressable
+                            key={variant.id}
+                            style={[s.variantButton, unavailable && s.disabled]}
+                            disabled={unavailable}
+                            onPress={() => add(choosing, variant)}
+                          >
+                            <Text style={s.variantButtonText}>{letter}</Text>
+                            <Text style={[s.variantStock, unavailable && s.low]}>
+                              {unavailable
+                                ? "Out"
+                                : `${variant.quantity_on_hand} left`}
+                            </Text>
+                          </Pressable>
+                        );
+                      })
+                  : [
+                      ...new Set(
+                        choosing.variants.map(
+                          (variant) => variant.name.split(" | ")[0],
+                        ),
+                      ),
+                    ].map((design) => {
+                      const designVariants = choosing.variants.filter((variant) =>
+                        variant.name.startsWith(`${design} | `),
+                      );
+                      const price = designVariants.find(
+                        (variant) => variant.price_override !== null,
+                      )?.price_override;
+                      const available = designVariants.reduce(
+                        (sum, variant) => sum + variant.quantity_on_hand,
+                        0,
+                      );
+                      return (
+                        <Pressable
+                          key={design}
+                          style={[s.designButton, available <= 0 && s.disabled]}
+                          disabled={available <= 0}
+                          onPress={() => setChosenDesign(design)}
+                        >
+                          <Text style={s.designButtonText}>{design}</Text>
+                          <Text style={s.designPrice}>
+                            {price === null || price === undefined
+                              ? "No price"
+                              : peso(price)}
+                          </Text>
+                          <Text style={s.designStock}>{available} letters ready</Text>
+                        </Pressable>
+                      );
+                    })
+                : choosing?.letters_required
                 ? choosing.alphabet_style?.letters.map((item) => {
                     const alreadyChosen = chosenLetters.filter(
                       (letter) => letter === item.letter,
                     ).length;
+                    const selected = alreadyChosen > 0;
                     const unavailable =
                       item.needs_stock_count ||
-                      item.quantity_on_hand <= alreadyChosen ||
-                      chosenLetters.length >= choosing.letters_required;
+                      (!selected &&
+                        (item.quantity_on_hand <= alreadyChosen ||
+                          chosenLetters.length >= choosing.letters_required));
                     return (
                       <Pressable
                         key={item.letter}
-                        style={[s.variantButton, unavailable && s.disabled]}
+                        style={[
+                          s.variantButton,
+                          selected && s.variantButtonOn,
+                          unavailable && !selected && s.disabled,
+                        ]}
                         disabled={unavailable}
                         onPress={() =>
-                          setChosenLetters((old) => [...old, item.letter])
+                          setChosenLetters((old) =>
+                            selected
+                              ? old.filter((letter) => letter !== item.letter)
+                              : [...old, item.letter],
+                          )
                         }
                       >
-                        <Text style={s.variantButtonText}>{item.letter}</Text>
-                        <Text style={[s.variantStock, unavailable && s.low]}>
-                          {item.needs_stock_count
+                        <Text style={[s.variantButtonText, selected && s.variantButtonTextOn]}>{item.letter}</Text>
+                        <Text style={[s.variantStock, selected && s.variantStockOn, unavailable && !selected && s.low]}>
+                          {selected
+                            ? "Selected"
+                            : item.needs_stock_count
                             ? "Count stock"
                             : `${item.quantity_on_hand} left`}
                         </Text>
@@ -1369,29 +1484,18 @@ function SaleScreen({
                 );
               })}
               {choosing?.letters_required ? (
-                <View style={s.totalBox}>
-                  <Text style={s.totalLabel}>
+                <View style={s.letterFooter}>
+                  <Text style={s.letterCount}>
                     {chosenLetters.length} of {choosing.letters_required} selected
                   </Text>
-                  <View style={s.choiceRow}>
-                    <Pressable
-                      style={s.alphabetButton}
-                      disabled={!chosenLetters.length}
-                      onPress={() => setChosenLetters((old) => old.slice(0, -1))}
-                    >
-                      <Text style={s.alphabetText}>Undo last</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        s.reviewButton,
-                        chosenLetters.length !== choosing.letters_required && s.disabled,
-                      ]}
-                      disabled={chosenLetters.length !== choosing.letters_required}
-                      onPress={() => add(choosing, null, chosenLetters)}
-                    >
-                      <Text style={s.reviewText}>Add to sale</Text>
-                    </Pressable>
-                  </View>
+                  <Pressable
+                    style={[s.letterAddButton, chosenLetters.length !== choosing.letters_required && s.disabled]}
+                    disabled={chosenLetters.length !== choosing.letters_required}
+                    onPress={() => add(choosing, null, chosenLetters)}
+                  >
+                    <Ionicons name="cart-outline" size={24} color={C.white} />
+                    <Text style={s.letterAddText}>Add to sale</Text>
+                  </Pressable>
                 </View>
               ) : null}
             </ScrollView>
@@ -1586,6 +1690,8 @@ function Products({
   const [sale, setSale] = useState("");
   const [startingStock, setStartingStock] = useState("0");
   const [hasChoices, setHasChoices] = useState(false);
+  const [extraAlphabetMode, setExtraAlphabetMode] = useState(false);
+  const [designPrices, setDesignPrices] = useState("Normal: 20\nSuperman: 50");
   const [choiceLabel, setChoiceLabel] = useState("Letter");
   const [choiceText, setChoiceText] = useState("");
   const [pickedUri, setPickedUri] = useState<string | null>(null);
@@ -1606,6 +1712,8 @@ function Products({
     setSale("");
     setStartingStock("0");
     setHasChoices(false);
+    setExtraAlphabetMode(false);
+    setDesignPrices("Normal: 20\nSuperman: 50");
     setChoiceLabel("Letter");
     setChoiceText("");
     setPickedUri(null);
@@ -1627,6 +1735,22 @@ function Products({
     reset();
     setCreating(true);
     setCategoryId(categories[0]?.id ?? null);
+  };
+  const startExtraAlphabet = () => {
+    reset();
+    setCreating(true);
+    setName("Extra Alphabet");
+    setCategoryId(
+      categories.find((item) => item.name === "Keyboard Clickers")?.id ??
+        categories[0]?.id ??
+        null,
+    );
+    setHasChoices(true);
+    setExtraAlphabetMode(true);
+    setChoiceLabel("Design and letter");
+    setChoiceText("");
+    setDesignPrices("Normal: 20\nSuperman: 50");
+    setStartingStock("0");
   };
   const chooseImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1675,6 +1799,14 @@ function Products({
         .filter(Boolean),
     ),
   ];
+  const extraAlphabetDesigns = () =>
+    designPrices
+      .split(/\n/)
+      .map((line) => {
+        const match = line.match(/^\s*(.+?)\s*:\s*(\d+(?:\.\d+)?)\s*$/);
+        return match ? { name: match[1].trim(), price: Number(match[2]) } : null;
+      })
+      .filter((item): item is { name: string; price: number } => Boolean(item));
   const useAlphabet = () => {
     setHasChoices(true);
     setChoiceLabel("Letter");
@@ -1716,6 +1848,14 @@ function Products({
         "Check the price",
         "Enter a valid price or leave the sale price empty.",
       );
+    if (extraAlphabetMode) {
+      const designs = extraAlphabetDesigns();
+      if (!designs.length || designs.some((design) => design.price < 20 || design.price > 50))
+        return Alert.alert(
+          "Check the design prices",
+          "Use one line per design, such as Normal: 20 or Superman: 50. Each price must be from ₱20 to ₱50.",
+        );
+    }
     if (creating && !pickedUri)
       return Alert.alert(
         "Add a product photo",
@@ -1731,7 +1871,17 @@ function Products({
           "Enter a whole number of zero or more.",
         );
       }
-      const variants = hasChoices ? choiceNames() : [];
+      const designs = extraAlphabetMode ? extraAlphabetDesigns() : [];
+      const variantSetup = extraAlphabetMode
+        ? designs.flatMap((design) =>
+            Array.from({ length: 26 }, (_, index) => ({
+              name: `${design.name} | ${String.fromCharCode(65 + index)}`,
+              price: design.price,
+            })),
+          )
+        : hasChoices
+          ? choiceNames().map((variantName) => ({ name: variantName, price: null }))
+          : [];
       if (hasChoices && !choiceLabel.trim()) {
         setSaving(false);
         return Alert.alert(
@@ -1739,7 +1889,7 @@ function Products({
           "Example: Letter, Colour, or Size.",
         );
       }
-      if (hasChoices && variants.length < 2) {
+      if (hasChoices && variantSetup.length < 2) {
         setSaving(false);
         return Alert.alert(
           "Add choices",
@@ -1757,7 +1907,7 @@ function Products({
           p_sale_price: prices.sp,
           p_starting_stock: stock,
           p_variant_label: hasChoices ? choiceLabel.trim() : null,
-          p_variants: variants.map((variantName) => ({ name: variantName })),
+          p_variants: variantSetup.map((variant) => ({ name: variant.name })),
         },
       );
       if (error || !createdId) {
@@ -1766,6 +1916,22 @@ function Products({
           "Product not created",
           error?.message ?? "Please try again.",
         );
+      }
+      if (extraAlphabetMode) {
+        const { data: createdVariants } = await supabase
+          .from("product_variants")
+          .select("id,name")
+          .eq("product_id", createdId);
+        for (const createdVariant of createdVariants ?? []) {
+          const configured = variantSetup.find(
+            (variant) => variant.name === createdVariant.name,
+          );
+          if (configured?.price !== null && configured?.price !== undefined)
+            await supabase
+              .from("product_variants")
+              .update({ price_override: configured.price })
+              .eq("id", createdVariant.id);
+        }
       }
       if (pickedUri) {
         try {
@@ -1872,23 +2038,27 @@ function Products({
               />
             ))}
           </ScrollView>
-          <Label>Normal price</Label>
-          <TextInput
-            style={s.priceInput}
-            keyboardType="decimal-pad"
-            value={regular}
-            onChangeText={setRegular}
-            placeholder="0.00"
-          />
-          <Label>Sale price (optional)</Label>
-          <TextInput
-            style={s.priceInput}
-            keyboardType="decimal-pad"
-            value={sale}
-            onChangeText={setSale}
-            placeholder="Leave empty when not on sale"
-          />
-          {creating ? (
+          {extraAlphabetMode ? (
+            <View style={s.choiceSetup}>
+              <Text style={s.rowTitle}>Design prices</Text>
+              <Text style={s.rowHelp}>One design and price per line. Every design automatically receives A to Z.</Text>
+              <TextInput
+                style={[s.input, s.choiceInput]}
+                value={designPrices}
+                onChangeText={setDesignPrices}
+                placeholder={"Normal: 20\nSuperman: 50"}
+                multiline
+              />
+            </View>
+          ) : (
+            <>
+              <Label>Normal price</Label>
+              <TextInput style={s.priceInput} keyboardType="decimal-pad" value={regular} onChangeText={setRegular} placeholder="0.00" />
+              <Label>Sale price (optional)</Label>
+              <TextInput style={s.priceInput} keyboardType="decimal-pad" value={sale} onChangeText={setSale} placeholder="Leave empty when not on sale" />
+            </>
+          )}
+          {creating && !extraAlphabetMode ? (
             <View style={s.choiceSetup}>
               <View style={s.choiceSetupTop}>
                 <View style={s.flex}>
@@ -2025,6 +2195,14 @@ function Products({
         icon="add-circle-outline"
         onPress={startCreate}
       />
+      <Pressable style={s.manageCategoryButton} onPress={startExtraAlphabet}>
+        <Ionicons name="text-outline" size={20} color={C.dark} />
+        <View style={s.flex}>
+          <Text style={s.manageCategoryText}>Set up Extra Alphabet</Text>
+          <Text style={s.rowHelp}>Each design gets A–Z and its own ₱20–₱50 price</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={C.muted} />
+      </Pressable>
       <Pressable style={s.manageCategoryButton} onPress={() => setManagingCategories(true)}>
         <Ionicons name="albums-outline" size={20} color={C.dark} />
         <Text style={s.manageCategoryText}>Add, rename or remove categories</Text>
@@ -2385,11 +2563,15 @@ function More({
       <View style={s.account}>
         <View style={s.avatar}>
           <Text style={s.avatarText}>
-            {(profile?.display_name ?? "S")[0].toUpperCase()}
+            {((profile?.display_name ?? "S").toLowerCase().includes("sebu") ? "3" : (profile?.display_name ?? "S")[0]).toUpperCase()}
           </Text>
         </View>
         <View>
-          <Text style={s.rowTitle}>{profile?.display_name ?? "Shop user"}</Text>
+          <Text style={s.rowTitle}>
+            {(profile?.display_name ?? "Shop user").toLowerCase().includes("sebu")
+              ? "3D Prints"
+              : profile?.display_name ?? "Shop user"}
+          </Text>
           <Text style={s.rowHelp}>This login belongs to this shop only</Text>
         </View>
       </View>
@@ -2397,6 +2579,7 @@ function More({
         <Ionicons name="log-out-outline" size={22} color={C.red} />
         <Text style={s.signoutText}>Sign out</Text>
       </Pressable>
+      <Text style={s.makerCredit}>Made by Esther Tay</Text>
     </ScrollView>
   );
 }
@@ -3113,6 +3296,28 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, minHeight: 52, color: C.ink, fontSize: 17 },
   chips: { minHeight: 60, gap: 9, alignItems: "center", paddingVertical: 9 },
+  categoryGrid: {
+    marginTop: 16,
+    paddingBottom: 26,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  categoryCard: {
+    width: "48%",
+    minHeight: 142,
+    padding: 18,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    borderRadius: 24,
+  },
+  categoryCardText: {
+    color: C.white,
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: "900",
+  },
   chip: {
     minHeight: 46,
     justifyContent: "center",
@@ -3132,7 +3337,8 @@ const s = StyleSheet.create({
   productListBasket: { paddingBottom: 118 },
   productRow: { gap: 11 },
   productCard: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     minHeight: 208,
     marginBottom: 11,
     padding: 13,
@@ -3218,12 +3424,13 @@ const s = StyleSheet.create({
   productPrice: {
     marginTop: 5,
     color: C.dark,
-    fontSize: 20,
+    fontSize: 26,
+    lineHeight: 31,
     fontWeight: "900",
   },
-  saleLine: { marginTop: 4, color: C.red, fontSize: 10, fontWeight: "900" },
+  saleLine: { marginTop: 5, color: C.red, fontSize: 14, lineHeight: 19, fontWeight: "900" },
   oldPrice: { color: C.muted, textDecorationLine: "line-through" },
-  stock: { marginTop: 6, color: C.green, fontSize: 12, fontWeight: "700" },
+  stock: { marginTop: 7, color: C.green, fontSize: 15, lineHeight: 20, fontWeight: "900" },
   low: { color: C.orange, fontWeight: "800" },
   basket: {
     position: "absolute",
@@ -3858,10 +4065,10 @@ const s = StyleSheet.create({
     padding: 16,
     alignItems: "center",
     borderRadius: 18,
-    backgroundColor: C.accentSoft,
+    backgroundColor: C.accentDark,
   },
-  changeBoxShort: { backgroundColor: C.redSoft },
-  changeValue: { marginTop: 4, color: C.accentDark, fontSize: 34, fontWeight: "900" },
+  changeBoxShort: { backgroundColor: C.red },
+  changeValue: { marginTop: 4, color: C.white, fontSize: 34, fontWeight: "900" },
   gcashHeading: { flexDirection: "row", alignItems: "center", gap: 11 },
   gcashIcon: {
     width: 48,
@@ -3948,7 +4155,12 @@ const s = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.border,
     borderRadius: 18,
-    backgroundColor: C.tealSoft,
+    backgroundColor: C.white,
+  },
+  variantButtonOn: {
+    borderWidth: 3,
+    borderColor: C.green,
+    backgroundColor: C.green,
   },
   variantButtonText: {
     color: C.ink,
@@ -3956,11 +4168,57 @@ const s = StyleSheet.create({
     fontWeight: "900",
     textAlign: "center",
   },
+  variantButtonTextOn: { color: C.white },
   variantStock: {
     marginTop: 3,
     color: C.teal,
     fontSize: 11,
     fontWeight: "800",
+  },
+  variantStockOn: { color: C.white },
+  designButton: {
+    width: "100%",
+    minHeight: 92,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: C.border,
+    borderRadius: 20,
+    backgroundColor: C.white,
+  },
+  designButtonText: { color: C.ink, fontSize: 20, fontWeight: "900" },
+  designPrice: { marginTop: 5, color: C.green, fontSize: 24, fontWeight: "900" },
+  designStock: { marginTop: 3, color: C.muted, fontSize: 14, fontWeight: "700" },
+  letterFooter: {
+    width: "100%",
+    marginTop: 8,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+  },
+  letterCount: {
+    color: C.ink,
+    fontSize: 18,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  letterAddButton: {
+    width: "100%",
+    minHeight: 64,
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    borderRadius: 20,
+    backgroundColor: C.green,
+  },
+  letterAddText: { color: C.white, fontSize: 18, fontWeight: "900" },
+  makerCredit: {
+    marginTop: 18,
+    color: C.muted,
+    fontSize: 10,
+    letterSpacing: 0.5,
+    textAlign: "right",
   },
   choiceSetup: {
     marginTop: 18,

@@ -17,6 +17,9 @@ import * as Sharing from "expo-sharing";
 import { supabase } from "@/src/lib/supabase";
 import { peso } from "@/src/lib/format";
 
+const publicShopName = (value: string | null | undefined) =>
+  value?.toLowerCase().includes("sebu") ? "3D Prints" : value ?? "";
+
 type Period = "daily" | "weekly" | "monthly";
 type SaleItem = {
   product_name: string;
@@ -349,7 +352,7 @@ export function ReportsScreen({
                 hour: "2-digit",
                 minute: "2-digit",
               }),
-              s.staff?.display_name ?? "",
+              publicShopName(s.staff?.display_name),
               i.product_name,
               i.variant_name ?? "",
               i.selected_letters?.join("") ?? "",
@@ -370,7 +373,7 @@ export function ReportsScreen({
                   hour: "2-digit",
                   minute: "2-digit",
                 }),
-                s.staff?.display_name ?? "",
+                publicShopName(s.staff?.display_name),
                 "",
                 "",
                 "",
@@ -579,7 +582,7 @@ export function ReportsScreen({
                   <Text style={s.rowName}>SALE-{sale.receipt_number}</Text>
                   <Text style={s.rowSmall}>
                     {new Date(sale.created_at).toLocaleString("en-PH")} ·{" "}
-                    {sale.staff?.display_name ?? "Staff"}
+                    {publicShopName(sale.staff?.display_name) || "Staff"}
                   </Text>
                   <Text style={s.rowSmall}>
                     {sale.sale_items
