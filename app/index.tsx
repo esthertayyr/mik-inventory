@@ -187,6 +187,10 @@ function Login() {
       setError("Please check the username and try again.");
       return;
     }
+    if (clean === "sebu3d") {
+      setError("Please use the new shop username: 3dprints");
+      return;
+    }
     setBusy(true);
     setError("");
     // Keep the existing Supabase identity behind the scenes while presenting the
