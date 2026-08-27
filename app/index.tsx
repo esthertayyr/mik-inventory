@@ -1464,9 +1464,8 @@ function SaleScreen({
                     const selected = alreadyChosen > 0;
                     const unavailable =
                       item.needs_stock_count ||
-                      (!selected &&
-                        (item.quantity_on_hand <= alreadyChosen ||
-                          chosenLetters.length >= choosing.letters_required));
+                      item.quantity_on_hand <= alreadyChosen ||
+                      chosenLetters.length >= choosing.letters_required;
                     return (
                       <Pressable
                         key={item.letter}
@@ -1475,23 +1474,36 @@ function SaleScreen({
                           selected && s.variantButtonOn,
                           unavailable && !selected && s.disabled,
                         ]}
-                        disabled={unavailable}
-                        onPress={() =>
-                          setChosenLetters((old) =>
-                            selected
-                              ? old.filter((letter) => letter !== item.letter)
-                              : [...old, item.letter],
-                          )
-                        }
+                        onPress={() => {
+                          if (!unavailable)
+                            setChosenLetters((old) => [...old, item.letter]);
+                        }}
                       >
                         <Text style={[s.variantButtonText, selected && s.variantButtonTextOn]}>{item.letter}</Text>
                         <Text style={[s.variantStock, selected && s.variantStockOn, unavailable && !selected && s.low]}>
                           {selected
-                            ? "Selected"
+                            ? `Selected ×${alreadyChosen}`
                             : item.needs_stock_count
                             ? "? left"
                             : `${item.quantity_on_hand} left`}
                         </Text>
+                        {selected ? (
+                          <Pressable
+                            accessibilityLabel={`Remove one ${item.letter}`}
+                            style={s.variantRemove}
+                            onPress={(event) => {
+                              event.stopPropagation();
+                              setChosenLetters((old) => {
+                                const index = old.lastIndexOf(item.letter);
+                                return index < 0
+                                  ? old
+                                  : [...old.slice(0, index), ...old.slice(index + 1)];
+                              });
+                            }}
+                          >
+                            <Ionicons name="remove" size={15} color={C.green} />
+                          </Pressable>
+                        ) : null}
                       </Pressable>
                     );
                   })
@@ -4334,6 +4346,17 @@ const s = StyleSheet.create({
     fontWeight: "800",
   },
   variantStockOn: { color: C.white },
+  variantRemove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: C.white,
+  },
   designButton: {
     width: "100%",
     minHeight: 92,
