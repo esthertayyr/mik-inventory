@@ -2277,6 +2277,7 @@ function Inventory({
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);
+  const [stockView, setStockView] = useState<"all" | "lowest" | "out">("all");
   const [selected, setSelected] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
     null,
@@ -2286,11 +2287,18 @@ function Inventory({
   const [mode, setMode] = useState<"stock_in" | "damage">("stock_in");
   const categoryName = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? "Other";
-  const filtered = products.filter(
-    (p) =>
-      (!category || p.category_id === category) &&
-      p.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = products
+    .filter(
+      (p) =>
+        (!category || p.category_id === category) &&
+        p.name.toLowerCase().includes(search.toLowerCase()) &&
+        (stockView !== "out" || p.quantity_on_hand <= 0),
+    )
+    .sort((a, b) =>
+      stockView === "lowest"
+        ? a.quantity_on_hand - b.quantity_on_hand || a.name.localeCompare(b.name)
+        : a.name.localeCompare(b.name),
+    );
   const save = async () => {
     const amount = Number(quantity);
     if (!selected || !Number.isInteger(amount) || amount <= 0)
@@ -2476,11 +2484,8 @@ function Inventory({
       <Text style={s.pageTitle}>Stock</Text>
       <Text style={s.subtitle}>Tap a product to update its stock.</Text>
       <Search value={search} onChange={setSearch} />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.chips}
-      >
+      <Text style={s.stockFilterLabel}>Category</Text>
+      <View style={s.stockFilterWrap}>
         <Chip
           label="All products"
           icon="apps"
@@ -2497,7 +2502,31 @@ function Inventory({
             onPress={() => setCategory(c.id)}
           />
         ))}
-      </ScrollView>
+      </View>
+      <Text style={s.stockFilterLabel}>Show stock by</Text>
+      <View style={s.stockSortRow}>
+        <Chip
+          label="All"
+          icon="list"
+          selected={stockView === "all"}
+          onPress={() => setStockView("all")}
+        />
+        <Chip
+          label="Lowest first"
+          icon="arrow-down"
+          selected={stockView === "lowest"}
+          onPress={() => setStockView("lowest")}
+        />
+        <Chip
+          label="Out of stock"
+          icon="alert-circle"
+          selected={stockView === "out"}
+          onPress={() => setStockView("out")}
+        />
+      </View>
+      <Text style={s.stockResultCount}>
+        {filtered.length} {filtered.length === 1 ? "product" : "products"}
+      </Text>
       <FlatList
         data={filtered}
         keyExtractor={(p) => p.id}
@@ -3313,6 +3342,29 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, minHeight: 52, color: C.ink, fontSize: 17 },
   chips: { minHeight: 60, gap: 9, alignItems: "center", paddingVertical: 9 },
+  stockFilterLabel: {
+    marginTop: 13,
+    marginBottom: 7,
+    color: C.dark,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  stockFilterWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  stockSortRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  stockResultCount: {
+    marginTop: 12,
+    color: C.muted,
+    fontSize: 13,
+    fontWeight: "800",
+  },
   categoryGrid: {
     marginTop: 16,
     paddingBottom: 26,
