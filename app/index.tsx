@@ -247,6 +247,7 @@ function Login() {
           <Text style={s.guidePreviewText}>See how Mik works</Text>
         </Pressable>
       </View>
+      <Text style={s.loginCredit}>Made by Esther Tay</Text>
       <GuideModal visible={guideOpen} onClose={() => setGuideOpen(false)} />
     </SafeAreaView>
   );
@@ -2287,6 +2288,7 @@ function Inventory({
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState(false);
   const [stockView, setStockView] = useState<"all" | "lowest" | "out">("all");
   const [selected, setSelected] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
@@ -2495,24 +2497,40 @@ function Inventory({
       <Text style={s.subtitle}>Tap a product to update its stock.</Text>
       <Search value={search} onChange={setSearch} />
       <Text style={s.stockFilterLabel}>Category</Text>
-      <View style={s.stockFilterWrap}>
-        <Chip
-          label="All products"
-          icon="apps"
-          selected={!category}
-          onPress={() => setCategory(null)}
-        />
-        {categories.map((c) => (
-          <Chip
-            key={c.id}
-            label={c.name}
-            icon={categoryIcon(c.name)}
-            tone={categoryTone(c.name)}
-            selected={category === c.id}
-            onPress={() => setCategory(c.id)}
+      <Pressable style={s.stockCategoryPicker} onPress={() => setCategoryOpen((open) => !open)}>
+        <View style={s.stockCategoryPickerIcon}>
+          <Ionicons
+            name={category ? categoryIcon(categoryName(category)) : "apps"}
+            size={21}
+            color={C.accent}
           />
-        ))}
-      </View>
+        </View>
+        <Text style={s.stockCategoryPickerText} numberOfLines={1}>
+          {category ? categoryName(category) : "All products"}
+        </Text>
+        <Text style={s.stockCategoryChange}>Change</Text>
+        <Ionicons name={categoryOpen ? "chevron-up" : "chevron-down"} size={20} color={C.muted} />
+      </Pressable>
+      {categoryOpen ? (
+        <View style={s.stockFilterWrap}>
+          <Chip
+            label="All products"
+            icon="apps"
+            selected={!category}
+            onPress={() => { setCategory(null); setCategoryOpen(false); }}
+          />
+          {categories.map((c) => (
+            <Chip
+              key={c.id}
+              label={c.name}
+              icon={categoryIcon(c.name)}
+              tone={categoryTone(c.name)}
+              selected={category === c.id}
+              onPress={() => { setCategory(c.id); setCategoryOpen(false); }}
+            />
+          ))}
+        </View>
+      ) : null}
       <Text style={s.stockFilterLabel}>Show stock by</Text>
       <View style={s.stockSortRow}>
         <Chip
@@ -2522,13 +2540,13 @@ function Inventory({
           onPress={() => setStockView("all")}
         />
         <Chip
-          label="Lowest first"
+          label="Lowest"
           icon="arrow-down"
           selected={stockView === "lowest"}
           onPress={() => setStockView("lowest")}
         />
         <Chip
-          label="Out of stock"
+          label="Zero"
           icon="alert-circle"
           selected={stockView === "out"}
           onPress={() => setStockView("out")}
@@ -2635,7 +2653,6 @@ function More({
         <Ionicons name="log-out-outline" size={22} color={C.red} />
         <Text style={s.signoutText}>Sign out</Text>
       </Pressable>
-      <Text style={s.makerCredit}>Made by Esther Tay</Text>
     </ScrollView>
   );
 }
@@ -3165,6 +3182,13 @@ const s = StyleSheet.create({
     gap: 7,
   },
   guidePreviewText: { color: C.dark, fontSize: 15, fontWeight: "800" },
+  loginCredit: {
+    marginTop: 14,
+    color: "#9AA2AA",
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
   top: {
     minHeight: 68,
     paddingHorizontal: 17,
@@ -3360,13 +3384,34 @@ const s = StyleSheet.create({
     fontWeight: "900",
   },
   stockFilterWrap: {
+    marginTop: 8,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
+  stockCategoryPicker: {
+    minHeight: 52,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderRadius: 17,
+    backgroundColor: C.white,
+  },
+  stockCategoryPickerIcon: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: C.accentSoft,
+  },
+  stockCategoryPickerText: { flex: 1, color: C.ink, fontSize: 16, fontWeight: "900" },
+  stockCategoryChange: { color: C.accent, fontSize: 12, fontWeight: "900" },
   stockSortRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
   },
   stockResultCount: {
@@ -4292,13 +4337,6 @@ const s = StyleSheet.create({
     backgroundColor: C.green,
   },
   letterAddText: { color: C.white, fontSize: 18, fontWeight: "900" },
-  makerCredit: {
-    marginTop: 18,
-    color: C.muted,
-    fontSize: 10,
-    letterSpacing: 0.5,
-    textAlign: "right",
-  },
   choiceSetup: {
     marginTop: 18,
     padding: 16,
