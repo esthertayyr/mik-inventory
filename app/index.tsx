@@ -1287,7 +1287,12 @@ function SaleScreen({
               ]}
               onPress={() => add(item)}
             >
-              <View style={s.productVisual}>
+              <View
+                style={[
+                  s.productVisual,
+                  { height: width < 700 ? 104 : cardWidth - 20 },
+                ]}
+              >
                 {item.image_url || placeholderImage(item.name) ? (
                   <Image
                     source={item.image_url ? { uri: item.image_url } : placeholderImage(item.name)}
@@ -3488,7 +3493,7 @@ const s = StyleSheet.create({
     backgroundColor: "#FCFDFF",
   },
   productVisual: {
-    aspectRatio: 1,
+    width: "100%",
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
