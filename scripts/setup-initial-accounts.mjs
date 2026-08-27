@@ -61,7 +61,9 @@ async function ensureUser(username, password, displayName) {
 }
 
 const owner = await ensureUser("owner", ownerPassword, "Owner");
-const sebu = await ensureUser("sebu3d", sebuPassword, "Sebu3D");
+// The original auth identity is retained so existing shop history and
+// memberships stay attached. The app exposes this account as `3dprints`.
+const sebu = await ensureUser("sebu3d", sebuPassword, "3D Prints");
 
 const { error: ownerError } = await admin
   .from("platform_admins")
@@ -70,7 +72,7 @@ if (ownerError) throw ownerError;
 
 const { data: shop, error: shopError } = await admin
   .from("businesses")
-  .update({ login_username: "sebu3d" })
+  .update({ name: "3D Prints", login_username: "3dprints" })
   .eq("slug", "sebu3d")
   .select("id")
   .single();
@@ -112,4 +114,4 @@ const { error: membershipError } = await admin
   );
 if (membershipError) throw membershipError;
 
-console.log("Initial Mik accounts are ready: Owner and sebu3d.");
+console.log("Initial Mik accounts are ready: Owner and 3dprints.");

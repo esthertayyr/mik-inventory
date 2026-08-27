@@ -1,6 +1,6 @@
 # Mik
 
-Your friendly little shop helper for iPhone, Android and the web. Sebu3D is the first shop profile inside Mik.
+Your friendly little shop helper for iPhone, Android and the web. 3D Prints is the first shop profile inside Mik.
 
 ## What Version 1 does
 
@@ -49,7 +49,7 @@ $env:MIK_SEBU_PASSWORD='CHOOSE-A-DIFFERENT-PRIVATE-PASSWORD'
 npm run setup:accounts
 ```
 
-This creates or refreshes the requested `Owner` and `sebu3d` logins. Passwords are deliberately supplied privately through environment variables and are never stored in the repository.
+This creates or refreshes the requested `Owner` and `3dprints` logins. Passwords are deliberately supplied privately through environment variables and are never stored in the repository.
 
 Username entry is case-insensitive. The Mik Owner can see every active shop and create a shop together with its username and starting password. Each shop uses one shared team login: the same shop account handles cashier sales, product creation, photos, prices and stock. It sees only its connected shop.
 

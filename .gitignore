@@ -6,3 +6,6 @@ supabase/.temp/
 dist/
 web-build/
 *.log
+
+.vercel
+.env*

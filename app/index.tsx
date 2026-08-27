@@ -189,8 +189,12 @@ function Login() {
     }
     setBusy(true);
     setError("");
+    // Keep the existing Supabase identity behind the scenes while presenting the
+    // shop's new, friendlier username. This avoids replacing the account and
+    // preserves all memberships, products, stock and sales history.
+    const authUsername = clean === "3dprints" ? "sebu3d" : clean;
     const { error: e } = await supabase.auth.signInWithPassword({
-      email: `${clean}@login.mik.app`,
+      email: `${authUsername}@login.mik.app`,
       password,
     });
     setBusy(false);
@@ -412,7 +416,9 @@ function PlatformAdmin() {
                     size={14}
                     color={C.muted}
                   />{" "}
-                  {shop.login_username ?? "No username connected"}
+                  {shop.slug === "sebu3d"
+                    ? "3dprints"
+                    : shop.login_username ?? "No username connected"}
                 </Text>
               </View>
               <View style={s.statusPill}>
