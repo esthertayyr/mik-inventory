@@ -1269,12 +1269,15 @@ function SaleScreen({
                 })}
               </View>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
-                <Chip label="Categories" icon="grid" selected={false} onPress={() => { setCategory(null); setSearch(""); }} />
-                {categories.map((c) => (
-                  <Chip key={c.id} label={c.name} icon={categoryIcon(c.name)} tone={categoryTone(c.name)} selected={category === c.id} onPress={() => setCategory(c.id)} />
-                ))}
-              </ScrollView>
+              <>
+                {width < 700 ? <Text style={s.swipeHint}>Swipe to see more categories →</Text> : null}
+                <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={s.chips}>
+                  <Chip label="Categories" icon="grid" selected={false} onPress={() => { setCategory(null); setSearch(""); }} />
+                  {categories.map((c) => (
+                    <Chip key={c.id} label={c.name} icon={categoryIcon(c.name)} tone={categoryTone(c.name)} selected={category === c.id} onPress={() => setCategory(c.id)} />
+                  ))}
+                </ScrollView>
+              </>
             )}
           </>
         }
@@ -1306,7 +1309,7 @@ function SaleScreen({
               <View
                 style={[
                   s.productVisual,
-                  { height: width < 700 ? 92 : cardWidth - 18 },
+                  { height: width < 700 ? 112 : cardWidth - 18 },
                 ]}
               >
                 {item.image_url || placeholderImage(item.name) ? (
@@ -3245,7 +3248,7 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
   },
   top: {
-    minHeight: 68,
+    minHeight: 60,
     paddingHorizontal: 17,
     flexDirection: "row",
     alignItems: "center",
@@ -3386,8 +3389,8 @@ const s = StyleSheet.create({
   pageTitle: {
     marginTop: 18,
     color: C.ink,
-    fontSize: 30,
-    lineHeight: 39,
+    fontSize: 26,
+    lineHeight: 33,
     fontWeight: "800",
     letterSpacing: -0.5,
   },
@@ -3395,7 +3398,7 @@ const s = StyleSheet.create({
   scroll: { paddingBottom: 34 },
   step: {
     marginTop: 12,
-    padding: 12,
+    padding: 9,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -3403,9 +3406,9 @@ const s = StyleSheet.create({
     backgroundColor: C.soft,
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: C.green,
@@ -3414,8 +3417,8 @@ const s = StyleSheet.create({
   stepText: {
     flex: 1,
     color: C.dark,
-    fontSize: 16,
-    lineHeight: 23,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: "800",
   },
   search: {
@@ -3432,6 +3435,7 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, minHeight: 52, color: C.ink, fontSize: 17 },
   chips: { minHeight: 60, gap: 9, alignItems: "center", paddingVertical: 9 },
+  swipeHint: { marginTop: 10, color: C.muted, fontSize: 12, fontWeight: "700" },
   stockFilterLabel: {
     marginTop: 13,
     marginBottom: 7,
@@ -3486,7 +3490,7 @@ const s = StyleSheet.create({
   },
   categoryCard: {
     width: "48%",
-    minHeight: 142,
+    minHeight: 126,
     padding: 18,
     alignItems: "flex-start",
     justifyContent: "space-between",
@@ -3519,7 +3523,7 @@ const s = StyleSheet.create({
   productCard: {
     flexGrow: 0,
     flexShrink: 0,
-    minHeight: 174,
+    minHeight: 188,
     marginBottom: 9,
     padding: 8,
     borderWidth: 1,
