@@ -39,25 +39,25 @@ import type {
 } from "@/src/types";
 
 const C = {
-  ink: "#101820",
-  muted: "#56616B",
-  green: "#132E3F",
-  dark: "#0D1F2D",
-  soft: "#F3F5F6",
-  accent: "#30483B",
-  accentDark: "#21362C",
+  ink: "#11151A",
+  muted: "#59626B",
+  green: "#102A43",
+  dark: "#0B1E2D",
+  soft: "#F4F5F5",
+  accent: "#29473A",
+  accentDark: "#1C342A",
   accentSoft: "#EEF2EF",
-  teal: "#1F455D",
-  tealSoft: "#EEF3F6",
-  purple: "#6B2639",
-  purpleSoft: "#F6F0F2",
+  teal: "#294B61",
+  tealSoft: "#EEF2F5",
+  purple: "#70263A",
+  purpleSoft: "#F6EFF1",
   cream: "#FFFFFF",
   white: "#FFFFFF",
-  border: "#D8DDE1",
-  orange: "#8A612B",
-  orangeSoft: "#F7F3EC",
-  red: "#792238",
-  redSoft: "#F7EFF1",
+  border: "#D9D9D5",
+  orange: "#8A692F",
+  orangeSoft: "#F6F1E8",
+  red: "#70263A",
+  redSoft: "#F6EFF1",
 };
 type Icon = keyof typeof Ionicons.glyphMap;
 function categoryIcon(name: string): Icon {
@@ -70,11 +70,11 @@ function categoryIcon(name: string): Icon {
 }
 function categoryTone(name: string) {
   const n = name.toLowerCase();
-  if (n.includes("keyboard")) return { color: "#123653", soft: "#FFFFFF" };
-  if (n.includes("fidget")) return { color: "#354D3E", soft: "#FFFFFF" };
-  if (n.includes("keychain")) return { color: "#7A1F39", soft: "#FFFFFF" };
-  if (n.includes("home") || n.includes("gift")) return { color: "#533C57", soft: "#FFFFFF" };
-  return { color: "#244F6B", soft: "#FFFFFF" };
+  if (n.includes("keyboard")) return { color: "#102A43", soft: "#FFFFFF" };
+  if (n.includes("fidget")) return { color: "#29473A", soft: "#FFFFFF" };
+  if (n.includes("keychain")) return { color: "#70263A", soft: "#FFFFFF" };
+  if (n.includes("home") || n.includes("gift")) return { color: "#49384E", soft: "#FFFFFF" };
+  return { color: "#294B61", soft: "#FFFFFF" };
 }
 function productIcon(name: string, category = ""): Icon {
   const n = `${name} ${category}`.toLowerCase();
