@@ -148,6 +148,13 @@ const ownerNav: {
   soft: string;
 }[] = [
   {
+    id: "home",
+    label: "Home",
+    icon: "home-outline",
+    color: C.green,
+    soft: C.soft,
+  },
+  {
     id: "sale",
     label: "Sell",
     icon: "cart-outline",
@@ -474,7 +481,7 @@ function ShopApp({
   adminBusiness?: AdminShop;
   onAdminExit?: () => void;
 }) {
-  const [screen, setScreen] = useState<Screen>("sale");
+  const [screen, setScreen] = useState<Screen>("home");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -653,11 +660,20 @@ function ShopApp({
       : Promise.resolve();
   const chooseLocation = async (id: string) => {
     setLocationId(id);
-    setScreen("sale");
+    setScreen("home");
     if (business) await loadData(business.id, id);
   };
   let body: ReactNode;
-  if (screen === "sale")
+  if (screen === "home")
+    body = (
+      <QuickStart
+        onOpen={(next) => {
+          setScreen(next);
+          if (next === "dashboard") void reload();
+        }}
+      />
+    );
+  else if (screen === "sale")
     body = (
       <SaleScreen
         key={locationId}
@@ -1624,6 +1640,52 @@ function SaleScreen({
         </View>
       ) : null}
     </View>
+  );
+}
+
+function QuickStart({ onOpen }: { onOpen: (screen: Screen) => void }) {
+  const actions: Array<{
+    title: string;
+    help: string;
+    icon: Icon;
+    screen: Screen;
+    color: string;
+    soft: string;
+  }> = [
+    { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: C.soft },
+    { title: "Update stock", help: "Count stock or add new stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
+    { title: "Sales today", help: "See what was sold and today's total", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
+    { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "reports", color: C.red, soft: C.redSoft },
+    { title: "Add missed sale", help: "Record a sale from an earlier date", icon: "calendar", screen: "sale", color: C.orange, soft: C.orangeSoft },
+    { title: "Products & prices", help: "Add or edit products and categories", icon: "pricetags", screen: "products", color: C.purple, soft: C.purpleSoft },
+  ];
+  return (
+    <ScrollView contentContainerStyle={s.quickScroll}>
+      <Text style={s.pageTitle}>What do you want to do?</Text>
+      <Text style={s.subtitle}>Tap one large button to begin.</Text>
+      <View style={s.quickGrid}>
+        {actions.map((action) => (
+          <Pressable
+            key={action.title}
+            accessibilityRole="button"
+            accessibilityLabel={`${action.title}. ${action.help}`}
+            style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.72 }]}
+            onPress={() => onOpen(action.screen)}
+          >
+            <View style={[s.quickIcon, { backgroundColor: action.color }]}>
+              <Ionicons name={action.icon} size={30} color={C.white} />
+            </View>
+            <Text style={s.quickTitle}>{action.title}</Text>
+            <Text style={s.quickHelp}>{action.help}</Text>
+            <View style={[s.quickGo, { backgroundColor: action.soft }]}>
+              <Text style={[s.quickGoText, { color: action.color }]}>Open</Text>
+              <Ionicons name="arrow-forward" size={18} color={action.color} />
+            </View>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={s.quickNote}>Wrong sale? Open “Correct a sale”. It will ask for the manager passcode before changing anything.</Text>
+    </ScrollView>
   );
 }
 
@@ -3532,6 +3594,51 @@ const s = StyleSheet.create({
   },
   subtitle: { marginTop: 4, color: C.muted, fontSize: 16, lineHeight: 24 },
   scroll: { paddingBottom: 34 },
+  quickScroll: { paddingHorizontal: 14, paddingTop: 18, paddingBottom: 34 },
+  quickGrid: {
+    marginTop: 18,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  quickCard: {
+    width: "48%",
+    minHeight: 212,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 22,
+    backgroundColor: C.white,
+  },
+  quickIcon: {
+    width: 52,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+  },
+  quickTitle: { marginTop: 14, color: C.ink, fontSize: 20, fontWeight: "900" },
+  quickHelp: { marginTop: 6, flex: 1, color: C.muted, fontSize: 14, lineHeight: 19, fontWeight: "600" },
+  quickGo: {
+    minHeight: 38,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 12,
+  },
+  quickGoText: { fontSize: 14, fontWeight: "900" },
+  quickNote: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: C.redSoft,
+    color: C.ink,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "700",
+  },
   step: {
     marginTop: 12,
     padding: 9,

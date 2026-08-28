@@ -1,6 +1,7 @@
 export type Role = "owner" | "staff";
 export type PaymentMethod = "cash" | "gcash";
 export type Screen =
+  | "home"
   | "dashboard"
   | "sale"
   | "products"
