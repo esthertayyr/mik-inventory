@@ -3664,7 +3664,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 12,
-    backgroundColor: C.white,
+    backgroundColor: "#F7F8FA",
     shadowColor: "#0D1722",
     shadowOpacity: 0.035,
     shadowRadius: 8,
