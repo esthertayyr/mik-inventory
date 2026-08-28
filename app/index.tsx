@@ -673,15 +673,17 @@ function ShopApp({
         }}
       />
     );
-  else if (screen === "sale")
+  else if (screen === "sale" || screen === "missed")
     body = (
       <SaleScreen
-        key={locationId}
+        key={`${locationId}-${screen}`}
         products={products}
         categories={categories}
         locationId={locationId}
         onSaved={reload}
         onPendingChange={setSaleInProgress}
+        startPastSale={screen === "missed"}
+        onNavigate={setScreen}
       />
     );
   else if (screen === "dashboard")
@@ -699,6 +701,7 @@ function ShopApp({
         categories={categories}
         locationId={locationId}
         onSaved={reload}
+        onHome={() => setScreen("home")}
       />
     );
   else if (screen === "products")
@@ -719,6 +722,8 @@ function ShopApp({
         <ReportsScreen locationId={locationId} hideTitle />
       </View>
     );
+  else if (screen === "correct")
+    body = <ReportsScreen locationId={locationId} correctionMode />;
   else if (screen === "shop")
     body = (
       <ShopProfile
@@ -737,7 +742,13 @@ function ShopApp({
       />
     );
   const selected =
-    screen === "products" || screen === "reports" || screen === "shop" ? "more" : screen;
+    screen === "products" || screen === "reports" || screen === "shop"
+      ? "more"
+      : screen === "missed"
+        ? "sale"
+        : screen === "correct"
+          ? "home"
+          : screen;
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -758,10 +769,10 @@ function ShopApp({
               : current?.name ?? "Shop location"}
           </Text>
         </View>
-        <View style={s.ready}>
-          <View style={s.dot} />
-          <Text style={s.readyText}>Ready</Text>
-        </View>
+        <Pressable style={s.headerHome} onPress={() => setScreen("home")} accessibilityLabel="Go to home page">
+          <Ionicons name="home" size={19} color={C.white} />
+          <Text style={s.headerHomeText}>Home</Text>
+        </Pressable>
       </View>
       {locations.length > 1 ? (
         <ScrollView
@@ -791,7 +802,7 @@ function ShopApp({
                 setScreen(item.id);
                 if (item.id === "dashboard") void reload();
               };
-              if (screen === "sale" && saleInProgress && item.id !== "sale")
+              if ((screen === "sale" || screen === "missed") && saleInProgress && item.id !== "sale")
                 Alert.alert(
                   "Keep this unfinished sale?",
                   "Leaving now will clear the selected products.",
@@ -862,12 +873,16 @@ function SaleScreen({
   locationId,
   onSaved,
   onPendingChange,
+  startPastSale = false,
+  onNavigate,
 }: {
   products: Product[];
   categories: Category[];
   locationId: string;
   onSaved: () => void;
   onPendingChange: (pending: boolean) => void;
+  startPastSale?: boolean;
+  onNavigate: (screen: Screen) => void;
 }) {
   const { width } = useWindowDimensions();
   const productColumns = width >= 980 ? 4 : width >= 700 ? 3 : 2;
@@ -884,7 +899,7 @@ function SaleScreen({
   const [cashReceived, setCashReceived] = useState("");
   const [review, setReview] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [recordPastSale, setRecordPastSale] = useState(false);
+  const [recordPastSale, setRecordPastSale] = useState(startPastSale);
   const [pastSaleDate, setPastSaleDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [managerPasscode, setManagerPasscode] = useState("");
   useEffect(() => onPendingChange(cart.length > 0), [cart.length, onPendingChange]);
@@ -1055,6 +1070,10 @@ function SaleScreen({
     Alert.alert(
       "Sale completed",
       `Receipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? `Cash\nChange: ${peso(changeDue)}` : "GCash — received"}.`,
+      [
+        { text: "See sales today", onPress: () => onNavigate("dashboard") },
+        { text: "Start next sale", onPress: () => onNavigate("sale") },
+      ],
     );
   };
   if (review)
@@ -1284,6 +1303,15 @@ function SaleScreen({
         ]}
         ListHeaderComponent={
           <>
+            {startPastSale ? (
+              <View style={s.missedBanner}>
+                <Ionicons name="calendar" size={24} color={C.white} />
+                <View style={s.flex}>
+                  <Text style={s.missedBannerTitle}>Adding a missed sale</Text>
+                  <Text style={s.missedBannerText}>Choose the products now. You will choose the original date before saving.</Text>
+                </View>
+              </View>
+            ) : null}
             <Text style={s.pageTitle}>
               {choosingCategory ? "Choose a category" : "Choose a product"}
             </Text>
@@ -1655,9 +1683,11 @@ function QuickStart({ onOpen }: { onOpen: (screen: Screen) => void }) {
     { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: C.soft },
     { title: "Update stock", help: "Count stock or add new stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
     { title: "Sales today", help: "See what was sold and today's total", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
-    { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "reports", color: C.red, soft: C.redSoft },
-    { title: "Add missed sale", help: "Record a sale from an earlier date", icon: "calendar", screen: "sale", color: C.orange, soft: C.orangeSoft },
+    { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft },
+    { title: "Add missed sale", help: "Record a sale from an earlier date", icon: "calendar", screen: "missed", color: C.orange, soft: C.orangeSoft },
     { title: "Products & prices", help: "Add or edit products and categories", icon: "pricetags", screen: "products", color: C.purple, soft: C.purpleSoft },
+    { title: "Reports & Excel", help: "See daily, weekly or monthly sales", icon: "bar-chart", screen: "reports", color: C.teal, soft: C.tealSoft },
+    { title: "Shop settings", help: "Logo, help guide and account", icon: "settings", screen: "more", color: C.accent, soft: C.accentSoft },
   ];
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
@@ -2430,11 +2460,13 @@ function Inventory({
   categories,
   locationId,
   onSaved,
+  onHome,
 }: {
   products: Product[];
   categories: Category[];
   locationId: string;
   onSaved: () => void;
+  onHome: () => void;
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);
@@ -2520,6 +2552,10 @@ function Inventory({
       mode === "damage"
         ? `${amount} damaged recorded.`
         : `${amount} added to stock.`,
+      [
+        { text: "Go home", onPress: onHome },
+        { text: "Update more stock" },
+      ],
     );
   };
   if (
@@ -3526,6 +3562,17 @@ const s = StyleSheet.create({
   navIconOn: { backgroundColor: C.green },
   navText: { marginTop: 3, color: C.muted, fontSize: 12, fontWeight: "700" },
   navTextOn: { color: C.dark, fontWeight: "900" },
+  headerHome: {
+    minHeight: 42,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 14,
+    backgroundColor: C.green,
+  },
+  headerHomeText: { color: C.white, fontSize: 14, fontWeight: "900" },
   adminTop: {
     minHeight: 72,
     paddingHorizontal: 18,
@@ -3639,6 +3686,17 @@ const s = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "700",
   },
+  missedBanner: {
+    marginBottom: 16,
+    padding: 15,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 18,
+    backgroundColor: C.orange,
+  },
+  missedBannerTitle: { color: C.white, fontSize: 18, fontWeight: "900" },
+  missedBannerText: { marginTop: 3, color: C.white, fontSize: 13, lineHeight: 18, fontWeight: "600" },
   step: {
     marginTop: 12,
     padding: 9,

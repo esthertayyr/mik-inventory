@@ -172,9 +172,11 @@ function CalendarPicker({
 export function ReportsScreen({
   locationId,
   hideTitle = false,
+  correctionMode = false,
 }: {
   locationId: string;
   hideTitle?: boolean;
+  correctionMode?: boolean;
 }) {
   const [period, setPeriod] = useState<Period>("daily");
   const [offset, setOffset] = useState(0);
@@ -440,8 +442,19 @@ export function ReportsScreen({
 
   return (
     <ScrollView contentContainerStyle={s.page}>
-      {hideTitle ? null : <Text style={s.title}>Sales Reports</Text>}
-      <View style={s.tabs}>
+      {correctionMode ? (
+        <>
+          <Text style={s.title}>Correct a sale</Text>
+          <View style={s.correctionGuide}>
+            <Ionicons name="return-up-back" size={26} color="#FFF" />
+            <View style={s.correctionGuideText}>
+              <Text style={s.correctionGuideTitle}>Choose the wrong sale below</Text>
+              <Text style={s.correctionGuideHelp}>Tap “Remove / correct”, then enter the manager passcode. Stock will be restored automatically.</Text>
+            </View>
+          </View>
+        </>
+      ) : hideTitle ? null : <Text style={s.title}>Sales Reports</Text>}
+      {correctionMode ? null : <View style={s.tabs}>
         {(["daily", "weekly", "monthly"] as Period[]).map((p) => (
           <Pressable
             key={p}
@@ -457,7 +470,7 @@ export function ReportsScreen({
             </Text>
           </Pressable>
         ))}
-      </View>
+      </View>}
       {period === "daily" ? (
         <View style={s.dateTools}>
           <Pressable
@@ -524,6 +537,7 @@ export function ReportsScreen({
         <Text style={s.error}>{error}</Text>
       ) : (
         <>
+          {correctionMode ? null : <>
           <View style={s.hero}>
             <Text style={s.heroLabel}>TOTAL SALES</Text>
             <Text style={s.heroValue}>{peso(total)}</Text>
@@ -580,7 +594,8 @@ export function ReportsScreen({
             <Ionicons name="download-outline" size={23} color="#FFF" />
             <Text style={s.exportText}>Export for Excel</Text>
           </Pressable>
-          <Text style={s.section}>Sales list</Text>
+          </>}
+          <Text style={s.section}>{correctionMode ? "Choose a sale" : "Sales list"}</Text>
           {sales.length ? (
             sales.map((sale) => (
               <View key={sale.id} style={s.sale}>
@@ -608,14 +623,14 @@ export function ReportsScreen({
                   {sale.status === "completed" ? (
                     <Pressable style={s.voidButton} onPress={() => setVoidTarget(sale)}>
                       <Ionicons name="create-outline" size={17} color="#B84457" />
-                      <Text style={s.voidText}>Correct sale</Text>
+                      <Text style={s.voidText}>{correctionMode ? "Remove / correct" : "Correct sale"}</Text>
                     </Pressable>
                   ) : null}
                 </View>
               </View>
             ))
           ) : (
-            <Text style={s.empty}>No sales in this period.</Text>
+            <Text style={s.empty}>{correctionMode ? "No sales found on this date. Choose another date above." : "No sales in this period."}</Text>
           )}
         </>
       )}
@@ -645,6 +660,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 const s = StyleSheet.create({
   page: { paddingBottom: 32 },
   title: { fontSize: 28, fontWeight: "800", color: "#11151A", marginTop: 16 },
+  correctionGuide: { marginTop: 12, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 18, backgroundColor: "#70263A" },
+  correctionGuideText: { flex: 1 },
+  correctionGuideTitle: { color: "#FFF", fontSize: 17, fontWeight: "900" },
+  correctionGuideHelp: { marginTop: 4, color: "#FFF", fontSize: 13, lineHeight: 18, fontWeight: "600" },
   tabs: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
   tab: {
     flex: 1,

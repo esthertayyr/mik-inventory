@@ -4,6 +4,8 @@ export type Screen =
   | "home"
   | "dashboard"
   | "sale"
+  | "missed"
+  | "correct"
   | "products"
   | "inventory"
   | "reports"
