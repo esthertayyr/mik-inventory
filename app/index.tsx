@@ -5,12 +5,15 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
+  Text as RNText,
+  TextInput as RNTextInput,
+  type TextInputProps,
+  type TextProps,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -37,6 +40,21 @@ import type {
   Sale,
   Screen,
 } from "@/src/types";
+
+const APP_FONT = Platform.select({
+  web: "Arial, Helvetica, sans-serif",
+  ios: "Arial",
+  android: "sans-serif",
+  default: "Arial",
+});
+
+function Text({ style, ...props }: TextProps) {
+  return <RNText {...props} style={[{ fontFamily: APP_FONT }, style]} />;
+}
+
+function TextInput({ style, ...props }: TextInputProps) {
+  return <RNTextInput {...props} style={[{ fontFamily: APP_FONT }, style]} />;
+}
 
 const C = {
   ink: "#11151A",
