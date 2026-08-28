@@ -1306,7 +1306,7 @@ function SaleScreen({
               <View
                 style={[
                   s.productVisual,
-                  { height: width < 700 ? 104 : cardWidth - 20 },
+                  { height: width < 700 ? 92 : cardWidth - 18 },
                 ]}
               >
                 {item.image_url || placeholderImage(item.name) ? (
@@ -1324,6 +1324,25 @@ function SaleScreen({
                     <Text style={s.badgeText}>{qty}</Text>
                   </View>
                 ) : null}
+                {item.sale_price !== null ? (
+                  <View style={s.saleBadge}>
+                    <Text style={s.saleBadgeText}>ON SALE</Text>
+                  </View>
+                ) : null}
+                <View
+                  style={[
+                    s.stockBadge,
+                    item.quantity_on_hand <= item.low_stock_threshold && s.stockBadgeLow,
+                  ]}
+                >
+                  <Text style={s.stockBadgeText}>
+                    {item.needs_stock_count
+                      ? "? left"
+                      : item.quantity_on_hand <= 0
+                        ? "Out"
+                        : `${item.quantity_on_hand} left`}
+                  </Text>
+                </View>
               </View>
               <Text style={s.productName} numberOfLines={2}>
                 {item.name}
@@ -1346,24 +1365,6 @@ function SaleScreen({
                     : `Choose ${item.variant_label ?? "option"}`}
                 </Text>
               ) : null}
-              {item.sale_price !== null && item.regular_price !== null ? (
-                <Text style={s.saleLine}>
-                  Was{" "}
-                  <Text style={s.oldPrice}>{peso(item.regular_price)}</Text>
-                </Text>
-              ) : null}
-              <Text
-                style={[
-                  s.stock,
-                  item.quantity_on_hand <= item.low_stock_threshold && s.low,
-                ]}
-              >
-                {item.needs_stock_count
-                  ? "? left"
-                  : item.quantity_on_hand <= 0
-                    ? "Out of stock"
-                    : `${item.quantity_on_hand} left`}
-              </Text>
             </Pressable>
           );
         }}
@@ -3249,7 +3250,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
-    borderBottomWidth: 0,
+    borderBottomWidth: 1,
     borderColor: C.border,
     backgroundColor: C.white,
   },
@@ -3301,7 +3302,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingBottom: 4,
     flexDirection: "row",
-    borderTopWidth: 0,
+    borderTopWidth: 1,
     borderColor: C.border,
     backgroundColor: C.white,
     width: "100%",
@@ -3387,7 +3388,8 @@ const s = StyleSheet.create({
     color: C.ink,
     fontSize: 30,
     lineHeight: 39,
-    fontWeight: "900",
+    fontWeight: "800",
+    letterSpacing: -0.5,
   },
   subtitle: { marginTop: 4, color: C.muted, fontSize: 16, lineHeight: 24 },
   scroll: { paddingBottom: 34 },
@@ -3397,7 +3399,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: C.soft,
   },
   stepCircle: {
@@ -3425,7 +3427,7 @@ const s = StyleSheet.create({
     gap: 8,
     borderWidth: 1.5,
     borderColor: C.border,
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: C.white,
   },
   searchInput: { flex: 1, minHeight: 52, color: C.ink, fontSize: 17 },
@@ -3517,9 +3519,9 @@ const s = StyleSheet.create({
   productCard: {
     flexGrow: 0,
     flexShrink: 0,
-    minHeight: 196,
-    marginBottom: 11,
-    padding: 10,
+    minHeight: 174,
+    marginBottom: 9,
+    padding: 8,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 14,
@@ -3592,19 +3594,41 @@ const s = StyleSheet.create({
     backgroundColor: C.green,
   },
   badgeText: { color: C.white, fontSize: 16, fontWeight: "900" },
+  saleBadge: {
+    position: "absolute",
+    top: 7,
+    left: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 7,
+    backgroundColor: C.red,
+  },
+  saleBadgeText: { color: C.white, fontSize: 9, fontWeight: "900", letterSpacing: 0.7 },
+  stockBadge: {
+    position: "absolute",
+    left: 7,
+    bottom: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 7,
+    backgroundColor: "rgba(13,31,45,0.88)",
+  },
+  stockBadgeLow: { backgroundColor: "rgba(121,34,56,0.92)" },
+  stockBadgeText: { color: C.white, fontSize: 10, fontWeight: "800" },
   productName: {
-    minHeight: 38,
+    minHeight: 34,
     color: C.ink,
-    fontSize: 15,
-    lineHeight: 19,
-    fontWeight: "900",
+    fontSize: 14,
+    lineHeight: 17,
+    fontWeight: "800",
   },
   productPrice: {
-    marginTop: 3,
+    marginTop: 1,
     color: C.dark,
-    fontSize: 24,
-    lineHeight: 29,
-    fontWeight: "900",
+    fontSize: 21,
+    lineHeight: 25,
+    fontWeight: "800",
+    letterSpacing: -0.4,
   },
   saleLine: { marginTop: 3, color: C.red, fontSize: 13, lineHeight: 18, fontWeight: "900" },
   oldPrice: { color: C.muted, textDecorationLine: "line-through" },
@@ -3634,7 +3658,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: C.green,
   },
   reviewText: { color: C.white, fontSize: 16, fontWeight: "900" },
@@ -3646,7 +3670,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: C.white,
   },
   backTitle: { color: C.ink, fontSize: 22, fontWeight: "900" },
@@ -3656,7 +3680,7 @@ const s = StyleSheet.create({
     padding: 13,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 19,
+    borderRadius: 13,
     backgroundColor: C.white,
   },
   cartProductTop: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -3685,7 +3709,7 @@ const s = StyleSheet.create({
     height: 38,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 13,
+    borderRadius: 10,
     backgroundColor: C.soft,
   },
   qtyNumber: {
@@ -3698,7 +3722,7 @@ const s = StyleSheet.create({
   totalBox: {
     marginTop: 14,
     padding: 19,
-    borderRadius: 22,
+    borderRadius: 15,
     backgroundColor: C.dark,
   },
   totalLabel: { color: "#DDE4FF", fontSize: 15, fontWeight: "700" },
@@ -3721,7 +3745,7 @@ const s = StyleSheet.create({
     gap: 7,
     borderWidth: 1.5,
     borderColor: C.border,
-    borderRadius: 20,
+    borderRadius: 13,
     backgroundColor: C.white,
   },
   choiceOn: { borderWidth: 2.5, borderColor: C.green, backgroundColor: C.soft },
@@ -3735,11 +3759,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 9,
-    borderRadius: 21,
+    borderRadius: 14,
     backgroundColor: C.green,
     shadowColor: C.green,
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
@@ -3748,7 +3772,7 @@ const s = StyleSheet.create({
   hero: {
     marginTop: 16,
     padding: 21,
-    borderRadius: 24,
+    borderRadius: 16,
     backgroundColor: C.dark,
   },
   heroLabel: { color: "#DDE4FF", fontSize: 15, fontWeight: "700" },
@@ -3760,7 +3784,7 @@ const s = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 21,
+    borderRadius: 13,
     backgroundColor: C.white,
   },
   statLabel: { marginTop: 8, color: C.muted, fontSize: 13, fontWeight: "700" },
@@ -3774,7 +3798,7 @@ const s = StyleSheet.create({
     gap: 11,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: C.white,
   },
   soldIcon: {
@@ -3801,7 +3825,7 @@ const s = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 19,
+    borderRadius: 12,
     backgroundColor: C.white,
   },
   receiptTop: {
@@ -3853,7 +3877,7 @@ const s = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 18,
+    borderRadius: 13,
     backgroundColor: C.white,
   },
   editHeading: { flexDirection: "row", alignItems: "center", gap: 11 },
@@ -3982,7 +4006,7 @@ const s = StyleSheet.create({
     gap: 12,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 22,
+    borderRadius: 14,
     backgroundColor: C.white,
   },
   menuIcon: {
@@ -3990,7 +4014,7 @@ const s = StyleSheet.create({
     height: 52,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: C.soft,
   },
   menuTitle: { color: C.ink, fontSize: 17, fontWeight: "900" },
@@ -4026,7 +4050,7 @@ const s = StyleSheet.create({
     gap: 12,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 21,
+    borderRadius: 14,
     backgroundColor: C.white,
   },
   avatar: {
@@ -4073,7 +4097,7 @@ const s = StyleSheet.create({
     maxWidth: 440,
     maxHeight: "92%",
     overflow: "hidden",
-    borderRadius: 28,
+    borderRadius: 18,
     backgroundColor: C.white,
     shadowColor: "#15233A",
     shadowOpacity: 0.24,
@@ -4116,7 +4140,7 @@ const s = StyleSheet.create({
     height: 88,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 28,
+    borderRadius: 18,
     backgroundColor: C.green,
   },
   guideTitle: {
@@ -4201,7 +4225,7 @@ const s = StyleSheet.create({
     padding: 16,
     borderWidth: 1.5,
     borderColor: C.border,
-    borderRadius: 22,
+    borderRadius: 14,
     backgroundColor: C.white,
   },
   cashCalculator: {
@@ -4209,7 +4233,7 @@ const s = StyleSheet.create({
     padding: 16,
     borderWidth: 1.5,
     borderColor: C.accentSoft,
-    borderRadius: 22,
+    borderRadius: 14,
     backgroundColor: C.white,
   },
   pastSaleCard: { marginTop: 14, padding: 14, borderWidth: 1, borderColor: C.border, borderRadius: 20, backgroundColor: C.white },
@@ -4230,7 +4254,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
     borderWidth: 2,
     borderColor: C.accent,
-    borderRadius: 19,
+    borderRadius: 12,
     backgroundColor: C.cream,
     color: C.ink,
     fontSize: 28,
@@ -4250,7 +4274,7 @@ const s = StyleSheet.create({
     marginTop: 14,
     padding: 16,
     alignItems: "center",
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: C.accentDark,
   },
   changeBoxShort: { backgroundColor: C.red },
@@ -4274,7 +4298,7 @@ const s = StyleSheet.create({
     gap: 9,
     borderWidth: 2,
     borderColor: C.green,
-    borderRadius: 19,
+    borderRadius: 13,
     backgroundColor: C.soft,
   },
   receivedButtonOn: { backgroundColor: C.accent, borderColor: C.accent },
@@ -4311,7 +4335,7 @@ const s = StyleSheet.create({
     maxWidth: 440,
     maxHeight: "86%",
     overflow: "hidden",
-    borderRadius: 28,
+    borderRadius: 18,
     backgroundColor: C.white,
   },
   variantHeader: {
@@ -4340,7 +4364,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1.5,
     borderColor: C.border,
-    borderRadius: 18,
+    borderRadius: 12,
     backgroundColor: C.white,
   },
   variantButtonOn: {
@@ -4379,7 +4403,7 @@ const s = StyleSheet.create({
     padding: 16,
     borderWidth: 2,
     borderColor: C.border,
-    borderRadius: 20,
+    borderRadius: 13,
     backgroundColor: C.white,
   },
   designButtonText: { color: C.ink, fontSize: 20, fontWeight: "900" },
@@ -4406,7 +4430,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 9,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: C.green,
   },
   letterAddText: { color: C.white, fontSize: 18, fontWeight: "900" },
