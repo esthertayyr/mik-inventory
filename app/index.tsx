@@ -1698,11 +1698,7 @@ function QuickStart({ onOpen }: { onOpen: (screen: Screen) => void }) {
             key={action.title}
             accessibilityRole="button"
             accessibilityLabel={`${action.title}. ${action.help}`}
-            style={({ pressed }) => [
-              s.quickCard,
-              { backgroundColor: action.soft },
-              pressed && { opacity: 0.72 },
-            ]}
+            style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.72 }]}
             onPress={() => onOpen(action.screen)}
           >
             <View style={[s.quickIcon, { borderColor: action.color }]}>
