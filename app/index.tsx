@@ -57,25 +57,25 @@ function TextInput({ style, ...props }: TextInputProps) {
 }
 
 const C = {
-  ink: "#11151A",
-  muted: "#59626B",
-  green: "#102A43",
-  dark: "#0B1E2D",
-  soft: "#F4F5F5",
-  accent: "#29473A",
-  accentDark: "#1C342A",
-  accentSoft: "#EEF2EF",
-  teal: "#294B61",
-  tealSoft: "#EEF2F5",
-  purple: "#70263A",
-  purpleSoft: "#F6EFF1",
+  ink: "#101318",
+  muted: "#626A73",
+  green: "#142C47",
+  dark: "#0D1722",
+  soft: "#F6F7F8",
+  accent: "#264A3B",
+  accentDark: "#193529",
+  accentSoft: "#F3F6F4",
+  teal: "#29465B",
+  tealSoft: "#F3F5F7",
+  purple: "#65243A",
+  purpleSoft: "#F8F4F5",
   cream: "#FFFFFF",
   white: "#FFFFFF",
-  border: "#D9D9D5",
-  orange: "#8A692F",
-  orangeSoft: "#F6F1E8",
-  red: "#70263A",
-  redSoft: "#F6EFF1",
+  border: "#E0E3E7",
+  orange: "#795C2D",
+  orangeSoft: "#F8F6F1",
+  red: "#65243A",
+  redSoft: "#F8F4F5",
 };
 type Icon = keyof typeof Ionicons.glyphMap;
 function categoryIcon(name: string): Icon {
@@ -818,15 +818,14 @@ function ShopApp({
               style={[
                 s.navIcon,
                 {
-                  backgroundColor:
-                    selected === item.id ? item.color : item.soft,
+                  backgroundColor: "transparent",
                 },
               ]}
             >
               <Ionicons
                 name={item.icon}
                 size={24}
-                color={selected === item.id ? C.white : item.color}
+                color={selected === item.id ? item.color : C.muted}
               />
             </View>
             <Text
@@ -1702,12 +1701,12 @@ function QuickStart({ onOpen }: { onOpen: (screen: Screen) => void }) {
             style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.72 }]}
             onPress={() => onOpen(action.screen)}
           >
-            <View style={[s.quickIcon, { backgroundColor: action.color }]}>
-              <Ionicons name={action.icon} size={30} color={C.white} />
+            <View style={[s.quickIcon, { borderColor: action.color }]}>
+              <Ionicons name={action.icon} size={28} color={action.color} />
             </View>
             <Text style={s.quickTitle}>{action.title}</Text>
             <Text style={s.quickHelp}>{action.help}</Text>
-            <View style={[s.quickGo, { backgroundColor: action.soft }]}>
+            <View style={s.quickGo}>
               <Text style={[s.quickGoText, { color: action.color }]}>Open</Text>
               <Ionicons name="arrow-forward" size={18} color={action.color} />
             </View>
@@ -2940,13 +2939,13 @@ type GuideStep = { title: string; body: string; icon: Icon; flow: GuideFlow[] };
 const guideSteps: GuideStep[] = [
   {
     title: "Welcome to Mik",
-    body: "The four buttons at the bottom take you to everything you need.",
-    icon: "sparkles",
+    body: "Home shows a large button for every common shop task. You can always tap Home at the top or bottom to return here.",
+    icon: "home",
     flow: [
+      { icon: "home-outline", label: "Home" },
       { icon: "cart-outline", label: "Sell" },
       { icon: "today-outline", label: "Today" },
       { icon: "cube-outline", label: "Stock" },
-      { icon: "grid-outline", label: "More" },
     ],
   },
   {
@@ -2972,7 +2971,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: "Check and change stock",
-    body: "Open Stock and choose a product. For products with choices, choose the letter, colour, or size before changing stock.",
+    body: "Tap Update stock on Home, choose a product, then choose Add stock or Damaged. Products with choices will ask which one first.",
     icon: "cube",
     flow: [
       { icon: "cube-outline", label: "Stock" },
@@ -2981,11 +2980,21 @@ const guideSteps: GuideStep[] = [
     ],
   },
   {
+    title: "Correct or add a missed sale",
+    body: "Home has separate buttons for a wrong sale and a sale entered late. Both protected changes ask for the manager passcode.",
+    icon: "return-up-back",
+    flow: [
+      { icon: "home-outline", label: "Home" },
+      { icon: "return-up-back-outline", label: "Correct" },
+      { icon: "calendar-outline", label: "Missed sale" },
+    ],
+  },
+  {
     title: "Create or edit a product",
-    body: "Under More, open Products & prices. Add the photo, price, and stock. Turn on choices for letters A–Z, colours, or sizes.",
+    body: "Tap Products & prices on Home. Add the photo, price, and stock. Turn on choices for letters A–Z, colours, or sizes.",
     icon: "pricetags",
     flow: [
-      { icon: "grid-outline", label: "More" },
+      { icon: "home-outline", label: "Home" },
       { icon: "pricetags-outline", label: "Products" },
       { icon: "camera-outline", label: "Photo" },
       { icon: "save-outline", label: "Save" },
@@ -2993,10 +3002,10 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: "View sales reports",
-    body: "Choose Daily, Weekly, Monthly, or pick an exact date on the calendar.",
+    body: "Tap Reports & Excel on Home, then choose Daily, Weekly, Monthly, or an exact calendar date.",
     icon: "bar-chart",
     flow: [
-      { icon: "grid-outline", label: "More" },
+      { icon: "home-outline", label: "Home" },
       { icon: "bar-chart-outline", label: "Reports" },
       { icon: "calendar-outline", label: "Choose date" },
     ],
@@ -3361,17 +3370,17 @@ const s = StyleSheet.create({
     width: "100%",
     maxWidth: 440,
     padding: 28,
-    borderRadius: 22,
+    borderRadius: 14,
     backgroundColor: C.white,
     borderWidth: 1,
     borderColor: C.border,
     shadowColor: "#0D1F2D",
-    shadowOpacity: 0.07,
-    shadowRadius: 22,
+    shadowOpacity: 0.025,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: 9 },
     elevation: 5,
   },
-  brandLogo: { width: 150, height: 150, alignSelf: "center" },
+  brandLogo: { width: 118, height: 118, alignSelf: "center" },
   logo: {
     width: 76,
     height: 76,
@@ -3553,11 +3562,11 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   navIcon: {
-    width: 48,
+    width: 42,
     height: 34,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 17,
+    borderRadius: 8,
   },
   navIconOn: { backgroundColor: C.green },
   navText: { marginTop: 3, color: C.muted, fontSize: 12, fontWeight: "700" },
@@ -3634,8 +3643,8 @@ const s = StyleSheet.create({
   pageTitle: {
     marginTop: 18,
     color: C.ink,
-    fontSize: 26,
-    lineHeight: 33,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: "800",
     letterSpacing: -0.5,
   },
@@ -3650,30 +3659,38 @@ const s = StyleSheet.create({
   },
   quickCard: {
     width: "48%",
-    minHeight: 212,
+    minHeight: 194,
     padding: 16,
     borderWidth: 1,
     borderColor: C.border,
-    borderRadius: 22,
+    borderRadius: 12,
     backgroundColor: C.white,
+    shadowColor: "#0D1722",
+    shadowOpacity: 0.035,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 1,
   },
   quickIcon: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 16,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    backgroundColor: C.white,
   },
-  quickTitle: { marginTop: 14, color: C.ink, fontSize: 20, fontWeight: "900" },
+  quickTitle: { marginTop: 13, color: C.ink, fontSize: 18, fontWeight: "900" },
   quickHelp: { marginTop: 6, flex: 1, color: C.muted, fontSize: 14, lineHeight: 19, fontWeight: "600" },
   quickGo: {
     minHeight: 38,
     marginTop: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 0,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderRadius: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
   },
   quickGoText: { fontSize: 14, fontWeight: "900" },
   quickNote: {
@@ -3832,7 +3849,7 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
     shadowColor: "#0D1F2D",
     shadowOpacity: 0.04,
-    shadowRadius: 10,
+    shadowRadius: 7,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
@@ -3962,7 +3979,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderRadius: 14,
+    borderRadius: 7,
     backgroundColor: C.green,
   },
   reviewText: { color: C.white, fontSize: 16, fontWeight: "900" },
@@ -4026,7 +4043,7 @@ const s = StyleSheet.create({
   totalBox: {
     marginTop: 14,
     padding: 19,
-    borderRadius: 15,
+    borderRadius: 10,
     backgroundColor: C.dark,
   },
   totalLabel: { color: "#DDE4FF", fontSize: 15, fontWeight: "700" },
