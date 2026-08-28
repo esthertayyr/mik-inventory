@@ -915,21 +915,37 @@ function SaleScreen({
   };
   const change = (key: string, n: number) =>
     setCart((old) =>
-      old.flatMap((x) =>
-        cartKey(x.product.id, x.variant?.id, x.selectedLetters) !== key
-          ? [x]
-          : x.quantity + n <= 0
-            ? []
-            : [
-                {
-                  ...x,
-                  quantity: Math.min(
-                    x.variant?.quantity_on_hand ?? x.product.quantity_on_hand,
-                    x.quantity + n,
-                  ),
-                },
-              ],
-      ),
+      old.flatMap((x) => {
+        if (cartKey(x.product.id, x.variant?.id, x.selectedLetters) !== key)
+          return [x];
+        if (x.quantity + n <= 0) return [];
+        const normalStock = x.variant?.quantity_on_hand ?? x.product.quantity_on_hand;
+        const selectedLetterCounts = x.selectedLetters.reduce<Record<string, number>>(
+          (counts, letter) => ({ ...counts, [letter]: (counts[letter] ?? 0) + 1 }),
+          {},
+        );
+        const letterStock = x.selectedLetters.length
+          ? Math.min(
+              ...Object.entries(selectedLetterCounts).map(([letter, needed]) =>
+                Math.floor(
+                  (x.product.alphabet_style?.letters.find((item) => item.letter === letter)
+                    ?.quantity_on_hand ?? 0) / needed,
+                ),
+              ),
+            )
+          : normalStock;
+        const available = Math.min(normalStock, letterStock);
+        if (n > 0 && x.quantity >= available) {
+          Alert.alert(
+            "Not enough letter stock",
+            x.selectedLetters.length
+              ? `Only ${available} matching set${available === 1 ? " is" : "s are"} available for ${x.selectedLetters.join(" · ")}. To sell another clicker with different letters, return to Sell and select the product again.`
+              : `Only ${available} unit${available === 1 ? " is" : "s are"} available.`,
+          );
+          return [x];
+        }
+        return [{ ...x, quantity: Math.min(available, x.quantity + n) }];
+      }),
     );
   const complete = async () => {
     if (!cart.length) return;
