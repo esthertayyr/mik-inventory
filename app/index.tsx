@@ -830,6 +830,7 @@ function SaleScreen({
   const { width } = useWindowDimensions();
   const productColumns = width >= 980 ? 4 : width >= 700 ? 3 : 2;
   const [category, setCategory] = useState<string | null>(null);
+  const [saleCategoryOpen, setSaleCategoryOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [choosing, setChoosing] = useState<Product | null>(null);
@@ -1269,15 +1270,34 @@ function SaleScreen({
                 })}
               </View>
             ) : (
-              <>
-                {width < 700 ? <Text style={s.swipeHint}>Swipe to see more categories →</Text> : null}
-                <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={s.chips}>
+              width < 700 ? (
+                <>
+                  <Text style={s.stockFilterLabel}>Category</Text>
+                  <Pressable style={s.stockCategoryPicker} onPress={() => setSaleCategoryOpen((open) => !open)}>
+                    <View style={s.stockCategoryPickerIcon}>
+                      <Ionicons name={category ? categoryIcon(categoryName(category)) : "apps"} size={21} color={C.accent} />
+                    </View>
+                    <Text style={s.stockCategoryPickerText} numberOfLines={1}>{category ? categoryName(category) : "All categories"}</Text>
+                    <Text style={s.stockCategoryChange}>Change</Text>
+                    <Ionicons name={saleCategoryOpen ? "chevron-up" : "chevron-down"} size={20} color={C.muted} />
+                  </Pressable>
+                  {saleCategoryOpen ? (
+                    <View style={s.stockFilterWrap}>
+                      <Chip label="All categories" icon="apps" selected={false} onPress={() => { setCategory(null); setSearch(""); setSaleCategoryOpen(false); }} />
+                      {categories.map((c) => (
+                        <Chip key={c.id} label={c.name} icon={categoryIcon(c.name)} tone={categoryTone(c.name)} selected={category === c.id} onPress={() => { setCategory(c.id); setSaleCategoryOpen(false); }} />
+                      ))}
+                    </View>
+                  ) : null}
+                </>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
                   <Chip label="Categories" icon="grid" selected={false} onPress={() => { setCategory(null); setSearch(""); }} />
                   {categories.map((c) => (
                     <Chip key={c.id} label={c.name} icon={categoryIcon(c.name)} tone={categoryTone(c.name)} selected={category === c.id} onPress={() => setCategory(c.id)} />
                   ))}
                 </ScrollView>
-              </>
+              )
             )}
           </>
         }
@@ -3435,7 +3455,6 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, minHeight: 52, color: C.ink, fontSize: 17 },
   chips: { minHeight: 60, gap: 9, alignItems: "center", paddingVertical: 9 },
-  swipeHint: { marginTop: 10, color: C.muted, fontSize: 12, fontWeight: "700" },
   stockFilterLabel: {
     marginTop: 13,
     marginBottom: 7,
