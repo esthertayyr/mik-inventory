@@ -206,8 +206,8 @@ function Login() {
       setError("Please check the username and try again.");
       return;
     }
-    if (clean === "sebu3d") {
-      setError("Please use the new shop username: 3dprints");
+    if (clean === "sebu3d" || clean === "3dprints") {
+      setError("Please use the new shop username: pixelbug");
       return;
     }
     setBusy(true);
@@ -215,7 +215,7 @@ function Login() {
     // Keep the existing Supabase identity behind the scenes while presenting the
     // shop's new, friendlier username. This avoids replacing the account and
     // preserves all memberships, products, stock and sales history.
-    const authUsername = clean === "3dprints" ? "sebu3d" : clean;
+    const authUsername = clean === "pixelbug" ? "sebu3d" : clean;
     const { error: e } = await supabase.auth.signInWithPassword({
       email: `${authUsername}@login.mik.app`,
       password,
@@ -298,6 +298,7 @@ function SignedIn({ session }: { session: Session }) {
 type AdminShop = {
   id: string;
   name: string;
+  logo_url: string | null;
   slug: string | null;
   login_username: string | null;
   status: string;
@@ -316,7 +317,7 @@ function PlatformAdmin() {
     setLoading(true);
     const { data, error } = await supabase
       .from("businesses")
-      .select("id,name,slug,login_username,status,created_at")
+      .select("id,name,logo_url,slug,login_username,status,created_at")
       .eq("status", "active")
       .order("created_at");
     if (error) Alert.alert("Shops not loaded", error.message);
@@ -441,7 +442,7 @@ function PlatformAdmin() {
                     color={C.muted}
                   />{" "}
                   {shop.slug === "sebu3d"
-                    ? "3dprints"
+                    ? "pixelbug"
                     : shop.login_username ?? "No username connected"}
                 </Text>
               </View>
@@ -564,7 +565,7 @@ function ShopApp({
     setLoading(true);
     if (adminBusiness) {
       setProfile({ id: "platform-admin", display_name: "Owner" });
-      const b = { id: adminBusiness.id, name: adminBusiness.name, role: "owner" } as Business;
+      const b = { id: adminBusiness.id, name: adminBusiness.name, logo_url: adminBusiness.logo_url, role: "owner" } as Business;
       setBusiness(b);
       const { data: ld } = await supabase.from("locations").select("id,business_id,name").eq("business_id", b.id).eq("active", true).order("name");
       const list = (ld ?? []) as Location[];
@@ -585,7 +586,7 @@ function ShopApp({
         .maybeSingle(),
       supabase
         .from("business_memberships")
-        .select("business_id,role,businesses(id,name)")
+        .select("business_id,role,businesses(id,name,logo_url)")
         .eq("user_id", session.user.id),
     ]);
     setProfile(p as Profile | null);
@@ -598,6 +599,7 @@ function ShopApp({
     const b = {
       id: member.business_id,
       name: member.businesses.name,
+      logo_url: member.businesses.logo_url ?? null,
       role: member.role,
     } as Business;
     setBusiness(b);
@@ -701,16 +703,25 @@ function ShopApp({
         <ReportsScreen locationId={locationId} hideTitle />
       </View>
     );
+  else if (screen === "shop")
+    body = (
+      <ShopProfile
+        business={business!}
+        onBack={() => setScreen("more")}
+        onSaved={(logo_url) => setBusiness((current) => current ? { ...current, logo_url } : current)}
+      />
+    );
   else
     body = (
       <More
         profile={profile}
+        business={business!}
         onOpen={setScreen}
         onGuide={() => setGuideOpen(true)}
       />
     );
   const selected =
-    screen === "products" || screen === "reports" ? "more" : screen;
+    screen === "products" || screen === "reports" || screen === "shop" ? "more" : screen;
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -720,17 +731,14 @@ function ShopApp({
             <Ionicons name="arrow-back" size={23} color={C.ink} />
           </Pressable>
         ) : null}
-        <Image
-          source={require("../assets/mik-app-icon.png")}
-          style={s.shopLogo}
-        />
+        <Image source={business?.logo_url ? { uri: business.logo_url } : require("../assets/mik-app-icon.png")} style={s.shopLogo} />
         <View style={s.flex}>
           <Text style={s.shopName} numberOfLines={1}>
             {business?.name}
           </Text>
           <Text style={s.locationName}>
             {(current?.name ?? "Shop location").toLowerCase().includes("sebu")
-              ? "3D Prints"
+              ? "Pixelbug"
               : current?.name ?? "Shop location"}
           </Text>
         </View>
@@ -2694,10 +2702,12 @@ function Inventory({
 
 function More({
   profile,
+  business,
   onOpen,
   onGuide,
 }: {
   profile: Profile | null;
+  business: Business;
   onOpen: (x: Screen) => void;
   onGuide: () => void;
 }) {
@@ -2705,6 +2715,14 @@ function More({
     <ScrollView contentContainerStyle={s.scroll}>
       <Text style={s.pageTitle}>More</Text>
       <Text style={s.subtitle}>Simple tools for this shop.</Text>
+      <Menu
+        icon="storefront-outline"
+        title="Shop profile & logo"
+        help={business.logo_url ? "Replace this shop's logo" : "Add this shop's logo"}
+        color={C.green}
+        soft={C.soft}
+        onPress={() => onOpen("shop")}
+      />
       <Menu
         icon="pricetags-outline"
         title="Products & prices"
@@ -2733,13 +2751,13 @@ function More({
       <View style={s.account}>
         <View style={s.avatar}>
           <Text style={s.avatarText}>
-            {((profile?.display_name ?? "S").toLowerCase().includes("sebu") ? "3" : (profile?.display_name ?? "S")[0]).toUpperCase()}
+            {((profile?.display_name ?? "S").toLowerCase().includes("sebu") ? "P" : (profile?.display_name ?? "S")[0]).toUpperCase()}
           </Text>
         </View>
         <View>
           <Text style={s.rowTitle}>
             {(profile?.display_name ?? "Shop user").toLowerCase().includes("sebu")
-              ? "3D Prints"
+              ? "Pixelbug"
               : profile?.display_name ?? "Shop user"}
           </Text>
           <Text style={s.rowHelp}>This login belongs to this shop only</Text>
@@ -2749,6 +2767,72 @@ function More({
         <Ionicons name="log-out-outline" size={22} color={C.red} />
         <Text style={s.signoutText}>Sign out</Text>
       </Pressable>
+    </ScrollView>
+  );
+}
+
+function ShopProfile({
+  business,
+  onBack,
+  onSaved,
+}: {
+  business: Business;
+  onBack: () => void;
+  onSaved: (logoUrl: string) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const chooseLogo = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted)
+      return Alert.alert("Photo access needed", "Allow Mik to choose a shop logo from this device.");
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 });
+    if (result.canceled) return;
+    setSaving(true);
+    try {
+      const asset = result.assets[0];
+      const resized = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [asset.width >= asset.height ? { resize: { width: 900 } } : { resize: { height: 900 } }],
+        { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      const response = await fetch(resized.uri);
+      if (!response.ok) throw new Error("Logo could not be read");
+      const path = `${business.id}/shop/logo.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from("product-images")
+        .upload(path, await response.arrayBuffer(), { contentType: "image/jpeg", upsert: true });
+      if (uploadError) throw uploadError;
+      const logo_url = `${supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl}?v=${Date.now()}`;
+      const { error: saveError } = await supabase.from("businesses").update({ logo_url }).eq("id", business.id);
+      if (saveError) throw saveError;
+      onSaved(logo_url);
+      Alert.alert("Shop logo updated", "The new logo now appears in this shop's header.");
+    } catch (error: any) {
+      Alert.alert("Logo not saved", error?.message ?? "Please try another image.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <ScrollView contentContainerStyle={s.scroll}>
+      <Back title="Shop profile" onPress={onBack} />
+      <Text style={s.subtitle}>This logo belongs only to {business.name}.</Text>
+      <View style={s.editCard}>
+        <View style={s.shopLogoPreview}>
+          <Image
+            source={business.logo_url ? { uri: business.logo_url } : require("../assets/mik-app-icon.png")}
+            style={s.shopLogoPreviewImage}
+          />
+        </View>
+        <Text style={s.shopProfileName}>{business.name}</Text>
+        <Text style={s.centerHelp}>Choose a clear square logo. Mik will resize it automatically.</Text>
+        <BigButton
+          label={saving ? "Saving logo…" : business.logo_url ? "Replace shop logo" : "Upload shop logo"}
+          icon="image-outline"
+          onPress={chooseLogo}
+          disabled={saving}
+        />
+      </View>
     </ScrollView>
   );
 }
@@ -3296,6 +3380,20 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   shopLogo: { width: 42, height: 42, borderRadius: 13 },
+  shopLogoPreview: {
+    width: 180,
+    height: 180,
+    alignSelf: "center",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 24,
+    backgroundColor: C.white,
+  },
+  shopLogoPreviewImage: { width: "100%", height: "100%", resizeMode: "contain" },
+  shopProfileName: { marginTop: 18, color: C.ink, fontSize: 25, fontWeight: "800", textAlign: "center" },
   shopIcon: {
     width: 40,
     height: 40,

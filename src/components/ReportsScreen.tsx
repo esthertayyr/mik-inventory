@@ -24,7 +24,7 @@ function Text({ style, ...props }: TextProps) { return <RNText {...props} style=
 function TextInput({ style, ...props }: TextInputProps) { return <RNTextInput {...props} style={[{ fontFamily: APP_FONT }, style]} />; }
 
 const publicShopName = (value: string | null | undefined) =>
-  value?.toLowerCase().includes("sebu") ? "3D Prints" : value ?? "";
+  value?.toLowerCase().includes("sebu") ? "Pixelbug" : value ?? "";
 
 type Period = "daily" | "weekly" | "monthly";
 type SaleItem = {

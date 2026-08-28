@@ -6,6 +6,7 @@ export type Screen =
   | "products"
   | "inventory"
   | "reports"
+  | "shop"
   | "more";
 
 export interface Category {
@@ -60,6 +61,7 @@ export interface Profile {
 export interface Business {
   id: string;
   name: string;
+  logo_url: string | null;
   role: Role;
 }
 export interface Location {
