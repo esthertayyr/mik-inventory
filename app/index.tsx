@@ -1701,14 +1701,14 @@ function QuickStart({ onOpen }: { onOpen: (screen: Screen) => void }) {
             style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.72 }]}
             onPress={() => onOpen(action.screen)}
           >
-            <View style={[s.quickIcon, { borderColor: action.color }]}>
-              <Ionicons name={action.icon} size={28} color={action.color} />
+            <View style={[s.quickIcon, { borderColor: C.green }]}>
+              <Ionicons name={action.icon} size={28} color={C.green} />
             </View>
             <Text style={s.quickTitle}>{action.title}</Text>
             <Text style={s.quickHelp}>{action.help}</Text>
             <View style={s.quickGo}>
-              <Text style={[s.quickGoText, { color: action.color }]}>Open</Text>
-              <Ionicons name="arrow-forward" size={18} color={action.color} />
+              <Text style={[s.quickGoText, { color: C.green }]}>Open</Text>
+              <Ionicons name="arrow-forward" size={18} color={C.green} />
             </View>
           </Pressable>
         ))}
@@ -3664,7 +3664,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 12,
-    backgroundColor: "#F7F8FA",
+    backgroundColor: C.soft,
     shadowColor: "#0D1722",
     shadowOpacity: 0.035,
     shadowRadius: 8,
