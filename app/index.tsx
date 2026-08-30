@@ -278,7 +278,7 @@ function Login() {
         </Pressable>
         </View>
       </View>
-      <Text style={s.loginCredit}>All hard work brings a profit. — Proverbs 14:23 · Made by ET for JM</Text>
+      <Text style={s.loginCredit}>Work produced by faith, labour prompted by love, and endurance inspired by hope. — 1 Thessalonians 1:3 · Made by ET for JM</Text>
       <GuideModal visible={guideOpen} onClose={() => setGuideOpen(false)} />
     </SafeAreaView>
   );
