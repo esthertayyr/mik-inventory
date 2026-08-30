@@ -38,14 +38,16 @@ type Order = {
 type Source = { id: string; name: string };
 type Form = {
   title: string; customer_name: string; customer_contact: string; source: string;
-  custom_source: string; quantity: string; order_date: string; target_date: string;
+  social_platform: string; custom_source: string; quantity: string; order_date: string; target_date: string;
   total_price: string; amount_paid: string; payment_channel: string;
   payment_reference: string; notes: string; image_uri: string;
 };
 
 const C = { ink: "#101318", muted: "#626A73", navy: "#142C47", green: "#264A3B", ruby: "#65243A", amber: "#795C2D", border: "#E0E3E7", pale: "#F6F7F8", white: "#FFF" };
 const today = () => new Date().toLocaleDateString("en-CA");
-const emptyForm = (): Form => ({ title: "", customer_name: "", customer_contact: "", source: "Facebook", custom_source: "", quantity: "1", order_date: today(), target_date: "", total_price: "", amount_paid: "", payment_channel: "", payment_reference: "", notes: "", image_uri: "" });
+const SOCIAL_PLATFORMS = ["Facebook", "Instagram", "TikTok", "WhatsApp", "Other"];
+const ORDER_SOURCES = ["Social media", "Walk-in", "Referral", "Marketplace", "Website", "Other"];
+const emptyForm = (): Form => ({ title: "", customer_name: "", customer_contact: "", source: "Social media", social_platform: "Facebook", custom_source: "", quantity: "1", order_date: today(), target_date: "", total_price: "", amount_paid: "", payment_channel: "", payment_reference: "", notes: "", image_uri: "" });
 const statusLabel: Record<OrderStatus,string> = { new: "New", making: "Making", ready: "Ready", completed: "Completed", cancelled: "Cancelled" };
 const statusIcon: Record<OrderStatus,keyof typeof Ionicons.glyphMap> = { new: "sparkles-outline", making: "construct-outline", ready: "checkmark-circle-outline", completed: "bag-check-outline", cancelled: "close-circle-outline" };
 const paymentLabel: Record<PaymentStatus,string> = { unpaid: "Unpaid", partial: "Partially paid", paid: "Paid" };
@@ -106,7 +108,11 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
   },[orders]);
 
   const startNew = () => { setForm(emptyForm()); setEditing("new"); };
-  const startEdit = (o: Order) => { setForm({ title:o.title,customer_name:o.customer_name??"",customer_contact:o.customer_contact??"",source:o.source,custom_source:"",quantity:String(o.quantity),order_date:o.order_date,target_date:o.target_date??"",total_price:String(o.total_price),amount_paid:String(o.amount_paid),payment_channel:o.payment_channel??"",payment_reference:o.payment_reference??"",notes:o.notes??"",image_uri:o.image_url??"" }); setEditing(o); };
+  const startEdit = (o: Order) => {
+    const isSocial = SOCIAL_PLATFORMS.includes(o.source);
+    setForm({ title:o.title,customer_name:o.customer_name??"",customer_contact:o.customer_contact??"",source:isSocial?"Social media":ORDER_SOURCES.includes(o.source)?o.source:"Other",social_platform:isSocial?o.source:"Facebook",custom_source:!isSocial&&!ORDER_SOURCES.includes(o.source)?o.source:"",quantity:String(o.quantity),order_date:o.order_date,target_date:o.target_date??"",total_price:String(o.total_price),amount_paid:String(o.amount_paid),payment_channel:o.payment_channel??"",payment_reference:o.payment_reference??"",notes:o.notes??"",image_uri:o.image_url??"" });
+    setEditing(o);
+  };
   const duplicate = (o: Order) => { startEdit(o); setForm(f=>({...f,title:`${o.title} copy`,order_date:today(),target_date:"",amount_paid:"",payment_channel:"",payment_reference:""})); setEditing("new"); };
   const choosePhoto = async () => {
     const permission=await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -116,7 +122,9 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
   };
   const save = async () => {
     const quantity=Number(form.quantity), total=Number(form.total_price), paid=Number(form.amount_paid || 0);
-    const source=form.source==="Other" ? form.custom_source.trim() || "Other" : form.source;
+    const source=form.source==="Social media"
+      ? (form.social_platform==="Other" ? form.custom_source.trim() || "Other social media" : form.social_platform)
+      : form.source==="Other" ? form.custom_source.trim() || "Other" : form.source;
     if(!form.title.trim()) return Alert.alert("Order name needed","Enter what the customer ordered.");
     if(!Number.isInteger(quantity)||quantity<1) return Alert.alert("Check quantity","Quantity must be at least 1.");
     if(!Number.isFinite(total)||total<0||!Number.isFinite(paid)||paid<0||paid>total) return Alert.alert("Check payment","Paid amount cannot be greater than the total price.");
@@ -143,7 +151,7 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
         await supabase.from("external_orders").update({image_url}).eq("id",id);
       } catch { Alert.alert("Order saved without photo","The order is safe, but the photo could not be uploaded."); }
     }
-    if(form.source==="Other"&&source!=="Other") await supabase.from("order_sources").upsert({business_id:businessId,name:source},{onConflict:"business_id,name"});
+    if((form.source==="Other"||form.social_platform==="Other")&&!source.startsWith("Other")) await supabase.from("order_sources").upsert({business_id:businessId,name:source},{onConflict:"business_id,name"});
     setSaving(false); setEditing(null); await load(); Alert.alert("Order saved","The order is now in the production queue.");
   };
   const setStatus = async (o:Order,status:OrderStatus) => {
@@ -158,13 +166,13 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
     const file=new File(Paths.cache,filename);file.create();file.write(csv);await Sharing.shareAsync(file.uri);
   };
 
-  if(editing) return <OrderForm form={form} setForm={setForm} sources={sources} saving={saving} editing={editing!=="new"} onBack={()=>setEditing(null)} onSave={save} onPhoto={choosePhoto}/>;
+  if(editing) return <OrderForm form={form} setForm={setForm} saving={saving} editing={editing!=="new"} onBack={()=>setEditing(null)} onSave={save} onPhoto={choosePhoto}/>;
   return <ScrollView contentContainerStyle={s.page}>
     <View style={s.headingRow}><View><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Custom and external orders</Text></View><Pressable style={s.add} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
     <View style={s.hero}><Text style={s.heroKicker}>PRODUCTION QUEUE</Text><Text style={s.heroValue}>{counts.active} active</Text><Text style={s.heroHelp}>{urgent?`${urgent} need attention today`:"Everything is on schedule"}</Text></View>
     <View style={s.summaryRow}><View style={s.summaryItem}><Text style={s.factLabel}>PAID ELSEWHERE</Text><Text style={s.summaryValue}>{peso(paymentSummary.paid)}</Text></View><View style={s.summaryItem}><Text style={s.factLabel}>OUTSTANDING</Text><Text style={s.summaryValue}>{peso(paymentSummary.outstanding)}</Text></View><View style={s.summaryItem}><Text style={s.factLabel}>TOP SOURCE</Text><Text style={s.summaryValue} numberOfLines={1}>{paymentSummary.topSource}</Text></View></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
-      {([['active',`Active ${counts.active}`],['new',`New ${counts.new}`],['making',`Making ${counts.making}`],['ready',`Ready ${counts.ready}`],['completed','Completed'],['all','All']] as const).map(([id,label])=><Pressable key={id} style={[s.tab,view===id&&s.tabOn]} onPress={()=>setView(id)}><Text style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
+      {([['active',`Active ${counts.active}`],['completed','Completed'],['all','All']] as const).map(([id,label])=><Pressable key={id} style={[s.tab,view===id&&s.tabOn]} onPress={()=>setView(id)}><Text style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
     </ScrollView>
     <View style={s.search}><Ionicons name="search" size={20} color={C.muted}/><TextInput style={s.searchInput} value={search} onChangeText={setSearch} placeholder="Search order or customer"/></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sourceRow}>{["All",...sources.map(x=>x.name)].map(x=><Pressable key={x} style={[s.sourceChip,sourceFilter===x&&s.sourceChipOn]} onPress={()=>setSourceFilter(x)}><Text style={[s.sourceText,sourceFilter===x&&s.sourceTextOn]}>{x}</Text></Pressable>)}</ScrollView>
@@ -185,7 +193,7 @@ function OrderCard({order,onEdit,onDuplicate,onStatus}:{order:Order;onEdit:()=>v
   </View>;
 }
 
-function OrderForm({form,setForm,sources,saving,editing,onBack,onSave,onPhoto}:{form:Form;setForm:Dispatch<SetStateAction<Form>>;sources:Source[];saving:boolean;editing:boolean;onBack:()=>void;onSave:()=>void;onPhoto:()=>void}) {
+function OrderForm({form,setForm,saving,editing,onBack,onSave,onPhoto}:{form:Form;setForm:Dispatch<SetStateAction<Form>>;saving:boolean;editing:boolean;onBack:()=>void;onSave:()=>void;onPhoto:()=>void}) {
   const update=(key:keyof Form,value:string)=>setForm(f=>({...f,[key]:value})); const total=Number(form.total_price||0),paid=Number(form.amount_paid||0);
   return <ScrollView contentContainerStyle={s.page}>
     <Pressable style={s.back} onPress={onBack}><Ionicons name="arrow-back" size={23} color={C.ink}/><Text style={s.backText}>{editing?"Edit order":"New order"}</Text></Pressable>
@@ -193,8 +201,9 @@ function OrderForm({form,setForm,sources,saving,editing,onBack,onSave,onPhoto}:{
     <Pressable style={s.photoPicker} onPress={onPhoto}>{form.image_uri?<Image source={{uri:form.image_uri}} style={s.formPhoto}/>:<><View style={s.photoCircle}><Ionicons name="camera-outline" size={28} color={C.white}/></View><Text style={s.photoTitle}>Add project photo</Text><Text style={s.photoHelp}>Optional, but useful for customised work</Text></>}</Pressable>
     <Field label="Order name *" value={form.title} onChangeText={v=>update("title",v)} placeholder="Example: Customised Gecko"/>
     <View style={s.two}><View style={s.half}><Field label="Customer name" value={form.customer_name} onChangeText={v=>update("customer_name",v)} placeholder="Optional"/></View><View style={s.half}><Field label="Contact" value={form.customer_contact} onChangeText={v=>update("customer_contact",v)} placeholder="Phone or username"/></View></View>
-    <Text style={s.label}>Where did this order come from?</Text><View style={s.wrap}>{[...sources.map(x=>x.name),"Other"].filter((x,i,a)=>a.indexOf(x)===i).map(x=><Pressable key={x} style={[s.choice,form.source===x&&s.choiceOn]} onPress={()=>update("source",x)}><Text style={[s.choiceText,form.source===x&&s.choiceTextOn]}>{x}</Text></Pressable>)}</View>
-    {form.source==="Other"?<Field label="Source name" value={form.custom_source} onChangeText={v=>update("custom_source",v)} placeholder="Example: Instagram"/>:null}
+    <Text style={s.label}>Where did this order come from?</Text><View style={s.wrap}>{ORDER_SOURCES.map(x=><Pressable key={x} style={[s.choice,form.source===x&&s.choiceOn]} onPress={()=>update("source",x)}><Text style={[s.choiceText,form.source===x&&s.choiceTextOn]}>{x}</Text></Pressable>)}</View>
+    {form.source==="Social media"?<><Text style={s.label}>Which social media?</Text><View style={s.wrap}>{SOCIAL_PLATFORMS.map(x=><Pressable key={x} style={[s.choice,form.social_platform===x&&s.choiceOn]} onPress={()=>update("social_platform",x)}><Text style={[s.choiceText,form.social_platform===x&&s.choiceTextOn]}>{x}</Text></Pressable>)}</View></>:null}
+    {form.source==="Other"||form.source==="Social media"&&form.social_platform==="Other"?<Field label="Source name" value={form.custom_source} onChangeText={v=>update("custom_source",v)} placeholder="Type where the order came from"/>:null}
     <View style={s.two}><View style={s.half}><Field label="Quantity *" value={form.quantity} onChangeText={v=>update("quantity",v)} keyboardType="number-pad"/></View><View style={s.half}><Field label="Total price *" value={form.total_price} onChangeText={v=>update("total_price",v)} keyboardType="decimal-pad" placeholder="₱0"/></View></View>
     <View style={s.two}><View style={s.half}><Field label="Order date" value={form.order_date} onChangeText={v=>update("order_date",v)} placeholder="YYYY-MM-DD"/></View><View style={s.half}><Field label="Target date" value={form.target_date} onChangeText={v=>update("target_date",v)} placeholder="YYYY-MM-DD"/></View></View>
     <Text style={s.label}>Quick target date</Text><View style={s.wrap}>{[1,3,7,14].map(days=><Pressable key={days} style={s.choice} onPress={()=>{const d=new Date(`${form.order_date}T12:00:00`);d.setDate(d.getDate()+days);update("target_date",d.toLocaleDateString("en-CA"));}}><Text style={s.choiceText}>+{days} days</Text></Pressable>)}</View>
@@ -208,7 +217,7 @@ function Field(props:TextInputProps&{label:string}) { return <View><Text style={
 
 const s=StyleSheet.create({
   page:{paddingTop:16,paddingBottom:40},headingRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:12},title:{fontSize:30,fontWeight:"700",color:C.ink,letterSpacing:-.8},subtitle:{marginTop:2,fontSize:15,color:C.muted},add:{minHeight:46,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:6,borderRadius:10,backgroundColor:C.navy},addText:{color:C.white,fontSize:14,fontWeight:"700"},
-  hero:{marginTop:18,padding:22,borderRadius:14,backgroundColor:C.navy},heroKicker:{color:"#D8E0E7",fontSize:11,fontWeight:"700",letterSpacing:1.6},heroValue:{marginTop:6,color:C.white,fontSize:34,fontWeight:"700"},heroHelp:{marginTop:5,color:C.white,fontSize:14,fontWeight:"600"},tabs:{gap:8,paddingVertical:14},tab:{minHeight:44,paddingHorizontal:15,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},tabOn:{backgroundColor:C.ink,borderColor:C.ink},tabText:{color:C.ink,fontSize:13,fontWeight:"800"},tabTextOn:{color:C.white},
+  hero:{marginTop:18,padding:22,borderWidth:1,borderColor:"#DCE5EB",borderRadius:14,backgroundColor:"#EEF3F7"},heroKicker:{color:C.navy,fontSize:11,fontWeight:"700",letterSpacing:1.6},heroValue:{marginTop:6,color:C.ink,fontSize:34,fontWeight:"700"},heroHelp:{marginTop:5,color:C.muted,fontSize:14,fontWeight:"600"},tabs:{gap:8,paddingVertical:14},tab:{minHeight:44,paddingHorizontal:15,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},tabOn:{backgroundColor:C.ink,borderColor:C.ink},tabText:{color:C.ink,fontSize:13,fontWeight:"800"},tabTextOn:{color:C.white},
   summaryRow:{marginTop:10,flexDirection:"row",gap:7},summaryItem:{minWidth:0,flex:1,padding:11,borderRadius:10,backgroundColor:C.pale},summaryValue:{marginTop:5,color:C.ink,fontSize:13,fontWeight:"700"},
   search:{minHeight:52,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:9,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},searchInput:{flex:1,minHeight:50,color:C.ink,fontSize:16},sourceRow:{gap:7,paddingVertical:10},sourceChip:{minHeight:36,paddingHorizontal:12,alignItems:"center",justifyContent:"center",borderRadius:18,backgroundColor:C.pale},sourceChipOn:{backgroundColor:C.green},sourceText:{color:C.ink,fontSize:12,fontWeight:"800"},sourceTextOn:{color:C.white},
   card:{marginTop:12,padding:14,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},cardTop:{flexDirection:"row",gap:12},photo:{width:78,height:78,borderRadius:10,resizeMode:"contain",backgroundColor:C.pale},noPhoto:{width:78,height:78,alignItems:"center",justifyContent:"center",borderRadius:10,backgroundColor:C.pale},cardMain:{flex:1},numberRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:6},number:{color:C.muted,fontSize:11,fontWeight:"700",letterSpacing:.7},status:{paddingHorizontal:8,paddingVertical:5,flexDirection:"row",alignItems:"center",gap:4,borderRadius:12,backgroundColor:C.pale},statusText:{color:C.navy,fontSize:10,fontWeight:"700"},cardTitle:{marginTop:7,color:C.ink,fontSize:19,lineHeight:23,fontWeight:"700"},meta:{marginTop:5,color:C.muted,fontSize:13,fontWeight:"600"},facts:{marginTop:14,paddingTop:12,flexDirection:"row",justifyContent:"space-between",borderTopWidth:1,borderTopColor:C.border},factLabel:{color:C.muted,fontSize:9,fontWeight:"700",letterSpacing:1},factValue:{marginTop:4,color:C.ink,fontSize:13,fontWeight:"700"},paymentDetail:{marginTop:10,color:C.muted,fontSize:12,fontWeight:"700"},next:{minHeight:50,marginTop:13,paddingHorizontal:16,flexDirection:"row",alignItems:"center",justifyContent:"space-between",borderRadius:10,backgroundColor:C.navy},nextText:{color:C.white,fontSize:15,fontWeight:"700"},cardActions:{minHeight:44,flexDirection:"row",alignItems:"center",gap:18},link:{flexDirection:"row",alignItems:"center",gap:5},linkText:{color:C.navy,fontSize:12,fontWeight:"800"},cancelText:{color:C.ruby,fontSize:12,fontWeight:"700"},

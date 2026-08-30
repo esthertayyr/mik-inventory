@@ -2799,8 +2799,12 @@ function Inventory({
         contentContainerStyle={s.list}
         renderItem={({ item }) => {
           const low = item.quantity_on_hand <= item.low_stock_threshold;
+          const tone = categoryTone(categoryName(item.category_id));
           return (
-            <Pressable style={s.listRow} onPress={() => setSelected(item)}>
+            <Pressable
+              style={[s.listRow, { backgroundColor: tone.soft, borderLeftColor: tone.color, borderLeftWidth: 4 }]}
+              onPress={() => setSelected(item)}
+            >
               {item.image_url || placeholderImage(item.name) ? (
                 <Image source={item.image_url ? { uri: item.image_url } : placeholderImage(item.name)} style={s.stockListImage} />
               ) : <View style={s.listIcon}>
@@ -2856,32 +2860,32 @@ function More({
         icon="storefront-outline"
         title="Shop profile & logo"
         help={business.logo_url ? "Replace this shop's logo" : "Add this shop's logo"}
-        color={C.green}
-        soft={C.soft}
+        color={C.muted}
+        soft="#F1F2F3"
         onPress={() => onOpen("shop")}
       />
       <Menu
         icon="pricetags-outline"
         title="Products & prices"
         help="View products and change prices"
-        color={C.accent}
-        soft={C.accentSoft}
+        color={C.muted}
+        soft="#F1F2F3"
         onPress={() => onOpen("products")}
       />
       <Menu
         icon="bar-chart-outline"
         title="Sales reports"
         help="Daily, weekly or monthly reports"
-        color={C.purple}
-        soft={C.purpleSoft}
+        color={C.muted}
+        soft="#F1F2F3"
         onPress={() => onOpen("reports")}
       />
       <Menu
         icon="help-circle-outline"
         title="How to use Mik"
         help="Replay the simple step-by-step guide"
-        color={C.green}
-        soft={C.soft}
+        color={C.muted}
+        soft="#F1F2F3"
         onPress={onGuide}
       />
       <Text style={s.section}>Shop login</Text>
