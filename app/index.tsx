@@ -160,7 +160,7 @@ const ownerNav: {
     soft: C.soft,
   },
   {
-    id: "sale",
+    id: "sell_start",
     label: "Sell",
     icon: "cart-outline",
     color: C.green,
@@ -735,6 +735,10 @@ function ShopApp({
         <ReportsScreen locationId={locationId} hideTitle />
       </View>
     );
+  else if (screen === "sell_start")
+    body = <SellStart onOpen={setScreen} />;
+  else if (screen === "production")
+    body = <ProductionStart onOpen={setScreen} />;
   else if (screen === "correct")
     body = <ReportsScreen locationId={locationId} correctionMode />;
   else if (screen === "shop")
@@ -773,10 +777,10 @@ function ShopApp({
   const selected =
     screen === "products" || screen === "reports" || screen === "shop" || screen === "printers" || screen === "filaments" || screen === "price_list"
       ? "more"
-      : screen === "missed"
-        ? "sale"
-        : screen === "event_sale"
-          ? "sale"
+      : screen === "production"
+        ? "home"
+      : screen === "missed" || screen === "sale" || screen === "event_sale"
+        ? "sell_start"
         : screen === "correct"
           ? "home"
           : screen;
@@ -898,6 +902,24 @@ function NoShopProfile() {
       </View>
     </SafeAreaView>
   );
+}
+
+function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
+  return <ScrollView contentContainerStyle={s.sellStartPage}>
+    <Text style={s.pageTitle}>How are you selling?</Text>
+    <Text style={s.subtitle}>Choose one to start.</Text>
+    <Pressable style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Shop sale</Text><Text style={s.sellModeHelp}>Normal everyday checkout</Text></View><Ionicons name="arrow-forward" size={23} color={C.green}/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Event sale</Text><Text style={s.sellModeHelp}>Fast checkout for markets</Text></View><Ionicons name="arrow-forward" size={23} color={C.accent}/></Pressable>
+    <Pressable style={s.earlierSale} onPress={()=>onOpen("missed")}><Ionicons name="calendar-outline" size={21} color={C.orange}/><View style={s.flex}><Text style={s.earlierSaleTitle}>Add an earlier sale</Text><Text style={s.earlierSaleHelp}>For sales entered on another day</Text></View><Ionicons name="chevron-forward" size={20} color={C.muted}/></Pressable>
+  </ScrollView>;
+}
+
+function ProductionStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
+  return <ScrollView contentContainerStyle={s.sellStartPage}>
+    <Text style={s.pageTitle}>Production</Text><Text style={s.subtitle}>What do you want to check?</Text>
+    <Pressable style={[s.sellModeCard,{backgroundColor:"#EEF7F1"}]} onPress={()=>onOpen("printers")}><View style={[s.sellModeIcon,{backgroundColor:"#087A38"}]}><Ionicons name="hardware-chip" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Printers</Text><Text style={s.sellModeHelp}>Working, attention or repair</Text></View><Ionicons name="arrow-forward" size={23} color="#087A38"/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:"#F0F6F6"}]} onPress={()=>onOpen("filaments")}><View style={[s.sellModeIcon,{backgroundColor:"#315E68"}]}><Ionicons name="color-filter" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Filaments</Text><Text style={s.sellModeHelp}>Brands, materials and colours</Text></View><Ionicons name="arrow-forward" size={23} color="#315E68"/></Pressable>
+  </ScrollView>;
 }
 
 function SaleScreen({
@@ -1744,37 +1766,20 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     screen: Screen;
     color: string;
     soft: string;
-    group: "sell" | "production" | "display" | "records" | "settings";
   }> = [
-    { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: "#EEF2F6", group:"sell" },
-    { title: "Event mode", help: "Fast selling for markets and busy pop-ups", icon: "flash", screen: "event_sale", color: C.accent, soft: C.accentSoft, group:"sell" },
-    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due now` : ""}` : "Track customer projects and due dates", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft, group:"sell" },
-    { title: "Update stock", help: "Count finished products and keycaps", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft, group:"production" },
-    { title: "Printers", help: "See which printers are working or need repair", icon: "hardware-chip", screen: "printers", color: "#087A38", soft: "#EEF7F1", group:"production" },
-    { title: "Filaments", help: "Track brands, materials, colours and spools", icon: "color-filter", screen: "filaments", color: "#315E68", soft: "#F0F6F6", group:"production" },
-    { title: "Price list", help: "View or print current selling prices", icon: "list", screen: "price_list", color: C.green, soft: "#F1F4F6", group:"display" },
-    { title: "Products & prices", help: "Add products, photos, categories and prices", icon: "pricetags", screen: "products", color: C.purple, soft: C.purpleSoft, group:"display" },
-    { title: "Sales today", help: "See what was sold and today's total", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft, group:"records" },
-    { title: "Reports & Excel", help: "See daily, weekly or monthly sales", icon: "bar-chart", screen: "reports", color: C.teal, soft: C.tealSoft, group:"records" },
-    { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft, group:"records" },
-    { title: "Add missed sale", help: "Record products sold on an earlier date", icon: "calendar", screen: "missed", color: C.orange, soft: C.orangeSoft, group:"records" },
-    { title: "Shop settings", help: "Logo, help guide and account", icon: "settings", screen: "more", color: "#4B5158", soft: "#F1F2F3", group:"settings" },
+    { title: "Sell", help: "Shop, event or earlier sale", icon: "cart", screen: "sell_start", color: C.green, soft: "#EEF2F6" },
+    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due` : ""}` : "Customer orders", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft },
+    { title: "Stock", help: "Check or update stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
+    { title: "Sales", help: "Today's sales", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
+    { title: "Production", help: "Printers and filament", icon: "construct", screen: "production", color: "#087A38", soft: "#EEF7F1" },
+    { title: "More", help: "Prices, reports and settings", icon: "grid", screen: "more", color: "#4B5158", soft: "#F1F2F3" },
   ];
-  const sections = [
-    {id:"sell",title:"Sell to customers",help:"Checkout, event sales and customer orders."},
-    {id:"production",title:"Run production",help:"Finished stock, printers and printing materials."},
-    {id:"display",title:"Display & pricing",help:"Products and the popup-store price list."},
-    {id:"records",title:"Check sales",help:"Review, export or correct sales records."},
-    {id:"settings",title:"Shop settings",help:"Shop profile, help and account."},
-  ] as const;
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
       <Text style={s.pageTitle}>What would you like to do?</Text>
-      <Text style={s.subtitle}>Choose an option to continue.</Text>
-      {sections.map((section)=><View key={section.id} style={s.quickSection}>
-        <Text style={s.quickSectionTitle}>{section.title}</Text><Text style={s.quickSectionHelp}>{section.help}</Text>
-        <View style={s.quickGrid}>
-        {actions.filter(action=>action.group===section.id).map((action) => (
+      <Text style={s.subtitle}>Tap one option.</Text>
+      <View style={s.quickGrid}>
+        {actions.map((action) => (
           <Pressable
             key={action.title}
             accessibilityRole="button"
@@ -1793,9 +1798,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
             </View>
           </Pressable>
         ))}
-        </View>
-      </View>)}
-      <Text style={s.quickNote}>Need to correct a sale? Choose “Correct a sale”. A manager passcode is required before any changes are made.</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -2933,6 +2936,8 @@ function More({
         soft="#F1F2F3"
         onPress={() => onOpen("reports")}
       />
+      <Menu icon="return-up-back-outline" title="Correct a sale" help="Cancel a wrong sale and restore stock" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("correct")} />
+      <Menu icon="calendar-outline" title="Add an earlier sale" help="Record products sold on another day" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("missed")} />
       <Menu
         icon="help-circle-outline"
         title="How to use Mik"
@@ -3036,7 +3041,7 @@ type GuideStep = { title: string; body: string; icon: Icon; flow: GuideFlow[] };
 const guideSteps: GuideStep[] = [
   {
     title: "Welcome to Mik",
-    body: "Home shows a large button for every common shop task. You can always tap Home at the top or bottom to return here.",
+    body: "Home has six simple choices. Tap Home at any time to come back.",
     icon: "home",
     flow: [
       { icon: "home-outline", label: "Home" },
@@ -3068,7 +3073,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: "Check and change stock",
-    body: "Tap Update stock on Home, choose a product, then choose Add stock or Damaged. Products with choices will ask which one first.",
+    body: "Tap Stock, choose a product, then add stock or record damaged stock. Mik asks for a letter, colour, or size when needed.",
     icon: "cube",
     flow: [
       { icon: "cube-outline", label: "Stock" },
@@ -3078,7 +3083,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: "Track outside orders",
-    body: "Tap Orders on Home for Facebook, online, referral, word-of-mouth, or walk-in projects. Record how much was paid elsewhere, then move the order from New to Making, Ready, and Completed.",
+    body: "Tap Orders for Facebook, online, referral, or walk-in work. Record where the customer paid, then update the order as work progresses.",
     icon: "clipboard",
     flow: [
       { icon: "clipboard-outline", label: "Orders" },
@@ -3089,7 +3094,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: "Correct or add a missed sale",
-    body: "Home has separate buttons for a wrong sale and a sale entered late. Both protected changes ask for the manager passcode.",
+    body: "Tap Sell to add an earlier sale. To cancel a wrong sale, open More, then Correct a sale. A manager passcode protects both actions.",
     icon: "return-up-back",
     flow: [
       { icon: "home-outline", label: "Home" },
@@ -3099,7 +3104,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: "Create or edit a product",
-    body: "Tap Products & prices on Home. Add the photo, price, and stock. Turn on choices for letters A–Z, colours, or sizes.",
+    body: "Open More, then Products & prices. Add a photo, price, and stock. Turn on choices only when a product needs letters, colours, or sizes.",
     icon: "pricetags",
     flow: [
       { icon: "home-outline", label: "Home" },
@@ -3110,7 +3115,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: "View sales reports",
-    body: "Tap Reports & Excel on Home, then choose Daily, Weekly, Monthly, or an exact calendar date.",
+    body: "Open More, then Sales reports. Choose a day, week, month, or exact date.",
     icon: "bar-chart",
     flow: [
       { icon: "home-outline", label: "Home" },
@@ -3837,6 +3842,14 @@ const s = StyleSheet.create({
   eventBanner:{marginBottom:14,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:"#DDE8E1",borderRadius:11,backgroundColor:C.accentSoft},
   eventBannerTitle:{color:C.accentDark,fontSize:15,fontWeight:"700"},
   eventBannerText:{marginTop:2,color:C.muted,fontSize:13},
+  sellStartPage:{paddingTop:6,paddingBottom:40},
+  sellModeCard:{minHeight:112,marginTop:12,padding:16,flexDirection:"row",alignItems:"center",gap:13,borderWidth:1,borderColor:C.border,borderRadius:13},
+  sellModeIcon:{width:58,height:58,alignItems:"center",justifyContent:"center",borderRadius:29},
+  sellModeTitle:{color:C.ink,fontSize:21,fontWeight:"700"},
+  sellModeHelp:{marginTop:4,color:C.muted,fontSize:14},
+  earlierSale:{minHeight:70,marginTop:14,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:11,backgroundColor:C.white},
+  earlierSaleTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
+  earlierSaleHelp:{marginTop:2,color:C.muted,fontSize:12},
   missedBannerTitle: { color: C.white, fontSize: 18, fontWeight: "700" },
   missedBannerText: { marginTop: 3, color: C.white, fontSize: 13, lineHeight: 18, fontWeight: "600" },
   step: {
