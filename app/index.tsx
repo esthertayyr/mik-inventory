@@ -988,7 +988,7 @@ function SaleScreen({
     variant: ProductVariant | null = null,
     selectedLetters: string[] = [],
   ) => {
-    if (p.letters_required > 0 && selectedLetters.length !== p.letters_required) {
+    if (!eventMode && p.letters_required > 0 && selectedLetters.length !== p.letters_required) {
       setChoosing(p);
       setChosenLetters([]);
       return;
@@ -1085,6 +1085,7 @@ function SaleScreen({
           product_id: x.product.id,
           variant_id: x.variant?.id ?? null,
           selected_letters: x.selectedLetters,
+          defer_letters: eventMode && x.product.letters_required > 0,
           quantity: x.quantity,
         })),
         p_payment_method: payment,
@@ -1092,7 +1093,9 @@ function SaleScreen({
         p_payment_reference:
           payment === "gcash" ? paymentReference.trim() : null,
       };
-    const { data, error } = recordPastSale
+    const { data, error } = eventMode
+      ? await supabase.rpc("create_event_sale", saleParams)
+      : recordPastSale
       ? await supabase.rpc("create_backdated_sale_with_choices", {
           ...saleParams,
           p_sale_date: pastSaleDate,
@@ -1128,8 +1131,8 @@ function SaleScreen({
       "Sale completed",
       `Receipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? `Cash\nChange: ${peso(changeDue)}` : "GCash — received"}.`,
       [
-        { text: "See sales today", onPress: () => onNavigate("dashboard") },
-        { text: "Start next sale", onPress: () => onNavigate(eventMode ? "event_sale" : "sale") },
+        { text: eventMode ? "See event sales" : "See sales today", onPress: () => onNavigate("dashboard") },
+        { text: eventMode ? "Next sale" : "Start next sale", onPress: () => onNavigate(eventMode ? "event_sale" : "sale") },
       ],
     );
   };
@@ -1301,7 +1304,7 @@ function SaleScreen({
               />
             </View>
           ) : null}
-          <View style={s.pastSaleCard}>
+          {!eventMode ? <View style={s.pastSaleCard}>
             <Pressable style={s.pastSaleTop} onPress={() => setRecordPastSale((value) => !value)}>
               <View style={s.pastSaleIcon}><Ionicons name="calendar-outline" size={22} color={C.dark} /></View>
               <View style={s.flex}>
@@ -1319,7 +1322,7 @@ function SaleScreen({
                 <Text style={s.rowHelp}>The entry will show on this date and be labelled as entered later.</Text>
               </View>
             ) : null}
-          </View>
+          </View> : null}
           <BigButton
             label={
               saving
@@ -1372,7 +1375,12 @@ function SaleScreen({
             {eventMode ? (
               <View style={s.eventBanner}>
                 <Ionicons name="flash" size={22} color={C.accent} />
-                <View style={s.flex}><Text style={s.eventBannerTitle}>Event mode</Text><Text style={s.eventBannerText}>Fast checkout for markets and busy pop-ups.</Text></View>
+                <View style={s.flex}>
+                  <Text style={s.eventBannerTitle}>Event mode — fast checkout</Text>
+                  <Text style={s.eventBannerText}>
+                    Tap the clicker and choose how many. No letters are selected now. The clicker base stock updates after payment; count the A–Z keycaps after the event.
+                  </Text>
+                </View>
               </View>
             ) : null}
             <View style={s.saleTitleRow}>
