@@ -278,7 +278,7 @@ function Login() {
         </Pressable>
         </View>
       </View>
-      <Text style={s.loginCredit}>Made by Esther Tay</Text>
+      <Text style={s.loginCredit}>All hard work brings a profit. — Proverbs 14:23 · Made by ET for JM</Text>
       <GuideModal visible={guideOpen} onClose={() => setGuideOpen(false)} />
     </SafeAreaView>
   );
@@ -3532,10 +3532,12 @@ const s = StyleSheet.create({
   guidePreviewText: { color: C.dark, fontSize: 15, fontWeight: "800" },
   loginCredit: {
     marginTop: 14,
-    color: "#9AA2AA",
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 0.3,
+    paddingHorizontal: 20,
+    color: "#A8ADB2",
+    fontSize: 9,
+    fontWeight: "500",
+    letterSpacing: 0.2,
+    textAlign: "center",
   },
   top: {
     minHeight: 60,
@@ -4406,7 +4408,7 @@ const s = StyleSheet.create({
   },
   stockNumLow: { backgroundColor: C.orangeSoft },
   stockNumText: { color: C.dark, fontSize: 19, fontWeight: "700" },
-  stockNumLabel:{marginTop:-2,color:C.muted,fontSize:9,fontWeight:"600",textTransform:"uppercase",letterSpacing:.5},
+  stockNumLabel:{marginTop:-2,color:C.muted,fontSize:11,fontWeight:"600",textTransform:"uppercase",letterSpacing:.35},
   menu: {
     minHeight: 90,
     marginTop: 10,
