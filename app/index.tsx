@@ -2609,7 +2609,7 @@ function Inventory({
     if (!selected || !Number.isInteger(entered) || entered < 0 || (mode !== "set" && entered === 0))
       return Alert.alert(
         "Check quantity",
-        mode === "set" ? "Enter the actual number you counted." : "Enter a whole number greater than zero.",
+        mode === "set" ? "Type how many items are there now." : "Enter a whole number greater than zero.",
       );
     if (mode === "set" && delta === 0) return Alert.alert("Count already correct", `Stock is already ${current}.`);
     const movementType: "stock_in" | "damage" = delta < 0 ? "damage" : "stock_in";
@@ -2783,7 +2783,7 @@ function Inventory({
               onPress={() => setMode("stock_in")}
             />
             <Choice
-              label="Set count"
+              label="Enter total stock"
               icon="keypad-outline"
               selected={mode === "set"}
               onPress={() => setMode("set")}
@@ -2796,7 +2796,7 @@ function Inventory({
               onPress={() => setMode("damage")}
             />
           </View>
-          <Label>{mode === "set" ? "What is the actual count?" : "How many?"}</Label>
+          <Label>{mode === "set" ? "How many are there now?" : "How many?"}</Label>
           <TextInput
             style={s.qtyInput}
             keyboardType="number-pad"
@@ -2806,7 +2806,7 @@ function Inventory({
             autoFocus
           />
           <BigButton
-            label={mode === "set" ? "Save count" : mode === "damage" ? "Remove from stock" : "Add stock"}
+            label={mode === "set" ? "Save total stock" : mode === "damage" ? "Remove from stock" : "Add stock"}
             icon={mode === "damage" ? "warning-outline" : "add-circle-outline"}
             onPress={save}
             danger={mode === "damage"}
@@ -2864,7 +2864,7 @@ function Inventory({
           onPress={() => setStockView("out")}
         />
         <Chip
-          label="Count needed"
+          label="Needs counting"
           icon="checkbox-outline"
           selected={stockView === "count"}
           onPress={() => setStockView("count")}
@@ -2900,7 +2900,7 @@ function Inventory({
                 <Text style={s.rowTitle}>{item.name}</Text>
                 <Text style={[s.rowHelp, low && s.low]}>
                   {needsCount(item)
-                    ? "Stock count needed"
+                    ? "Please count this stock"
                     : item.variants.length
                       ? `${item.variants.length} choices · tap to see each one`
                       : low
