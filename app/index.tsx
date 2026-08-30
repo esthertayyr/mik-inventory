@@ -916,7 +916,7 @@ function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
 
 function ProductionStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   return <ScrollView contentContainerStyle={s.sellStartPage}>
-    <Text style={s.pageTitle}>Production</Text><Text style={s.subtitle}>What do you want to check?</Text>
+    <Text style={s.pageTitle}>Printers & Filament</Text><Text style={s.subtitle}>What do you want to check?</Text>
     <Pressable style={[s.sellModeCard,{backgroundColor:"#EEF7F1"}]} onPress={()=>onOpen("printers")}><View style={[s.sellModeIcon,{backgroundColor:"#087A38"}]}><Ionicons name="hardware-chip" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Printers</Text><Text style={s.sellModeHelp}>Working, attention or repair</Text></View><Ionicons name="arrow-forward" size={23} color="#087A38"/></Pressable>
     <Pressable style={[s.sellModeCard,{backgroundColor:"#F0F6F6"}]} onPress={()=>onOpen("filaments")}><View style={[s.sellModeIcon,{backgroundColor:"#315E68"}]}><Ionicons name="color-filter" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Filaments</Text><Text style={s.sellModeHelp}>Brands, materials and colours</Text></View><Ionicons name="arrow-forward" size={23} color="#315E68"/></Pressable>
   </ScrollView>;
@@ -1786,7 +1786,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     { title: "Orders", help: orderSummary.active ? `${orderSummary.active} customer orders active` : "Track customer orders", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft },
     { title: "Stock", help: "Count or update products", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
     { title: "Sales", help: "View sales and receipts", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
-    { title: "Production", help: "Track printers and filament", icon: "construct", screen: "production", color: "#087A38", soft: "#EEF7F1" },
+    { title: "Printers & Filament", help: "Check machines and materials", icon: "construct", screen: "production", color: "#087A38", soft: "#EEF7F1" },
     { title: "More", help: "Prices, reports and shop settings", icon: "grid", screen: "more", color: "#4B5158", soft: "#F1F2F3" },
   ];
   return (
@@ -2774,7 +2774,7 @@ function Inventory({
               : (selectedVariant?.quantity_on_hand ?? selected.quantity_on_hand)}
           </Text>
           <Text style={s.stockLabel}>currently in stock</Text>
-          <Text style={s.section}>What happened?</Text>
+          <Text style={s.section}>What do you want to do?</Text>
           <View style={s.stockActionChoices}>
             <Choice
               label="Add stock"
@@ -2783,7 +2783,7 @@ function Inventory({
               onPress={() => setMode("stock_in")}
             />
             <Choice
-              label="Edit stock total"
+              label="Change stock number"
               icon="keypad-outline"
               selected={mode === "set"}
               onPress={() => setMode("set")}
@@ -2796,7 +2796,7 @@ function Inventory({
               onPress={() => setMode("damage")}
             />
           </View>
-          <Label>{mode === "set" ? "How many are there now?" : "How many?"}</Label>
+          <Label>{mode === "set" ? "Count the items. How many do you have now?" : "How many?"}</Label>
           <TextInput
             style={s.qtyInput}
             keyboardType="number-pad"
@@ -2806,7 +2806,7 @@ function Inventory({
             autoFocus
           />
           <BigButton
-            label={mode === "set" ? "Save new total" : mode === "damage" ? "Remove from stock" : "Add stock"}
+            label={mode === "set" ? "Save new number" : mode === "damage" ? "Remove from stock" : "Add stock"}
             icon={mode === "damage" ? "warning-outline" : "add-circle-outline"}
             onPress={save}
             danger={mode === "damage"}
@@ -2852,7 +2852,7 @@ function Inventory({
           onPress={() => setStockView("all")}
         />
         <Chip
-          label="Lowest"
+          label="Low first"
           icon="arrow-down"
           selected={stockView === "lowest"}
           onPress={() => setStockView("lowest")}
@@ -2864,7 +2864,7 @@ function Inventory({
           onPress={() => setStockView("out")}
         />
         <Chip
-          label="Needs counting"
+          label="Count now"
           icon="checkbox-outline"
           selected={stockView === "count"}
           onPress={() => setStockView("count")}
