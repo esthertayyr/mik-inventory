@@ -89,11 +89,11 @@ function categoryIcon(name: string): Icon {
 }
 function categoryTone(name: string) {
   const n = name.toLowerCase();
-  if (n.includes("keyboard")) return { color: "#102A43", soft: "#FFFFFF" };
-  if (n.includes("fidget")) return { color: "#29473A", soft: "#FFFFFF" };
-  if (n.includes("keychain")) return { color: "#70263A", soft: "#FFFFFF" };
-  if (n.includes("home") || n.includes("gift")) return { color: "#49384E", soft: "#FFFFFF" };
-  return { color: "#294B61", soft: "#FFFFFF" };
+  if (n.includes("keyboard")) return { color: "#102A43", soft: "#EEF3F7" };
+  if (n.includes("fidget")) return { color: "#29473A", soft: "#EFF4F1" };
+  if (n.includes("keychain")) return { color: "#70263A", soft: "#F7EFF1" };
+  if (n.includes("home") || n.includes("gift")) return { color: "#49384E", soft: "#F4F1F5" };
+  return { color: "#294B61", soft: "#EFF4F6" };
 }
 function productIcon(name: string, category = ""): Icon {
   const n = `${name} ${category}`.toLowerCase();
@@ -1342,11 +1342,21 @@ function SaleScreen({
                       accessibilityRole="button"
                       accessibilityLabel={`Open ${c.name}`}
                       key={c.id}
-                      style={[s.categoryCard, { backgroundColor: tone.color }]}
+                      style={[
+                        s.categoryCard,
+                        {
+                          backgroundColor: tone.soft,
+                          borderColor: `${tone.color}26`,
+                          width: width >= 980 ? "23.5%" : width >= 700 ? "31.8%" : "48%",
+                          minHeight: width >= 700 ? 148 : 126,
+                        },
+                      ]}
                       onPress={() => setCategory(c.id)}
                     >
-                      <Ionicons name={categoryIcon(c.name)} size={36} color={C.white} />
-                      <Text style={s.categoryCardText}>{c.name}</Text>
+                      <View style={[s.categoryCardIcon, { backgroundColor: tone.color }]}>
+                        <Ionicons name={categoryIcon(c.name)} size={28} color={C.white} />
+                      </View>
+                      <Text style={[s.categoryCardText, { color: tone.color }]}>{c.name}</Text>
                     </Pressable>
                   );
                 })}
@@ -1373,12 +1383,12 @@ function SaleScreen({
                   ) : null}
                 </>
               ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
+                <View style={s.desktopCategoryTabs}>
                   <Chip label="Categories" icon="grid" selected={false} onPress={() => { setCategory(null); setSearch(""); }} />
                   {categories.map((c) => (
                     <Chip key={c.id} label={c.name} icon={categoryIcon(c.name)} tone={categoryTone(c.name)} selected={category === c.id} onPress={() => setCategory(c.id)} />
                   ))}
-                </ScrollView>
+                </View>
               )
             )}
           </>
@@ -3864,18 +3874,30 @@ const s = StyleSheet.create({
     gap: 12,
   },
   categoryCard: {
-    width: "48%",
-    minHeight: 126,
     padding: 18,
     alignItems: "flex-start",
     justifyContent: "space-between",
     borderRadius: 15,
+    borderWidth: 1,
+  },
+  categoryCardIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: "center",
+    justifyContent: "center",
   },
   categoryCardText: {
-    color: C.white,
     fontSize: 19,
     lineHeight: 24,
-    fontWeight: "800",
+    fontWeight: "700",
+  },
+  desktopCategoryTabs: {
+    marginTop: 14,
+    marginBottom: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 9,
   },
   chip: {
     minHeight: 46,
