@@ -246,7 +246,7 @@ function Login() {
           resizeMode="contain"
         />
         <Text style={s.loginTitle}>Welcome back.</Text>
-        <Text style={s.centerHelp}>Sign in to open your shop.</Text>
+        <Text style={s.centerHelp}>Sign in to manage your shop.</Text>
         <Label>Username</Label>
         <TextInput
           style={s.input}
@@ -267,7 +267,7 @@ function Login() {
         />
         {error ? <Text style={s.error}>{error}</Text> : null}
         <BigButton
-          label={busy ? "Opening your shop…" : "Let’s go"}
+          label={busy ? "Opening your shop…" : "Continue"}
           icon="arrow-forward-circle-outline"
           onPress={signIn}
           disabled={busy}
@@ -827,14 +827,14 @@ function ShopApp({
               style={[
                 s.navIcon,
                 {
-                  backgroundColor: "transparent",
+                  backgroundColor: selected === item.id ? item.color : "transparent",
                 },
               ]}
             >
               <Ionicons
                 name={item.icon}
                 size={24}
-                color={selected === item.id ? item.color : C.muted}
+                color={selected === item.id ? C.white : C.muted}
               />
             </View>
             <Text
@@ -1701,23 +1701,31 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     screen: Screen;
     color: string;
     soft: string;
+    group: "daily" | "manage" | "records";
   }> = [
-    { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: C.soft },
-    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due now` : ""}` : "Track custom, online and referral projects", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft },
-    { title: "Update stock", help: "Count stock or add new stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
-    { title: "Sales today", help: "See what was sold and today's total", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
-    { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft },
-    { title: "Add missed sale", help: "Record a sale from an earlier date", icon: "calendar", screen: "missed", color: C.orange, soft: C.orangeSoft },
-    { title: "Products & prices", help: "Add or edit products and categories", icon: "pricetags", screen: "products", color: C.purple, soft: C.purpleSoft },
-    { title: "Reports & Excel", help: "See daily, weekly or monthly sales", icon: "bar-chart", screen: "reports", color: C.teal, soft: C.tealSoft },
-    { title: "Shop settings", help: "Logo, help guide and account", icon: "settings", screen: "more", color: C.accent, soft: C.accentSoft },
+    { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: C.soft, group:"daily" },
+    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due now` : ""}` : "Track custom, online and referral projects", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft, group:"daily" },
+    { title: "Update stock", help: "Count stock or add new stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft, group:"daily" },
+    { title: "Sales today", help: "See what was sold and today's total", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft, group:"records" },
+    { title: "Reports & Excel", help: "See daily, weekly or monthly sales", icon: "bar-chart", screen: "reports", color: C.teal, soft: C.tealSoft, group:"records" },
+    { title: "Products & prices", help: "Add or edit products and categories", icon: "pricetags", screen: "products", color: C.purple, soft: C.purpleSoft, group:"manage" },
+    { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft, group:"manage" },
+    { title: "Add missed sale", help: "Record a sale from an earlier date", icon: "calendar", screen: "missed", color: C.orange, soft: C.orangeSoft, group:"manage" },
+    { title: "Shop settings", help: "Logo, help guide and account", icon: "settings", screen: "more", color: "#4B5158", soft: C.soft, group:"manage" },
   ];
+  const sections = [
+    {id:"daily",title:"Sell & fulfil",help:"The tasks used during the day."},
+    {id:"records",title:"Check performance",help:"Review sales and export records."},
+    {id:"manage",title:"Manage the shop",help:"Products, corrections and settings."},
+  ] as const;
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
-      <Text style={s.pageTitle}>What do you want to do?</Text>
-      <Text style={s.subtitle}>Tap one large button to begin.</Text>
-      <View style={s.quickGrid}>
-        {actions.map((action) => (
+      <Text style={s.pageTitle}>What would you like to do?</Text>
+      <Text style={s.subtitle}>Choose an option to continue.</Text>
+      {sections.map((section)=><View key={section.id} style={s.quickSection}>
+        <Text style={s.quickSectionTitle}>{section.title}</Text><Text style={s.quickSectionHelp}>{section.help}</Text>
+        <View style={s.quickGrid}>
+        {actions.filter(action=>action.group===section.id).map((action) => (
           <Pressable
             key={action.title}
             accessibilityRole="button"
@@ -1736,8 +1744,9 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
             </View>
           </Pressable>
         ))}
-      </View>
-      <Text style={s.quickNote}>Wrong sale? Open “Correct a sale”. It will ask for the manager passcode before changing anything.</Text>
+        </View>
+      </View>)}
+      <Text style={s.quickNote}>Need to correct a sale? Choose “Correct a sale”. A manager passcode is required before any changes are made.</Text>
     </ScrollView>
   );
 }
@@ -3486,7 +3495,7 @@ const s = StyleSheet.create({
   kicker: {
     color: C.green,
     fontSize: 13,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: 1.3,
   },
   guidePreview: {
@@ -3538,7 +3547,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: C.soft,
   },
-  shopName: { color: C.ink, fontSize: 17, fontWeight: "900" },
+  shopName: { color: C.ink, fontSize: 17, fontWeight: "700" },
   locationName: {
     marginTop: 2,
     color: C.muted,
@@ -3599,7 +3608,7 @@ const s = StyleSheet.create({
   },
   navIconOn: { backgroundColor: C.green },
   navText: { marginTop: 2, color: C.muted, fontSize: 11, fontWeight: "700" },
-  navTextOn: { color: C.dark, fontWeight: "900" },
+  navTextOn: { color: C.dark, fontWeight: "700" },
   headerHome: {
     minHeight: 42,
     paddingHorizontal: 13,
@@ -3610,7 +3619,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: C.green,
   },
-  headerHomeText: { color: C.white, fontSize: 14, fontWeight: "900" },
+  headerHomeText: { color: C.white, fontSize: 14, fontWeight: "700" },
   adminTop: {
     minHeight: 72,
     paddingHorizontal: 18,
@@ -3666,7 +3675,7 @@ const s = StyleSheet.create({
   statusText: {
     color: C.green,
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: "700",
     textTransform: "uppercase",
   },
   pageTitle: {
@@ -3674,14 +3683,17 @@ const s = StyleSheet.create({
     color: C.ink,
     fontSize: 24,
     lineHeight: 30,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: -0.5,
   },
   subtitle: { marginTop: 4, color: C.muted, fontSize: 16, lineHeight: 24 },
   scroll: { paddingBottom: 34 },
   quickScroll: { paddingHorizontal: 14, paddingTop: 18, paddingBottom: 34 },
+  quickSection:{marginTop:24},
+  quickSectionTitle:{color:C.ink,fontSize:18,fontWeight:"700",letterSpacing:-.25},
+  quickSectionHelp:{marginTop:3,color:C.muted,fontSize:13,lineHeight:18},
   quickGrid: {
-    marginTop: 18,
+    marginTop: 11,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
@@ -3704,7 +3716,7 @@ const s = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: "rgba(255,255,255,.14)",
   },
-  quickTitle: { marginTop: 13, color: C.white, fontSize: 19, fontWeight: "900", letterSpacing:-.3 },
+  quickTitle: { marginTop: 13, color: C.white, fontSize: 19, fontWeight: "700", letterSpacing:-.3 },
   quickHelp: { marginTop: 6, flex: 1, color: "#F3F5F7", fontSize: 13, lineHeight: 18, fontWeight: "600" },
   quickGo: {
     minHeight: 38,
@@ -3716,7 +3728,7 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,.24)",
   },
-  quickGoText: { color:C.white,fontSize: 13, fontWeight: "900" },
+  quickGoText: { color:C.white,fontSize: 13, fontWeight: "700" },
   quickNote: {
     marginTop: 16,
     padding: 14,
@@ -3736,7 +3748,7 @@ const s = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: C.orange,
   },
-  missedBannerTitle: { color: C.white, fontSize: 18, fontWeight: "900" },
+  missedBannerTitle: { color: C.white, fontSize: 18, fontWeight: "700" },
   missedBannerText: { marginTop: 3, color: C.white, fontSize: 13, lineHeight: 18, fontWeight: "600" },
   step: {
     marginTop: 12,
@@ -3755,7 +3767,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: C.green,
   },
-  stepNumber: { color: C.white, fontSize: 16, fontWeight: "900" },
+  stepNumber: { color: C.white, fontSize: 16, fontWeight: "700" },
   stepText: {
     flex: 1,
     color: C.dark,
@@ -3782,7 +3794,7 @@ const s = StyleSheet.create({
     marginBottom: 7,
     color: C.dark,
     fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   stockFilterWrap: {
     marginTop: 8,
@@ -3809,8 +3821,8 @@ const s = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: C.accentSoft,
   },
-  stockCategoryPickerText: { flex: 1, color: C.ink, fontSize: 16, fontWeight: "900" },
-  stockCategoryChange: { color: C.accent, fontSize: 12, fontWeight: "900" },
+  stockCategoryPickerText: { flex: 1, color: C.ink, fontSize: 16, fontWeight: "700" },
+  stockCategoryChange: { color: C.accent, fontSize: 12, fontWeight: "700" },
   categoryMenu:{marginTop:7,overflow:"hidden",borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white,shadowColor:"#0D1722",shadowOpacity:.08,shadowRadius:12,shadowOffset:{width:0,height:6},elevation:3},
   categoryMenuRow:{minHeight:50,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderBottomWidth:1,borderBottomColor:"#EEF0F2"},
   categoryMenuRowOn:{backgroundColor:C.accentSoft},
@@ -3911,7 +3923,7 @@ const s = StyleSheet.create({
     color: C.muted,
     fontSize: 11,
     lineHeight: 15,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: 0.7,
     textAlign: "center",
   },
@@ -3929,7 +3941,7 @@ const s = StyleSheet.create({
     color: C.muted,
     fontSize: 7,
     lineHeight: 9,
-    fontWeight: "900",
+    fontWeight: "700",
     textAlign: "center",
   },
   badge: {
@@ -3944,7 +3956,7 @@ const s = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: C.green,
   },
-  badgeText: { color: C.white, fontSize: 16, fontWeight: "900" },
+  badgeText: { color: C.white, fontSize: 16, fontWeight: "700" },
   saleBadge: {
     position: "absolute",
     top: 7,
@@ -3954,7 +3966,7 @@ const s = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: C.red,
   },
-  saleBadgeText: { color: C.white, fontSize: 9, fontWeight: "900", letterSpacing: 0.7 },
+  saleBadgeText: { color: C.white, fontSize: 9, fontWeight: "700", letterSpacing: 0.7 },
   stockBadge: {
     position: "absolute",
     left: 7,
@@ -3981,9 +3993,9 @@ const s = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: -0.4,
   },
-  saleLine: { marginTop: 3, color: C.red, fontSize: 13, lineHeight: 18, fontWeight: "900" },
+  saleLine: { marginTop: 3, color: C.red, fontSize: 13, lineHeight: 18, fontWeight: "700" },
   oldPrice: { color: C.muted, textDecorationLine: "line-through" },
-  stock: { marginTop: 4, color: C.green, fontSize: 14, lineHeight: 19, fontWeight: "900" },
+  stock: { marginTop: 4, color: C.green, fontSize: 14, lineHeight: 19, fontWeight: "700" },
   low: { color: C.orange, fontWeight: "800" },
   basket: {
     position: "absolute",
@@ -4002,7 +4014,7 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   basketCount: { color: C.muted, fontSize: 13, fontWeight: "700" },
-  basketTotal: { marginTop: 2, color: C.ink, fontSize: 25, fontWeight: "900" },
+  basketTotal: { marginTop: 2, color: C.ink, fontSize: 25, fontWeight: "700" },
   reviewButton: {
     minHeight: 60,
     paddingHorizontal: 19,
@@ -4012,7 +4024,7 @@ const s = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: C.green,
   },
-  reviewText: { color: C.white, fontSize: 16, fontWeight: "900" },
+  reviewText: { color: C.white, fontSize: 16, fontWeight: "700" },
   back: { minHeight: 64, flexDirection: "row", alignItems: "center", gap: 10 },
   backButton: {
     width: 50,
@@ -4024,7 +4036,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: C.white,
   },
-  backTitle: { color: C.ink, fontSize: 22, fontWeight: "900" },
+  backTitle: { color: C.ink, fontSize: 22, fontWeight: "700" },
   cartRow: {
     minHeight: 88,
     marginTop: 10,
@@ -4045,13 +4057,13 @@ const s = StyleSheet.create({
     borderColor: C.border,
   },
   quantityLabel: { color: C.muted, fontSize: 13, fontWeight: "800" },
-  rowTitle: { color: C.ink, fontSize: 16, fontWeight: "900" },
+  rowTitle: { color: C.ink, fontSize: 16, fontWeight: "700" },
   rowHelp: { marginTop: 3, color: C.muted, fontSize: 13, lineHeight: 18 },
   lineTotal: {
     minWidth: 65,
     color: C.ink,
     fontSize: 15,
-    fontWeight: "900",
+    fontWeight: "700",
     textAlign: "right",
   },
   quantity: { flexDirection: "row", alignItems: "center", gap: 5 },
@@ -4067,7 +4079,7 @@ const s = StyleSheet.create({
     minWidth: 30,
     color: C.ink,
     fontSize: 18,
-    fontWeight: "900",
+    fontWeight: "700",
     textAlign: "center",
   },
   totalBox: {
@@ -4077,13 +4089,13 @@ const s = StyleSheet.create({
     backgroundColor: C.dark,
   },
   totalLabel: { color: "#DDE4FF", fontSize: 15, fontWeight: "700" },
-  totalValue: { marginTop: 5, color: C.white, fontSize: 34, fontWeight: "900" },
+  totalValue: { marginTop: 5, color: C.white, fontSize: 34, fontWeight: "700" },
   section: {
     marginTop: 24,
     marginBottom: 9,
     color: C.ink,
     fontSize: 19,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   choiceRow: { flexDirection: "row", gap: 10 },
   choice: {
@@ -4118,7 +4130,7 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-  bigButtonText: { color: C.white, fontSize: 17, fontWeight: "900" },
+  bigButtonText: { color: C.white, fontSize: 17, fontWeight: "700" },
   safe: { marginTop: 11, color: C.muted, fontSize: 13, textAlign: "center" },
   hero: {
     marginTop: 16,
@@ -4127,7 +4139,7 @@ const s = StyleSheet.create({
     backgroundColor: C.dark,
   },
   heroLabel: { color: "#DDE4FF", fontSize: 15, fontWeight: "700" },
-  heroValue: { marginTop: 5, color: C.white, fontSize: 36, fontWeight: "900" },
+  heroValue: { marginTop: 5, color: C.white, fontSize: 36, fontWeight: "700" },
   heroSmall: { marginTop: 5, color: "#DDE4FF", fontSize: 13 },
   stats: { marginTop: 10, flexDirection: "row", gap: 10 },
   stat: {
@@ -4139,7 +4151,7 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   statLabel: { marginTop: 8, color: C.muted, fontSize: 13, fontWeight: "700" },
-  statValue: { marginTop: 3, color: C.ink, fontSize: 20, fontWeight: "900" },
+  statValue: { marginTop: 3, color: C.ink, fontSize: 20, fontWeight: "700" },
   soldRow: {
     minHeight: 66,
     marginBottom: 7,
@@ -4170,7 +4182,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: C.green,
   },
-  soldQtyText: { color: C.white, fontSize: 18, fontWeight: "900" },
+  soldQtyText: { color: C.white, fontSize: 18, fontWeight: "700" },
   receipt: {
     marginBottom: 9,
     padding: 14,
@@ -4190,7 +4202,7 @@ const s = StyleSheet.create({
     marginTop: 3,
     color: C.accentDark,
     fontSize: 11,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   receiptItems: {
     marginTop: 10,
@@ -4232,7 +4244,7 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   editHeading: { flexDirection: "row", alignItems: "center", gap: 11 },
-  editName: { color: C.ink, fontSize: 22, fontWeight: "900" },
+  editName: { color: C.ink, fontSize: 22, fontWeight: "700" },
   productMiniIcon: {
     width: 46,
     height: 46,
@@ -4314,15 +4326,15 @@ const s = StyleSheet.create({
     color: C.muted,
     fontSize: 7,
     lineHeight: 9,
-    fontWeight: "900",
+    fontWeight: "700",
     textAlign: "center",
   },
-  rowPrice: { color: C.dark, fontSize: 16, fontWeight: "900" },
+  rowPrice: { color: C.dark, fontSize: 16, fontWeight: "700" },
   stockBig: {
     marginTop: 22,
     color: C.dark,
     fontSize: 48,
-    fontWeight: "900",
+    fontWeight: "700",
     textAlign: "center",
   },
   stockLabel: { color: C.muted, fontSize: 14, textAlign: "center" },
@@ -4347,7 +4359,7 @@ const s = StyleSheet.create({
     backgroundColor: C.soft,
   },
   stockNumLow: { backgroundColor: C.orangeSoft },
-  stockNumText: { color: C.dark, fontSize: 19, fontWeight: "900" },
+  stockNumText: { color: C.dark, fontSize: 19, fontWeight: "700" },
   menu: {
     minHeight: 90,
     marginTop: 10,
@@ -4368,7 +4380,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: C.soft,
   },
-  menuTitle: { color: C.ink, fontSize: 17, fontWeight: "900" },
+  menuTitle: { color: C.ink, fontSize: 17, fontWeight: "700" },
   locationCard: {
     padding: 14,
     borderWidth: 1,
@@ -4391,7 +4403,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
-  addText: { color: C.green, fontSize: 15, fontWeight: "900" },
+  addText: { color: C.green, fontSize: 15, fontWeight: "700" },
   cancel: { minHeight: 48, alignItems: "center", justifyContent: "center" },
   account: {
     minHeight: 80,
@@ -4412,7 +4424,7 @@ const s = StyleSheet.create({
     borderRadius: 26,
     backgroundColor: C.green,
   },
-  avatarText: { color: C.white, fontSize: 21, fontWeight: "900" },
+  avatarText: { color: C.white, fontSize: 21, fontWeight: "700" },
   signout: {
     minHeight: 58,
     marginTop: 12,
@@ -4425,7 +4437,7 @@ const s = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: C.redSoft,
   },
-  signoutText: { color: C.red, fontSize: 16, fontWeight: "900" },
+  signoutText: { color: C.red, fontSize: 16, fontWeight: "700" },
   empty: {
     marginTop: 16,
     padding: 24,
@@ -4467,7 +4479,7 @@ const s = StyleSheet.create({
   guideKicker: {
     color: C.accentDark,
     fontSize: 13,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: 1.2,
   },
   guideCount: {
@@ -4499,7 +4511,7 @@ const s = StyleSheet.create({
     color: C.ink,
     fontSize: 25,
     lineHeight: 32,
-    fontWeight: "900",
+    fontWeight: "700",
     textAlign: "center",
   },
   guideBody: {
@@ -4570,7 +4582,7 @@ const s = StyleSheet.create({
     borderRadius: 19,
     backgroundColor: C.green,
   },
-  guideNextText: { color: C.white, fontSize: 16, fontWeight: "900" },
+  guideNextText: { color: C.white, fontSize: 16, fontWeight: "700" },
   gcashCheck: {
     marginTop: 12,
     padding: 16,
@@ -4609,7 +4621,7 @@ const s = StyleSheet.create({
     backgroundColor: C.cream,
     color: C.ink,
     fontSize: 28,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   quickCashRow: { marginTop: 10, flexDirection: "row", gap: 8 },
   quickCash: {
@@ -4620,7 +4632,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: C.accentSoft,
   },
-  quickCashText: { color: C.accentDark, fontSize: 15, fontWeight: "900" },
+  quickCashText: { color: C.accentDark, fontSize: 15, fontWeight: "700" },
   changeBox: {
     marginTop: 14,
     padding: 16,
@@ -4629,7 +4641,7 @@ const s = StyleSheet.create({
     backgroundColor: C.accentDark,
   },
   changeBoxShort: { backgroundColor: C.red },
-  changeValue: { marginTop: 4, color: C.white, fontSize: 34, fontWeight: "900" },
+  changeValue: { marginTop: 4, color: C.white, fontSize: 34, fontWeight: "700" },
   gcashHeading: { flexDirection: "row", alignItems: "center", gap: 11 },
   gcashIcon: {
     width: 48,
@@ -4657,7 +4669,7 @@ const s = StyleSheet.create({
     flexShrink: 1,
     color: C.dark,
     fontSize: 16,
-    fontWeight: "900",
+    fontWeight: "700",
     textAlign: "center",
   },
   receivedTextOn: { color: C.white },
@@ -4671,9 +4683,9 @@ const s = StyleSheet.create({
     marginTop: 3,
     color: C.teal,
     fontSize: 14,
-    fontWeight: "900",
+    fontWeight: "700",
   },
-  variantHint: { marginTop: 4, color: C.teal, fontSize: 12, fontWeight: "900" },
+  variantHint: { marginTop: 4, color: C.teal, fontSize: 12, fontWeight: "700" },
   variantOverlay: {
     flex: 1,
     padding: 18,
@@ -4701,10 +4713,10 @@ const s = StyleSheet.create({
   variantKicker: {
     color: C.teal,
     fontSize: 12,
-    fontWeight: "900",
+    fontWeight: "700",
     letterSpacing: 1.1,
   },
-  variantTitle: { marginTop: 3, color: C.ink, fontSize: 21, fontWeight: "900" },
+  variantTitle: { marginTop: 3, color: C.ink, fontSize: 21, fontWeight: "700" },
   variantGrid: { padding: 16, flexDirection: "row", flexWrap: "wrap", gap: 10 },
   variantButton: {
     width: "22%",
@@ -4726,7 +4738,7 @@ const s = StyleSheet.create({
   variantButtonText: {
     color: C.ink,
     fontSize: 20,
-    fontWeight: "900",
+    fontWeight: "700",
     textAlign: "center",
   },
   variantButtonTextOn: { color: C.white },
@@ -4757,8 +4769,8 @@ const s = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: C.white,
   },
-  designButtonText: { color: C.ink, fontSize: 20, fontWeight: "900" },
-  designPrice: { marginTop: 5, color: C.green, fontSize: 24, fontWeight: "900" },
+  designButtonText: { color: C.ink, fontSize: 20, fontWeight: "700" },
+  designPrice: { marginTop: 5, color: C.green, fontSize: 24, fontWeight: "700" },
   designStock: { marginTop: 3, color: C.muted, fontSize: 14, fontWeight: "700" },
   letterFooter: {
     width: "100%",
@@ -4770,7 +4782,7 @@ const s = StyleSheet.create({
   letterCount: {
     color: C.ink,
     fontSize: 18,
-    fontWeight: "900",
+    fontWeight: "700",
     textAlign: "center",
   },
   letterAddButton: {
@@ -4784,7 +4796,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: C.green,
   },
-  letterAddText: { color: C.white, fontSize: 18, fontWeight: "900" },
+  letterAddText: { color: C.white, fontSize: 18, fontWeight: "700" },
   choiceSetup: {
     marginTop: 18,
     padding: 16,
@@ -4803,7 +4815,7 @@ const s = StyleSheet.create({
     backgroundColor: C.border,
   },
   choiceToggleOn: { backgroundColor: C.teal },
-  choiceToggleText: { color: C.muted, fontSize: 14, fontWeight: "900" },
+  choiceToggleText: { color: C.muted, fontSize: 14, fontWeight: "700" },
   choiceToggleTextOn: { color: C.white },
   alphabetButton: {
     minHeight: 54,
@@ -4817,7 +4829,7 @@ const s = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: C.soft,
   },
-  alphabetText: { color: C.dark, fontSize: 16, fontWeight: "900" },
+  alphabetText: { color: C.dark, fontSize: 16, fontWeight: "700" },
   choiceInput: { minHeight: 92, textAlignVertical: "top", paddingTop: 15 },
   choicePills: {
     marginTop: 10,
@@ -4834,7 +4846,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: C.tealSoft,
   },
-  choicePillText: { color: C.teal, fontSize: 14, fontWeight: "900" },
+  choicePillText: { color: C.teal, fontSize: 14, fontWeight: "700" },
   variantLetter: {
     width: 52,
     height: 52,
@@ -4843,5 +4855,5 @@ const s = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: C.tealSoft,
   },
-  variantLetterText: { color: C.teal, fontSize: 18, fontWeight: "900" },
+  variantLetterText: { color: C.teal, fontSize: 18, fontWeight: "700" },
 });
