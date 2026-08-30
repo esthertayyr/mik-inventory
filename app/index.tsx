@@ -1703,7 +1703,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     soft: string;
     group: "daily" | "manage" | "records";
   }> = [
-    { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: C.soft, group:"daily" },
+    { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: "#EEF2F6", group:"daily" },
     { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due now` : ""}` : "Track custom, online and referral projects", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft, group:"daily" },
     { title: "Update stock", help: "Count stock or add new stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft, group:"daily" },
     { title: "Sales today", help: "See what was sold and today's total", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft, group:"records" },
@@ -1711,7 +1711,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     { title: "Products & prices", help: "Add or edit products and categories", icon: "pricetags", screen: "products", color: C.purple, soft: C.purpleSoft, group:"manage" },
     { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft, group:"manage" },
     { title: "Add missed sale", help: "Record a sale from an earlier date", icon: "calendar", screen: "missed", color: C.orange, soft: C.orangeSoft, group:"manage" },
-    { title: "Shop settings", help: "Logo, help guide and account", icon: "settings", screen: "more", color: "#4B5158", soft: C.soft, group:"manage" },
+    { title: "Shop settings", help: "Logo, help guide and account", icon: "settings", screen: "more", color: "#4B5158", soft: "#F1F2F3", group:"manage" },
   ];
   const sections = [
     {id:"daily",title:"Sell & fulfil",help:"The tasks used during the day."},
@@ -1730,17 +1730,17 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
             key={action.title}
             accessibilityRole="button"
             accessibilityLabel={`${action.title}. ${action.help}`}
-            style={({ pressed }) => [s.quickCard, { backgroundColor: action.color, width: width >= 920 ? "31.8%" : "48%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
+            style={({ pressed }) => [s.quickCard, { backgroundColor: action.soft, width: width >= 920 ? "31.8%" : "48%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
             onPress={() => onOpen(action.screen)}
           >
-            <View style={s.quickIcon}>
+            <View style={[s.quickIcon,{backgroundColor:action.color}]}>
               <Ionicons name={action.icon} size={28} color={C.white} />
             </View>
             <Text style={s.quickTitle}>{action.title}</Text>
             <Text style={s.quickHelp}>{action.help}</Text>
             <View style={s.quickGo}>
-              <Text style={s.quickGoText}>Open</Text>
-              <Ionicons name="arrow-forward" size={18} color={C.white} />
+              <Text style={[s.quickGoText,{color:action.color}]}>Open</Text>
+              <Ionicons name="arrow-forward" size={18} color={action.color} />
             </View>
           </Pressable>
         ))}
@@ -3701,12 +3701,14 @@ const s = StyleSheet.create({
   quickCard: {
     minHeight: 188,
     padding: 17,
+    borderWidth:1,
+    borderColor:C.border,
     borderRadius: 14,
     shadowColor: "#0D1722",
-    shadowOpacity: 0.12,
-    shadowRadius: 13,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 3,
+    shadowOpacity: 0.045,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
   quickIcon: {
     width: 48,
@@ -3714,10 +3716,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,.14)",
   },
-  quickTitle: { marginTop: 13, color: C.white, fontSize: 19, fontWeight: "700", letterSpacing:-.3 },
-  quickHelp: { marginTop: 6, flex: 1, color: "#F3F5F7", fontSize: 13, lineHeight: 18, fontWeight: "600" },
+  quickTitle: { marginTop: 13, color: C.ink, fontSize: 19, fontWeight: "700", letterSpacing:-.3 },
+  quickHelp: { marginTop: 6, flex: 1, color: C.muted, fontSize: 13, lineHeight: 18, fontWeight: "500" },
   quickGo: {
     minHeight: 38,
     marginTop: 12,
@@ -3726,9 +3727,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,.24)",
+    borderTopColor: C.border,
   },
-  quickGoText: { color:C.white,fontSize: 13, fontWeight: "700" },
+  quickGoText: { fontSize: 13, fontWeight: "700" },
   quickNote: {
     marginTop: 16,
     padding: 14,
