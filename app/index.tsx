@@ -43,10 +43,10 @@ import type {
 } from "@/src/types";
 
 const APP_FONT = Platform.select({
-  web: "Arial, Helvetica, sans-serif",
-  ios: "Arial",
+  web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  ios: "System",
   android: "sans-serif",
-  default: "Arial",
+  default: "System",
 });
 
 function Text({ style, ...props }: TextProps) {
@@ -163,11 +163,11 @@ const ownerNav: {
     soft: C.soft,
   },
   {
-    id: "dashboard",
-    label: "Today",
-    icon: "today-outline",
-    color: C.accent,
-    soft: C.accentSoft,
+    id: "orders",
+    label: "Orders",
+    icon: "clipboard-outline",
+    color: C.purple,
+    soft: C.purpleSoft,
   },
   {
     id: "inventory",
@@ -199,6 +199,8 @@ export default function Home() {
 }
 
 function Login() {
+  const { width } = useWindowDimensions();
+  const wide = width >= 820;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -235,14 +237,16 @@ function Login() {
   return (
     <SafeAreaView style={s.login}>
       <StatusBar style="dark" />
-      <View style={s.loginCard}>
+      <View style={[s.loginShell, wide && s.loginShellWide]}>
+        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK · SIMPLE SHOPKEEPING</Text><Text style={s.loginEditorialTitle}>Your shop, beautifully organised.</Text><Text style={s.loginEditorialBody}>Sales, stock and customer orders—clear enough to understand at a glance.</Text><View style={s.loginEditorialRule}/><Text style={s.loginEditorialQuote}>Made for busy hands and calm decisions.</Text></View> : null}
+        <View style={[s.loginCard, wide && s.loginCardWide]}>
         <Image
           source={require("../assets/mik-logo.png")}
           style={s.brandLogo}
           resizeMode="contain"
         />
-        <Text style={s.loginTitle}>Hello!</Text>
-        <Text style={s.centerHelp}>Let’s get your shop ready.</Text>
+        <Text style={s.loginTitle}>Welcome back.</Text>
+        <Text style={s.centerHelp}>Sign in to open your shop.</Text>
         <Label>Username</Label>
         <TextInput
           style={s.input}
@@ -272,6 +276,7 @@ function Login() {
           <Ionicons name="help-circle-outline" size={21} color={C.green} />
           <Text style={s.guidePreviewText}>See how Mik works</Text>
         </Pressable>
+        </View>
       </View>
       <Text style={s.loginCredit}>Made by Esther Tay</Text>
       <GuideModal visible={guideOpen} onClose={() => setGuideOpen(false)} />
@@ -750,7 +755,7 @@ function ShopApp({
       ? "more"
       : screen === "missed"
         ? "sale"
-        : screen === "correct" || screen === "orders"
+        : screen === "correct"
           ? "home"
           : screen;
   return (
@@ -1355,10 +1360,10 @@ function SaleScreen({
                     <Ionicons name={saleCategoryOpen ? "chevron-up" : "chevron-down"} size={20} color={C.muted} />
                   </Pressable>
                   {saleCategoryOpen ? (
-                    <View style={s.stockFilterWrap}>
-                      <Chip label="All categories" icon="apps" selected={false} onPress={() => { setCategory(null); setSearch(""); setSaleCategoryOpen(false); }} />
+                    <View style={s.categoryMenu}>
+                      <Pressable style={s.categoryMenuRow} onPress={() => { setCategory(null); setSearch(""); setSaleCategoryOpen(false); }}><Ionicons name="apps" size={20} color={C.ink}/><Text style={s.categoryMenuText}>All categories</Text></Pressable>
                       {categories.map((c) => (
-                        <Chip key={c.id} label={c.name} icon={categoryIcon(c.name)} tone={categoryTone(c.name)} selected={category === c.id} onPress={() => { setCategory(c.id); setSaleCategoryOpen(false); }} />
+                        <Pressable key={c.id} style={[s.categoryMenuRow,category===c.id&&s.categoryMenuRowOn]} onPress={() => { setCategory(c.id); setSaleCategoryOpen(false); }}><Ionicons name={categoryIcon(c.name)} size={20} color={categoryTone(c.name).color}/><Text style={s.categoryMenuText}>{c.name}</Text>{category===c.id?<Ionicons name="checkmark" size={20} color={C.accent}/>:null}</Pressable>
                       ))}
                     </View>
                   ) : null}
@@ -1402,7 +1407,7 @@ function SaleScreen({
               <View
                 style={[
                   s.productVisual,
-                  { height: width < 700 ? 112 : cardWidth - 18 },
+                  { height: cardWidth - 18 },
                 ]}
               >
                 {item.image_url || placeholderImage(item.name) ? (
@@ -1675,6 +1680,7 @@ function SaleScreen({
 }
 
 function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (screen: Screen) => void }) {
+  const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
   useEffect(() => {
     supabase
@@ -1697,7 +1703,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     soft: string;
   }> = [
     { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: C.soft },
-    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due now` : ""}` : "Track custom, online and referral projects", icon: "clipboard", screen: "orders", color: C.green, soft: C.soft },
+    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due now` : ""}` : "Track custom, online and referral projects", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft },
     { title: "Update stock", help: "Count stock or add new stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
     { title: "Sales today", help: "See what was sold and today's total", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
     { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft },
@@ -1716,17 +1722,17 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
             key={action.title}
             accessibilityRole="button"
             accessibilityLabel={`${action.title}. ${action.help}`}
-            style={({ pressed }) => [s.quickCard, pressed && { opacity: 0.72 }]}
+            style={({ pressed }) => [s.quickCard, { backgroundColor: action.color, width: width >= 920 ? "31.8%" : "48%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
             onPress={() => onOpen(action.screen)}
           >
-            <View style={[s.quickIcon, { borderColor: C.green }]}>
-              <Ionicons name={action.icon} size={28} color={C.green} />
+            <View style={s.quickIcon}>
+              <Ionicons name={action.icon} size={28} color={C.white} />
             </View>
             <Text style={s.quickTitle}>{action.title}</Text>
             <Text style={s.quickHelp}>{action.help}</Text>
             <View style={s.quickGo}>
-              <Text style={[s.quickGoText, { color: C.green }]}>Open</Text>
-              <Ionicons name="arrow-forward" size={18} color={C.green} />
+              <Text style={s.quickGoText}>Open</Text>
+              <Ionicons name="arrow-forward" size={18} color={C.white} />
             </View>
           </Pressable>
         ))}
@@ -2731,22 +2737,10 @@ function Inventory({
         <Ionicons name={categoryOpen ? "chevron-up" : "chevron-down"} size={20} color={C.muted} />
       </Pressable>
       {categoryOpen ? (
-        <View style={s.stockFilterWrap}>
-          <Chip
-            label="All products"
-            icon="apps"
-            selected={!category}
-            onPress={() => { setCategory(null); setCategoryOpen(false); }}
-          />
+        <View style={s.categoryMenu}>
+          <Pressable style={[s.categoryMenuRow,!category&&s.categoryMenuRowOn]} onPress={() => { setCategory(null); setCategoryOpen(false); }}><Ionicons name="apps" size={20} color={C.ink}/><Text style={s.categoryMenuText}>All products</Text>{!category?<Ionicons name="checkmark" size={20} color={C.accent}/>:null}</Pressable>
           {categories.map((c) => (
-            <Chip
-              key={c.id}
-              label={c.name}
-              icon={categoryIcon(c.name)}
-              tone={categoryTone(c.name)}
-              selected={category === c.id}
-              onPress={() => { setCategory(c.id); setCategoryOpen(false); }}
-            />
+            <Pressable key={c.id} style={[s.categoryMenuRow,category===c.id&&s.categoryMenuRowOn]} onPress={() => { setCategory(c.id); setCategoryOpen(false); }}><Ionicons name={categoryIcon(c.name)} size={20} color={categoryTone(c.name).color}/><Text style={s.categoryMenuText}>{c.name}</Text>{category===c.id?<Ionicons name="checkmark" size={20} color={C.accent}/>:null}</Pressable>
           ))}
         </View>
       ) : null}
@@ -3392,24 +3386,30 @@ const s = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 22,
+    padding: 18,
     backgroundColor: C.cream,
   },
+  loginShell:{width:"100%",maxWidth:1040,overflow:"hidden",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white,shadowColor:"#071521",shadowOpacity:.09,shadowRadius:28,shadowOffset:{width:0,height:14},elevation:8},
+  loginShellWide:{minHeight:650,flexDirection:"row"},
+  loginEditorial:{width:"52%",padding:56,justifyContent:"center",backgroundColor:C.dark},
+  loginKicker:{color:"#C7D1DA",fontSize:11,fontWeight:"800",letterSpacing:2.1},
+  loginEditorialTitle:{maxWidth:430,marginTop:24,color:C.white,fontSize:48,lineHeight:55,fontWeight:"800",letterSpacing:-1.7},
+  loginEditorialBody:{maxWidth:410,marginTop:20,color:"#D7DEE5",fontSize:18,lineHeight:28},
+  loginEditorialRule:{width:48,height:2,marginTop:38,backgroundColor:C.white},
+  loginEditorialQuote:{marginTop:16,color:C.white,fontSize:14,fontWeight:"700",letterSpacing:.2},
   loginCard: {
     width: "100%",
-    maxWidth: 440,
+    maxWidth: 520,
     padding: 28,
-    borderRadius: 14,
+    borderRadius: 20,
     backgroundColor: C.white,
     borderWidth: 1,
     borderColor: C.border,
-    shadowColor: "#0D1F2D",
-    shadowOpacity: 0.025,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 9 },
-    elevation: 5,
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  brandLogo: { width: 118, height: 118, alignSelf: "center" },
+  loginCardWide:{width:"48%",justifyContent:"center",paddingHorizontal:52,borderWidth:0},
+  brandLogo: { width: 96, height: 96, alignSelf: "center" },
   logo: {
     width: 76,
     height: 76,
@@ -3435,7 +3435,7 @@ const s = StyleSheet.create({
   loginTitle: {
     marginTop: 4,
     color: C.ink,
-    fontSize: 32,
+    fontSize: 34,
     lineHeight: 40,
     fontWeight: "800",
     textAlign: "center",
@@ -3598,7 +3598,7 @@ const s = StyleSheet.create({
     borderRadius: 8,
   },
   navIconOn: { backgroundColor: C.green },
-  navText: { marginTop: 3, color: C.muted, fontSize: 12, fontWeight: "700" },
+  navText: { marginTop: 2, color: C.muted, fontSize: 11, fontWeight: "700" },
   navTextOn: { color: C.dark, fontWeight: "900" },
   headerHome: {
     minHeight: 42,
@@ -3674,7 +3674,7 @@ const s = StyleSheet.create({
     color: C.ink,
     fontSize: 24,
     lineHeight: 30,
-    fontWeight: "800",
+    fontWeight: "900",
     letterSpacing: -0.5,
   },
   subtitle: { marginTop: 4, color: C.muted, fontSize: 16, lineHeight: 24 },
@@ -3687,30 +3687,25 @@ const s = StyleSheet.create({
     gap: 12,
   },
   quickCard: {
-    width: "48%",
-    minHeight: 194,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 12,
-    backgroundColor: C.soft,
+    minHeight: 188,
+    padding: 17,
+    borderRadius: 14,
     shadowColor: "#0D1722",
-    shadowOpacity: 0.035,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 1,
+    shadowOpacity: 0.12,
+    shadowRadius: 13,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 3,
   },
   quickIcon: {
     width: 48,
     height: 48,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1.5,
-    borderRadius: 12,
-    backgroundColor: C.white,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,.14)",
   },
-  quickTitle: { marginTop: 13, color: C.ink, fontSize: 18, fontWeight: "900" },
-  quickHelp: { marginTop: 6, flex: 1, color: C.muted, fontSize: 14, lineHeight: 19, fontWeight: "600" },
+  quickTitle: { marginTop: 13, color: C.white, fontSize: 19, fontWeight: "900", letterSpacing:-.3 },
+  quickHelp: { marginTop: 6, flex: 1, color: "#F3F5F7", fontSize: 13, lineHeight: 18, fontWeight: "600" },
   quickGo: {
     minHeight: 38,
     marginTop: 12,
@@ -3719,9 +3714,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: "rgba(255,255,255,.24)",
   },
-  quickGoText: { fontSize: 14, fontWeight: "900" },
+  quickGoText: { color:C.white,fontSize: 13, fontWeight: "900" },
   quickNote: {
     marginTop: 16,
     padding: 14,
@@ -3816,6 +3811,10 @@ const s = StyleSheet.create({
   },
   stockCategoryPickerText: { flex: 1, color: C.ink, fontSize: 16, fontWeight: "900" },
   stockCategoryChange: { color: C.accent, fontSize: 12, fontWeight: "900" },
+  categoryMenu:{marginTop:7,overflow:"hidden",borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white,shadowColor:"#0D1722",shadowOpacity:.08,shadowRadius:12,shadowOffset:{width:0,height:6},elevation:3},
+  categoryMenuRow:{minHeight:50,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderBottomWidth:1,borderBottomColor:"#EEF0F2"},
+  categoryMenuRowOn:{backgroundColor:C.accentSoft},
+  categoryMenuText:{flex:1,color:C.ink,fontSize:15,fontWeight:"700"},
   stockSortRow: {
     flexDirection: "row",
     gap: 8,
@@ -3895,9 +3894,11 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 10,
     marginBottom: 7,
-    backgroundColor: "#EEF1F3",
+    borderWidth:1,
+    borderColor:"#EEF0F2",
+    backgroundColor: C.white,
   },
-  productCardImage: { width: "100%", height: "100%", resizeMode: "contain" },
+  productCardImage: { width: "100%", height: "100%", resizeMode: "contain", objectFit:"contain" },
   missingPhoto: {
     width: "100%",
     height: "100%",

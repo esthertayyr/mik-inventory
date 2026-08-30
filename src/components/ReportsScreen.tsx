@@ -19,7 +19,7 @@ import * as Sharing from "expo-sharing";
 import { supabase } from "@/src/lib/supabase";
 import { peso } from "@/src/lib/format";
 
-const APP_FONT = Platform.select({ web: "Arial, Helvetica, sans-serif", ios: "Arial", android: "sans-serif", default: "Arial" });
+const APP_FONT = Platform.select({ web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", ios: "System", android: "sans-serif", default: "System" });
 function Text({ style, ...props }: TextProps) { return <RNText {...props} style={[{ fontFamily: APP_FONT }, style]} />; }
 function TextInput({ style, ...props }: TextInputProps) { return <RNTextInput {...props} style={[{ fontFamily: APP_FONT }, style]} />; }
 
