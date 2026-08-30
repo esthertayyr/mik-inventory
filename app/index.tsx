@@ -27,6 +27,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/src/lib/supabase";
 import { peso, shortDate } from "@/src/lib/format";
 import { ReportsScreen } from "@/src/components/ReportsScreen";
+import { OrdersScreen } from "@/src/components/OrdersScreen";
 import type {
   Business,
   CartItem,
@@ -667,6 +668,7 @@ function ShopApp({
   if (screen === "home")
     body = (
       <QuickStart
+        locationId={locationId}
         onOpen={(next) => {
           setScreen(next);
           if (next === "dashboard") void reload();
@@ -732,6 +734,8 @@ function ShopApp({
         onSaved={(logo_url) => setBusiness((current) => current ? { ...current, logo_url } : current)}
       />
     );
+  else if (screen === "orders")
+    body = <OrdersScreen businessId={business!.id} locationId={locationId} />;
   else
     body = (
       <More
@@ -746,7 +750,7 @@ function ShopApp({
       ? "more"
       : screen === "missed"
         ? "sale"
-        : screen === "correct"
+        : screen === "correct" || screen === "orders"
           ? "home"
           : screen;
   return (
@@ -1670,7 +1674,20 @@ function SaleScreen({
   );
 }
 
-function QuickStart({ onOpen }: { onOpen: (screen: Screen) => void }) {
+function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (screen: Screen) => void }) {
+  const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
+  useEffect(() => {
+    supabase
+      .from("external_orders")
+      .select("status,target_date")
+      .eq("location_id", locationId)
+      .then(({ data }) => {
+        const active = (data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status)).length;
+        const todayValue = new Date().toLocaleDateString("en-CA");
+        const urgent = (data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status) && o.target_date && o.target_date <= todayValue).length;
+        setOrderSummary({ active, urgent });
+      });
+  }, [locationId]);
   const actions: Array<{
     title: string;
     help: string;
@@ -1680,6 +1697,7 @@ function QuickStart({ onOpen }: { onOpen: (screen: Screen) => void }) {
     soft: string;
   }> = [
     { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: C.soft },
+    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due now` : ""}` : "Track custom, online and referral projects", icon: "clipboard", screen: "orders", color: C.green, soft: C.soft },
     { title: "Update stock", help: "Count stock or add new stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
     { title: "Sales today", help: "See what was sold and today's total", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
     { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft },
@@ -2977,6 +2995,17 @@ const guideSteps: GuideStep[] = [
       { icon: "cube-outline", label: "Stock" },
       { icon: "image-outline", label: "Product" },
       { icon: "add-circle-outline", label: "Add stock" },
+    ],
+  },
+  {
+    title: "Track outside orders",
+    body: "Tap Orders on Home for Facebook, online, referral, word-of-mouth, or walk-in projects. Record how much was paid elsewhere, then move the order from New to Making, Ready, and Completed.",
+    icon: "clipboard",
+    flow: [
+      { icon: "clipboard-outline", label: "Orders" },
+      { icon: "card-outline", label: "Payment" },
+      { icon: "construct-outline", label: "Making" },
+      { icon: "checkmark-circle-outline", label: "Ready" },
     ],
   },
   {
