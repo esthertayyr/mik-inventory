@@ -487,6 +487,7 @@ function ShopApp({
   adminBusiness?: AdminShop;
   onAdminExit?: () => void;
 }) {
+  const { width } = useWindowDimensions();
   const [screen, setScreen] = useState<Screen>("home");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
@@ -778,10 +779,10 @@ function ShopApp({
               : current?.name ?? "Shop location"}
           </Text>
         </View>
-        <Pressable style={s.headerHome} onPress={() => setScreen("home")} accessibilityLabel="Go to home page">
+        {width < 900 ? <Pressable style={s.headerHome} onPress={() => setScreen("home")} accessibilityLabel="Go to home page">
           <Ionicons name="home" size={19} color={C.white} />
           <Text style={s.headerHomeText}>Home</Text>
-        </Pressable>
+        </Pressable> : <Text style={s.desktopBrand}>MIK</Text>}
       </View>
       {locations.length > 1 ? (
         <ScrollView
@@ -800,12 +801,12 @@ function ShopApp({
           ))}
         </ScrollView>
       ) : null}
-      <View style={s.content}>{body}</View>
-      <View style={s.nav}>
+      <View style={[s.content,width>=900&&s.desktopContent]}>{body}</View>
+      <View style={[s.nav,width>=900&&s.desktopNav]}>
         {nav.map((item) => (
           <Pressable
             key={item.id}
-            style={s.navItem}
+            style={[s.navItem,width>=900&&s.desktopNavItem]}
             onPress={() => {
               const openScreen = () => {
                 setScreen(item.id);
@@ -826,6 +827,7 @@ function ShopApp({
             <View
               style={[
                 s.navIcon,
+                width>=900&&s.desktopNavIcon,
                 {
                   backgroundColor: selected === item.id ? item.color : "transparent",
                 },
@@ -3581,6 +3583,7 @@ const s = StyleSheet.create({
     alignSelf: "center",
     paddingHorizontal: 18,
   },
+  desktopContent:{order:2,paddingHorizontal:28},
   nav: {
     minHeight: 76,
     paddingHorizontal: 8,
@@ -3593,12 +3596,14 @@ const s = StyleSheet.create({
     maxWidth: 1180,
     alignSelf: "center",
   },
+  desktopNav:{order:1,minHeight:62,paddingHorizontal:22,paddingBottom:0,borderTopWidth:0,borderBottomWidth:1},
   navItem: {
     flex: 1,
     minHeight: 70,
     alignItems: "center",
     justifyContent: "center",
   },
+  desktopNavItem:{minHeight:61,flexDirection:"row",gap:8},
   navIcon: {
     width: 42,
     height: 34,
@@ -3606,6 +3611,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 8,
   },
+  desktopNavIcon:{width:36,height:32},
   navIconOn: { backgroundColor: C.green },
   navText: { marginTop: 2, color: C.muted, fontSize: 11, fontWeight: "700" },
   navTextOn: { color: C.dark, fontWeight: "700" },
@@ -3620,6 +3626,7 @@ const s = StyleSheet.create({
     backgroundColor: C.green,
   },
   headerHomeText: { color: C.white, fontSize: 14, fontWeight: "700" },
+  desktopBrand:{color:C.ink,fontSize:18,fontWeight:"600",letterSpacing:5},
   adminTop: {
     minHeight: 72,
     paddingHorizontal: 18,
