@@ -1375,9 +1375,24 @@ function SaleScreen({
                 <View style={s.flex}><Text style={s.eventBannerTitle}>Event mode</Text><Text style={s.eventBannerText}>Fast checkout for markets and busy pop-ups.</Text></View>
               </View>
             ) : null}
-            <Text style={s.pageTitle}>
-              {choosingCategory ? "Choose a category" : "Choose a product"}
-            </Text>
+            <View style={s.saleTitleRow}>
+              <Text style={[s.pageTitle, s.flex]}>
+                {choosingCategory ? "Choose a category" : "Choose a product"}
+              </Text>
+              {count > 0 ? (
+                <Pressable
+                  accessibilityLabel="Clear this sale"
+                  style={s.clearSaleButton}
+                  onPress={() => Alert.alert("Clear this sale?", "All selected products will be removed.", [
+                    { text: "Keep sale", style: "cancel" },
+                    { text: "Clear sale", style: "destructive", onPress: () => { setCart([]); setChoosing(null); setChosenLetters([]); setChosenDesign(null); } },
+                  ])}
+                >
+                  <Ionicons name="close-circle-outline" size={20} color={C.red} />
+                  <Text style={s.clearSaleText}>Clear sale</Text>
+                </Pressable>
+              ) : null}
+            </View>
             <Step number="1">
               {choosingCategory
                 ? "Tap the type of product the customer wants."
@@ -1767,12 +1782,12 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     color: string;
     soft: string;
   }> = [
-    { title: "Sell", help: "Shop, event or earlier sale", icon: "cart", screen: "sell_start", color: C.green, soft: "#EEF2F6" },
-    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due` : ""}` : "Customer orders", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft },
-    { title: "Stock", help: "Check or update stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
-    { title: "Sales", help: "Today's sales", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
-    { title: "Production", help: "Printers and filament", icon: "construct", screen: "production", color: "#087A38", soft: "#EEF7F1" },
-    { title: "More", help: "Prices, reports and settings", icon: "grid", screen: "more", color: "#4B5158", soft: "#F1F2F3" },
+    { title: "Sell", help: "Make a shop or event sale", icon: "cart", screen: "sell_start", color: C.green, soft: "#EEF2F6" },
+    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} customer orders active` : "Track customer orders", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft },
+    { title: "Stock", help: "Count or update products", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
+    { title: "Sales", help: "View sales and receipts", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
+    { title: "Production", help: "Track printers and filament", icon: "construct", screen: "production", color: "#087A38", soft: "#EEF7F1" },
+    { title: "More", help: "Prices, reports and shop settings", icon: "grid", screen: "more", color: "#4B5158", soft: "#F1F2F3" },
   ];
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
@@ -2555,53 +2570,67 @@ function Inventory({
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
-  const [stockView, setStockView] = useState<"all" | "lowest" | "out">("all");
+  const [stockView, setStockView] = useState<"all" | "lowest" | "out" | "count">("all");
   const [selected, setSelected] = useState<Product | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
     null,
   );
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [quantity, setQuantity] = useState("");
-  const [mode, setMode] = useState<"stock_in" | "damage">("stock_in");
+  const [mode, setMode] = useState<"stock_in" | "set" | "damage">("stock_in");
   const categoryName = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? "Other";
+  const shownStock = (p: Product) => p.name.startsWith("Extra Alphabet -") && p.alphabet_style
+    ? p.alphabet_style.letters.reduce((total, item) => total + item.quantity_on_hand, 0)
+    : p.variants.length
+      ? p.variants.reduce((total, item) => total + item.quantity_on_hand, 0)
+      : p.quantity_on_hand;
+  const needsCount = (p: Product) => p.needs_stock_count || Boolean(p.alphabet_style?.letters.some((item) => item.needs_stock_count));
   const filtered = products
     .filter(
       (p) =>
         (!category || p.category_id === category) &&
         p.name.toLowerCase().includes(search.toLowerCase()) &&
-        (stockView !== "out" || p.quantity_on_hand <= 0),
+        (stockView !== "out" || shownStock(p) <= 0) &&
+        (stockView !== "count" || needsCount(p)),
     )
     .sort((a, b) =>
       stockView === "lowest"
-        ? a.quantity_on_hand - b.quantity_on_hand || a.name.localeCompare(b.name)
+        ? shownStock(a) - shownStock(b) || a.name.localeCompare(b.name)
         : a.name.localeCompare(b.name),
     );
   const save = async () => {
-    const amount = Number(quantity);
-    if (!selected || !Number.isInteger(amount) || amount <= 0)
+    const entered = Number(quantity);
+    const current = selectedLetter
+      ? (selected?.alphabet_style?.letters.find((item) => item.letter === selectedLetter)?.quantity_on_hand ?? 0)
+      : (selectedVariant?.quantity_on_hand ?? selected?.quantity_on_hand ?? 0);
+    const delta = mode === "set" ? entered - current : mode === "damage" ? -entered : entered;
+    const amount = Math.abs(delta);
+    if (!selected || !Number.isInteger(entered) || entered < 0 || (mode !== "set" && entered === 0))
       return Alert.alert(
         "Check quantity",
-        "Enter a whole number greater than zero.",
+        mode === "set" ? "Enter the actual number you counted." : "Enter a whole number greater than zero.",
       );
+    if (mode === "set" && delta === 0) return Alert.alert("Count already correct", `Stock is already ${current}.`);
+    const movementType: "stock_in" | "damage" = delta < 0 ? "damage" : "stock_in";
     let error: { message: string } | null = null;
     if (selectedLetter && selected.alphabet_style) {
       const letterResult = await supabase.rpc("record_alphabet_inventory_movement", {
           p_location_id: locationId,
           p_style_id: selected.alphabet_style.id,
           p_letter: selectedLetter,
-          p_type: mode,
+          p_type: movementType,
           p_quantity: amount,
-          p_note: mode === "damage" ? "Damaged alphabet letter" : "Alphabet stock added",
+          p_note: mode === "set" ? `Actual letter count set to ${entered}` : mode === "damage" ? "Damaged or lost alphabet letter" : "Alphabet stock received",
         });
       error = letterResult.error;
       if (!error && selected.name.startsWith("Extra Alphabet -")) {
         const totalResult = await supabase.rpc("record_inventory_movement", {
           p_location_id: locationId,
           p_product_id: selected.id,
-          p_type: mode,
+          p_type: movementType,
           p_quantity: amount,
-          p_note: mode === "damage" ? "Damaged alphabet total" : "Alphabet total stock added",
+          p_note: mode === "set" ? `Actual alphabet count adjusted to ${entered}` : mode === "damage" ? "Damaged or lost alphabet total" : "Alphabet total stock received",
         });
         error = totalResult.error;
       }
@@ -2609,19 +2638,19 @@ function Inventory({
       const variantResult = await supabase.rpc("record_variant_inventory_movement", {
           p_location_id: locationId,
           p_variant_id: selectedVariant.id,
-          p_type: mode,
+          p_type: movementType,
           p_quantity: amount,
           p_note:
-            mode === "damage" ? "Damaged product choice" : "Choice stock added",
+            mode === "set" ? `Actual choice count set to ${entered}` : mode === "damage" ? "Damaged or lost product choice" : "Choice stock received",
         });
       error = variantResult.error;
     } else {
       const productResult = await supabase.rpc("record_inventory_movement", {
           p_location_id: locationId,
           p_product_id: selected.id,
-          p_type: mode,
+          p_type: movementType,
           p_quantity: amount,
-          p_note: mode === "damage" ? "Damaged product" : "Stock added",
+          p_note: mode === "set" ? `Actual count set to ${entered}` : mode === "damage" ? "Damaged or lost product" : "Stock received",
         });
       error = productResult.error;
     }
@@ -2633,9 +2662,11 @@ function Inventory({
     await onSaved();
     Alert.alert(
       "Stock updated",
-      mode === "damage"
-        ? `${amount} damaged recorded.`
-        : `${amount} added to stock.`,
+      mode === "set"
+        ? `Actual stock is now ${entered}.`
+        : mode === "damage"
+          ? `${amount} damaged or lost recorded.`
+          : `${amount} received into stock.`,
       [
         { text: "Go home", onPress: onHome },
         { text: "Update more stock" },
@@ -2744,7 +2775,7 @@ function Inventory({
           </Text>
           <Text style={s.stockLabel}>currently in stock</Text>
           <Text style={s.section}>What happened?</Text>
-          <View style={s.choiceRow}>
+          <View style={s.stockActionChoices}>
             <Choice
               label="Add stock"
               icon="add-circle-outline"
@@ -2752,14 +2783,20 @@ function Inventory({
               onPress={() => setMode("stock_in")}
             />
             <Choice
-              label="Damaged"
+              label="Set count"
+              icon="keypad-outline"
+              selected={mode === "set"}
+              onPress={() => setMode("set")}
+            />
+            <Choice
+              label="Remove stock"
               icon="warning-outline"
               selected={mode === "damage"}
               danger
               onPress={() => setMode("damage")}
             />
           </View>
-          <Label>How many?</Label>
+          <Label>{mode === "set" ? "What is the actual count?" : "How many?"}</Label>
           <TextInput
             style={s.qtyInput}
             keyboardType="number-pad"
@@ -2769,7 +2806,7 @@ function Inventory({
             autoFocus
           />
           <BigButton
-            label={mode === "damage" ? "Record damaged items" : "Add to stock"}
+            label={mode === "set" ? "Save count" : mode === "damage" ? "Remove from stock" : "Add stock"}
             icon={mode === "damage" ? "warning-outline" : "add-circle-outline"}
             onPress={save}
             danger={mode === "damage"}
@@ -2826,6 +2863,12 @@ function Inventory({
           selected={stockView === "out"}
           onPress={() => setStockView("out")}
         />
+        <Chip
+          label="Count needed"
+          icon="checkbox-outline"
+          selected={stockView === "count"}
+          onPress={() => setStockView("count")}
+        />
       </View>
       </View>
       <Text style={s.stockResultCount}>
@@ -2836,7 +2879,8 @@ function Inventory({
         keyExtractor={(p) => p.id}
         contentContainerStyle={s.list}
         renderItem={({ item }) => {
-          const low = item.quantity_on_hand <= item.low_stock_threshold;
+          const quantityShown = shownStock(item);
+          const low = quantityShown <= item.low_stock_threshold;
           const tone = categoryTone(categoryName(item.category_id));
           return (
             <Pressable
@@ -2855,7 +2899,7 @@ function Inventory({
               <View style={s.flex}>
                 <Text style={s.rowTitle}>{item.name}</Text>
                 <Text style={[s.rowHelp, low && s.low]}>
-                  {item.needs_stock_count
+                  {needsCount(item)
                     ? "Stock count needed"
                     : item.variants.length
                       ? `${item.variants.length} choices · tap to see each one`
@@ -2866,7 +2910,7 @@ function Inventory({
               </View>
               <View style={[s.stockNum, low && s.stockNumLow]}>
                 <Text style={[s.stockNumText, low && s.low]}>
-                  {item.quantity_on_hand}
+                  {quantityShown}
                 </Text>
                 <Text style={[s.stockNumLabel, low && s.low]}>left</Text>
               </View>
@@ -3788,6 +3832,20 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     gap: 12,
   },
+  saleTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  clearSaleButton: {
+    minHeight: 42,
+    marginTop: 18,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#E8CCD3",
+    borderRadius: 10,
+    backgroundColor: C.white,
+  },
+  clearSaleText: { color: C.red, fontSize: 13, fontWeight: "700" },
   quickCard: {
     minHeight: 188,
     padding: 17,
@@ -3932,6 +3990,7 @@ const s = StyleSheet.create({
   categoryMenuText:{flex:1,color:C.ink,fontSize:15,fontWeight:"700"},
   stockSortRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   stockResultCount: {
@@ -4213,6 +4272,7 @@ const s = StyleSheet.create({
     fontWeight: "700",
   },
   choiceRow: { flexDirection: "row", gap: 10 },
+  stockActionChoices: { gap: 9 },
   choice: {
     flex: 1,
     minHeight: 84,
