@@ -2732,8 +2732,9 @@ function Inventory({
   return (
     <View style={s.flex}>
       <Text style={s.pageTitle}>Stock</Text>
-      <Text style={s.subtitle}>Tap a product to update its stock.</Text>
+      <Text style={s.subtitle}>Choose a product to update its stock.</Text>
       <Search value={search} onChange={setSearch} />
+      <View style={s.stockFilters}>
       <Text style={s.stockFilterLabel}>Category</Text>
       <Pressable style={s.stockCategoryPicker} onPress={() => setCategoryOpen((open) => !open)}>
         <View style={s.stockCategoryPickerIcon}>
@@ -2778,6 +2779,7 @@ function Inventory({
           onPress={() => setStockView("out")}
         />
       </View>
+      </View>
       <Text style={s.stockResultCount}>
         {filtered.length} {filtered.length === 1 ? "product" : "products"}
       </Text>
@@ -2789,13 +2791,15 @@ function Inventory({
           const low = item.quantity_on_hand <= item.low_stock_threshold;
           return (
             <Pressable style={s.listRow} onPress={() => setSelected(item)}>
-              <View style={s.listIcon}>
+              {item.image_url || placeholderImage(item.name) ? (
+                <Image source={item.image_url ? { uri: item.image_url } : placeholderImage(item.name)} style={s.stockListImage} />
+              ) : <View style={s.listIcon}>
                 <Ionicons
                   name={productIcon(item.name, categoryName(item.category_id))}
                   size={24}
                   color={low ? C.orange : C.accent}
                 />
-              </View>
+              </View>}
               <View style={s.flex}>
                 <Text style={s.rowTitle}>{item.name}</Text>
                 <Text style={[s.rowHelp, low && s.low]}>
@@ -2812,8 +2816,9 @@ function Inventory({
                 <Text style={[s.stockNumText, low && s.low]}>
                   {item.quantity_on_hand}
                 </Text>
+                <Text style={[s.stockNumLabel, low && s.low]}>left</Text>
               </View>
-              <Ionicons name="chevron-forward" size={22} color={C.muted} />
+              <Ionicons name="chevron-forward" size={19} color={C.muted} />
             </Pressable>
           );
         }}
@@ -3814,6 +3819,7 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+  stockFilters:{marginTop:12,padding:13,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:C.soft},
   stockCategoryPicker: {
     minHeight: 52,
     paddingHorizontal: 12,
@@ -4317,6 +4323,7 @@ const s = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: C.accentSoft,
   },
+  stockListImage:{width:52,height:52,borderWidth:1,borderColor:C.border,borderRadius:12,resizeMode:"contain",backgroundColor:C.white},
   listImage: { width: 58, height: 58, borderRadius: 16, resizeMode: "cover" },
   manageCategoryButton: { minHeight: 48, marginTop: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 16, backgroundColor: C.soft },
   manageCategoryText: { color: C.dark, fontSize: 14, fontWeight: "800" },
@@ -4363,8 +4370,9 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
   stockNum: {
-    width: 52,
-    height: 52,
+    minWidth: 48,
+    minHeight: 48,
+    paddingHorizontal:7,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
@@ -4372,6 +4380,7 @@ const s = StyleSheet.create({
   },
   stockNumLow: { backgroundColor: C.orangeSoft },
   stockNumText: { color: C.dark, fontSize: 19, fontWeight: "700" },
+  stockNumLabel:{marginTop:-2,color:C.muted,fontSize:9,fontWeight:"600",textTransform:"uppercase",letterSpacing:.5},
   menu: {
     minHeight: 90,
     marginTop: 10,
