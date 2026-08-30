@@ -28,6 +28,8 @@ import { supabase } from "@/src/lib/supabase";
 import { peso, shortDate } from "@/src/lib/format";
 import { ReportsScreen } from "@/src/components/ReportsScreen";
 import { OrdersScreen } from "@/src/components/OrdersScreen";
+import { PrintersScreen } from "@/src/components/PrintersScreen";
+import { FilamentsScreen } from "@/src/components/FilamentsScreen";
 import type {
   Business,
   CartItem,
@@ -81,19 +83,21 @@ const C = {
 type Icon = keyof typeof Ionicons.glyphMap;
 function categoryIcon(name: string): Icon {
   const n = name.toLowerCase();
-  if (n.includes("keyboard")) return "keypad";
+  if (n.includes("keyboard") || n.includes("clicker") || n.includes("keycap")) return "keypad";
   if (n.includes("fidget")) return "sync";
   if (n.includes("keychain")) return "key";
+  if (n.includes("decor") || n.includes("display")) return "sparkles";
   if (n.includes("home") || n.includes("gift")) return "home";
   return "cube";
 }
 function categoryTone(name: string) {
   const n = name.toLowerCase();
-  if (n.includes("keyboard")) return { color: "#102A43", soft: "#EEF3F7" };
-  if (n.includes("fidget")) return { color: "#29473A", soft: "#EFF4F1" };
-  if (n.includes("keychain")) return { color: "#70263A", soft: "#F7EFF1" };
-  if (n.includes("home") || n.includes("gift")) return { color: "#49384E", soft: "#F4F1F5" };
-  return { color: "#294B61", soft: "#EFF4F6" };
+  if (n.includes("keyboard") || n.includes("clicker") || n.includes("keycap")) return { color: "#102A43", soft: "#F5F8FA" };
+  if (n.includes("fidget") || n.includes("flexi")) return { color: "#29473A", soft: "#F6F8F7" };
+  if (n.includes("keychain") || n.includes("charm")) return { color: "#70263A", soft: "#FAF6F7" };
+  if (n.includes("decor") || n.includes("display")) return { color: "#5A405F", soft: "#F9F6F9" };
+  if (n.includes("home") || n.includes("gift") || n.includes("desk")) return { color: "#49384E", soft: "#F8F6F8" };
+  return { color: "#294B61", soft: "#F6F8F9" };
 }
 function productIcon(name: string, category = ""): Icon {
   const n = `${name} ${category}`.toLowerCase();
@@ -681,7 +685,7 @@ function ShopApp({
         }}
       />
     );
-  else if (screen === "sale" || screen === "missed")
+  else if (screen === "sale" || screen === "missed" || screen === "event_sale")
     body = (
       <SaleScreen
         key={`${locationId}-${screen}`}
@@ -691,6 +695,7 @@ function ShopApp({
         onSaved={reload}
         onPendingChange={setSaleInProgress}
         startPastSale={screen === "missed"}
+        eventMode={screen === "event_sale"}
         onNavigate={setScreen}
       />
     );
@@ -742,6 +747,20 @@ function ShopApp({
     );
   else if (screen === "orders")
     body = <OrdersScreen businessId={business!.id} locationId={locationId} />;
+  else if (screen === "printers")
+    body = <PrintersScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
+  else if (screen === "filaments")
+    body = <FilamentsScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
+  else if (screen === "price_list")
+    body = (
+      <PriceList
+        products={products}
+        categories={categories}
+        business={business!}
+        onBack={() => setScreen("home")}
+        onEdit={() => setScreen("products")}
+      />
+    );
   else
     body = (
       <More
@@ -752,10 +771,12 @@ function ShopApp({
       />
     );
   const selected =
-    screen === "products" || screen === "reports" || screen === "shop"
+    screen === "products" || screen === "reports" || screen === "shop" || screen === "printers" || screen === "filaments" || screen === "price_list"
       ? "more"
       : screen === "missed"
         ? "sale"
+        : screen === "event_sale"
+          ? "sale"
         : screen === "correct"
           ? "home"
           : screen;
@@ -886,6 +907,7 @@ function SaleScreen({
   onSaved,
   onPendingChange,
   startPastSale = false,
+  eventMode = false,
   onNavigate,
 }: {
   products: Product[];
@@ -894,6 +916,7 @@ function SaleScreen({
   onSaved: () => void;
   onPendingChange: (pending: boolean) => void;
   startPastSale?: boolean;
+  eventMode?: boolean;
   onNavigate: (screen: Screen) => void;
 }) {
   const { width } = useWindowDimensions();
@@ -923,9 +946,9 @@ function SaleScreen({
       p.name.toLowerCase().includes(search.toLowerCase()),
   );
   const choosingCategory = category === null && search.trim() === "";
+  const saleContentWidth = Math.min(width, 1180) - (width >= 900 ? 56 : 36);
   const cardWidth =
-    (Math.min(width, 1180) - 36 - (productColumns - 1) * 11) /
-    productColumns;
+    (saleContentWidth - (productColumns - 1) * 11) / productColumns;
   const total = cart.reduce((n, x) => n + x.quantity * x.unitPrice, 0);
   const cashAmount = Number(cashReceived);
   const cashIsEnough =
@@ -1084,7 +1107,7 @@ function SaleScreen({
       `Receipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? `Cash\nChange: ${peso(changeDue)}` : "GCash — received"}.`,
       [
         { text: "See sales today", onPress: () => onNavigate("dashboard") },
-        { text: "Start next sale", onPress: () => onNavigate("sale") },
+        { text: "Start next sale", onPress: () => onNavigate(eventMode ? "event_sale" : "sale") },
       ],
     );
   };
@@ -1322,6 +1345,12 @@ function SaleScreen({
                   <Text style={s.missedBannerTitle}>Adding a missed sale</Text>
                   <Text style={s.missedBannerText}>Choose the products now. You will choose the original date before saving.</Text>
                 </View>
+              </View>
+            ) : null}
+            {eventMode ? (
+              <View style={s.eventBanner}>
+                <Ionicons name="flash" size={22} color={C.accent} />
+                <View style={s.flex}><Text style={s.eventBannerTitle}>Event mode</Text><Text style={s.eventBannerText}>Fast checkout for markets and busy pop-ups.</Text></View>
               </View>
             ) : null}
             <Text style={s.pageTitle}>
@@ -1715,22 +1744,28 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     screen: Screen;
     color: string;
     soft: string;
-    group: "daily" | "manage" | "records";
+    group: "sell" | "production" | "display" | "records" | "settings";
   }> = [
-    { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: "#EEF2F6", group:"daily" },
-    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due now` : ""}` : "Track custom, online and referral projects", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft, group:"daily" },
-    { title: "Update stock", help: "Count stock or add new stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft, group:"daily" },
+    { title: "New sale", help: "Tap products and collect payment", icon: "cart", screen: "sale", color: C.green, soft: "#EEF2F6", group:"sell" },
+    { title: "Event mode", help: "Fast selling for markets and busy pop-ups", icon: "flash", screen: "event_sale", color: C.accent, soft: C.accentSoft, group:"sell" },
+    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active${orderSummary.urgent ? ` · ${orderSummary.urgent} due now` : ""}` : "Track customer projects and due dates", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft, group:"sell" },
+    { title: "Update stock", help: "Count finished products and keycaps", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft, group:"production" },
+    { title: "Printers", help: "See which printers are working or need repair", icon: "hardware-chip", screen: "printers", color: "#087A38", soft: "#EEF7F1", group:"production" },
+    { title: "Filaments", help: "Track brands, materials, colours and spools", icon: "color-filter", screen: "filaments", color: "#315E68", soft: "#F0F6F6", group:"production" },
+    { title: "Price list", help: "View or print current selling prices", icon: "list", screen: "price_list", color: C.green, soft: "#F1F4F6", group:"display" },
+    { title: "Products & prices", help: "Add products, photos, categories and prices", icon: "pricetags", screen: "products", color: C.purple, soft: C.purpleSoft, group:"display" },
     { title: "Sales today", help: "See what was sold and today's total", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft, group:"records" },
     { title: "Reports & Excel", help: "See daily, weekly or monthly sales", icon: "bar-chart", screen: "reports", color: C.teal, soft: C.tealSoft, group:"records" },
-    { title: "Products & prices", help: "Add or edit products and categories", icon: "pricetags", screen: "products", color: C.purple, soft: C.purpleSoft, group:"manage" },
-    { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft, group:"manage" },
-    { title: "Add missed sale", help: "Record a sale from an earlier date", icon: "calendar", screen: "missed", color: C.orange, soft: C.orangeSoft, group:"manage" },
-    { title: "Shop settings", help: "Logo, help guide and account", icon: "settings", screen: "more", color: "#4B5158", soft: "#F1F2F3", group:"manage" },
+    { title: "Correct a sale", help: "Cancel a wrong sale and restore stock", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft, group:"records" },
+    { title: "Add missed sale", help: "Record products sold on an earlier date", icon: "calendar", screen: "missed", color: C.orange, soft: C.orangeSoft, group:"records" },
+    { title: "Shop settings", help: "Logo, help guide and account", icon: "settings", screen: "more", color: "#4B5158", soft: "#F1F2F3", group:"settings" },
   ];
   const sections = [
-    {id:"daily",title:"Sell & fulfil",help:"The tasks used during the day."},
-    {id:"records",title:"Check performance",help:"Review sales and export records."},
-    {id:"manage",title:"Manage the shop",help:"Products, corrections and settings."},
+    {id:"sell",title:"Sell to customers",help:"Checkout, event sales and customer orders."},
+    {id:"production",title:"Run production",help:"Finished stock, printers and printing materials."},
+    {id:"display",title:"Display & pricing",help:"Products and the popup-store price list."},
+    {id:"records",title:"Check sales",help:"Review, export or correct sales records."},
+    {id:"settings",title:"Shop settings",help:"Shop profile, help and account."},
   ] as const;
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
@@ -2802,7 +2837,7 @@ function Inventory({
           const tone = categoryTone(categoryName(item.category_id));
           return (
             <Pressable
-              style={[s.listRow, { backgroundColor: tone.soft, borderLeftColor: tone.color, borderLeftWidth: 4 }]}
+              style={[s.listRow, { backgroundColor: C.white, borderLeftColor: tone.color, borderLeftWidth: 4 }]}
               onPress={() => setSelected(item)}
             >
               {item.image_url || placeholderImage(item.name) ? (
@@ -2841,6 +2876,21 @@ function Inventory({
   );
 }
 
+function PriceList({products,categories,business,onBack,onEdit}:{products:Product[];categories:Category[];business:Business;onBack:()=>void;onEdit:()=>void}) {
+  const grouped=categories.map(category=>({category,items:products.filter(product=>product.category_id===category.id)})).filter(group=>group.items.length);
+  const missing=products.filter(product=>product.sale_price===null&&product.regular_price===null).length;
+  const printList=()=>{
+    if(Platform.OS!=="web") return Alert.alert("Open on a computer","Use Mik on a computer to print the shop price list.");
+    const escape=(value:string)=>value.replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]!));
+    const sections=grouped.map(group=>`<section><h2>${escape(group.category.name)}</h2>${group.items.map(product=>`<div class="row"><span>${escape(product.name)}</span><strong>${(product.sale_price??product.regular_price)!==null?escape(peso(Number(product.sale_price??product.regular_price))):"Price needed"}</strong></div>`).join("")}</section>`).join("");
+    const popup=window.open("","_blank","width=900,height=900");
+    if(!popup)return Alert.alert("Allow pop-ups","Allow pop-ups for Mik, then try Print price list again.");
+    popup.document.write(`<!doctype html><html><head><title>${escape(business.name)} Price List</title><style>body{font-family:Arial,sans-serif;color:#101318;max-width:820px;margin:0 auto;padding:40px}header{border-bottom:3px solid #142C47;padding-bottom:20px;margin-bottom:25px}h1{font-size:34px;margin:0}p{color:#626A73}h2{font-size:18px;margin:25px 0 8px;color:#264A3B}.row{display:flex;justify-content:space-between;gap:25px;padding:10px 0;border-bottom:1px solid #E0E3E7}.row strong{white-space:nowrap}@media print{body{padding:0}}</style></head><body><header><h1>${escape(business.name)}</h1><p>Price List</p></header>${sections}</body></html>`);
+    popup.document.close();popup.focus();popup.print();
+  };
+  return <ScrollView contentContainerStyle={s.scroll}><Back title="Price list" onPress={onBack}/><View style={s.priceListHero}><View style={s.flex}><Text style={s.priceListKicker}>POP-UP DISPLAY</Text><Text style={s.priceListTitle}>Current selling prices</Text><Text style={s.priceListHelp}>Sale prices are shown automatically when available.</Text></View><Ionicons name="receipt-outline" size={38} color={C.accent}/></View>{missing?<View style={s.priceWarning}><Ionicons name="alert-circle-outline" size={21} color={C.orange}/><Text style={s.priceWarningText}>{missing} {missing===1?"product needs":"products need"} a price before printing.</Text></View>:null}<View style={s.priceActions}><Pressable style={s.pricePrimary} onPress={printList}><Ionicons name="print-outline" size={21} color={C.white}/><Text style={s.pricePrimaryText}>Print price list</Text></Pressable><Pressable style={s.priceSecondary} onPress={onEdit}><Ionicons name="create-outline" size={21} color={C.dark}/><Text style={s.priceSecondaryText}>Edit prices</Text></Pressable></View>{grouped.map(group=><View key={group.category.id} style={s.priceSection}><View style={[s.priceSectionMark,{backgroundColor:categoryTone(group.category.name).color}]}/><Text style={s.priceSectionTitle}>{group.category.name}</Text>{group.items.map(product=><View key={product.id} style={s.priceRow}><Text style={s.priceName}>{product.name}</Text><View style={s.priceRight}>{product.sale_price!==null?<Text style={s.priceSaleTag}>SALE</Text>:null}<Text style={[s.priceValue,product.sale_price===null&&product.regular_price===null&&s.priceMissing]}>{product.sale_price!==null||product.regular_price!==null?peso(Number(product.sale_price??product.regular_price)):"Price needed"}</Text></View></View>)}</View>)}</ScrollView>;
+}
+
 function More({
   profile,
   business,
@@ -2872,6 +2922,9 @@ function More({
         soft="#F1F2F3"
         onPress={() => onOpen("products")}
       />
+      <Menu icon="receipt-outline" title="Price list" help="View, print or check selling prices" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("price_list")} />
+      <Menu icon="hardware-chip-outline" title="Printers" help="See which printers are working" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("printers")} />
+      <Menu icon="color-filter-outline" title="Filaments" help="Track materials, colours and spools" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("filaments")} />
       <Menu
         icon="bar-chart-outline"
         title="Sales reports"
@@ -3781,6 +3834,9 @@ const s = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: C.orange,
   },
+  eventBanner:{marginBottom:14,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:"#DDE8E1",borderRadius:11,backgroundColor:C.accentSoft},
+  eventBannerTitle:{color:C.accentDark,fontSize:15,fontWeight:"700"},
+  eventBannerText:{marginTop:2,color:C.muted,fontSize:13},
   missedBannerTitle: { color: C.white, fontSize: 18, fontWeight: "700" },
   missedBannerText: { marginTop: 3, color: C.white, fontSize: 13, lineHeight: 18, fontWeight: "600" },
   step: {
@@ -4409,6 +4465,26 @@ const s = StyleSheet.create({
   stockNumLow: { backgroundColor: C.orangeSoft },
   stockNumText: { color: C.dark, fontSize: 19, fontWeight: "700" },
   stockNumLabel:{marginTop:-2,color:C.muted,fontSize:11,fontWeight:"600",textTransform:"uppercase",letterSpacing:.35},
+  priceListHero:{marginTop:14,padding:20,flexDirection:"row",alignItems:"center",gap:16,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:"#F5F7F8"},
+  priceListKicker:{color:C.accent,fontSize:11,fontWeight:"700",letterSpacing:1.5},
+  priceListTitle:{marginTop:5,color:C.ink,fontSize:26,fontWeight:"700",letterSpacing:-.5},
+  priceListHelp:{marginTop:4,color:C.muted,fontSize:14,lineHeight:20},
+  priceWarning:{marginTop:10,padding:12,flexDirection:"row",alignItems:"center",gap:8,borderRadius:10,backgroundColor:C.orangeSoft},
+  priceWarningText:{flex:1,color:C.ink,fontSize:13,fontWeight:"600"},
+  priceActions:{marginTop:12,flexDirection:"row",gap:9},
+  pricePrimary:{minHeight:50,flex:1,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:10,backgroundColor:C.dark},
+  pricePrimaryText:{color:C.white,fontSize:14,fontWeight:"700"},
+  priceSecondary:{minHeight:50,flex:1,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},
+  priceSecondaryText:{color:C.dark,fontSize:14,fontWeight:"700"},
+  priceSection:{marginTop:18,overflow:"hidden",borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
+  priceSectionMark:{height:4,width:"100%"},
+  priceSectionTitle:{paddingHorizontal:14,paddingTop:13,paddingBottom:9,color:C.ink,fontSize:18,fontWeight:"700"},
+  priceRow:{minHeight:52,paddingHorizontal:14,paddingVertical:9,flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:12,borderTopWidth:1,borderTopColor:"#ECEEEF"},
+  priceName:{flex:1,color:C.ink,fontSize:14,lineHeight:19,fontWeight:"600"},
+  priceRight:{alignItems:"flex-end"},
+  priceValue:{color:C.dark,fontSize:17,fontWeight:"700"},
+  priceSaleTag:{marginBottom:1,color:C.red,fontSize:9,fontWeight:"700",letterSpacing:.8},
+  priceMissing:{color:C.orange,fontSize:12},
   menu: {
     minHeight: 90,
     marginTop: 10,

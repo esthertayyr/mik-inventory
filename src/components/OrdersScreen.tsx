@@ -171,7 +171,7 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
 
   if(editing) return <OrderForm form={form} setForm={setForm} saving={saving} editing={editing!=="new"} onBack={()=>setEditing(null)} onSave={save} onPhoto={choosePhoto}/>;
   return <ScrollView contentContainerStyle={s.page}>
-    <View style={s.headingRow}><View><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Custom and external orders</Text></View><Pressable style={s.add} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
+    <View style={s.headingRow}><View><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Customer orders received outside Mik</Text></View><Pressable style={s.add} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
     <View style={s.hero}><Text style={s.heroKicker}>PRODUCTION QUEUE</Text><Text style={s.heroValue}>{counts.active} active</Text><Text style={s.heroHelp}>{urgent?`${urgent} need attention today`:"Everything is on schedule"}</Text></View>
     <View style={s.summaryRow}><View style={s.summaryItem}><Text style={s.factLabel}>PAID ELSEWHERE</Text><Text style={s.summaryValue}>{peso(paymentSummary.paid)}</Text></View><View style={s.summaryItem}><Text style={s.factLabel}>OUTSTANDING</Text><Text style={s.summaryValue}>{peso(paymentSummary.outstanding)}</Text></View><View style={s.summaryItem}><Text style={s.factLabel}>TOP SOURCE</Text><Text style={s.summaryValue} numberOfLines={1}>{paymentSummary.topSource}</Text></View></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
