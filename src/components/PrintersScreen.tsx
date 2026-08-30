@@ -12,7 +12,8 @@ const STATUSES: Array<{id:PrinterStatus;label:string;short:string;color:string;s
   {id:"under_repair",label:"Under repair",short:"Repair",color:"#9B2C3F",soft:"#FAECEF",icon:"construct"},
   {id:"retired",label:"Retired",short:"Retired",color:"#606870",soft:"#F0F1F2",icon:"archive"},
 ];
-const MODELS=["A1 mini","A1","P1S","X1 Carbon","H2D","Other"];
+const MODELS=["Bambu Lab A1","Bambu Lab P2S","Bambu Lab AMS Lite","Other"];
+const isAccessory=(model:string)=>model.toLowerCase().includes("ams lite");
 const statusInfo=(status:PrinterStatus)=>STATUSES.find(x=>x.id===status)!;
 
 export function PrintersScreen({businessId,locationId,onBack}:{businessId:string;locationId:string;onBack:()=>void}) {
@@ -20,34 +21,36 @@ export function PrintersScreen({businessId,locationId,onBack}:{businessId:string
   const [printers,setPrinters]=useState<Printer[]>([]);
   const [loading,setLoading]=useState(true);
   const [editing,setEditing]=useState<Printer|"new"|null>(null);
-  const [name,setName]=useState(""); const [model,setModel]=useState("P1S");
+  const [name,setName]=useState(""); const [model,setModel]=useState("Bambu Lab A1");
   const [status,setStatus]=useState<PrinterStatus>("working"); const [notes,setNotes]=useState("");
   const [saving,setSaving]=useState(false);
   const load=useCallback(async()=>{setLoading(true);const {data,error}=await supabase.from("printers").select("id,name,model,status,notes,updated_at").eq("business_id",businessId).order("status").order("name");if(error)Alert.alert("Printers not loaded",error.message);setPrinters((data??[]) as Printer[]);setLoading(false);},[businessId]);
   useEffect(()=>{void load();},[load]);
   const counts=useMemo(()=>Object.fromEntries(STATUSES.map(s=>[s.id,printers.filter(p=>p.status===s.id).length])) as Record<PrinterStatus,number>,[printers]);
-  const active=printers.filter(p=>p.status!=="retired").length;
-  const openNew=()=>{setEditing("new");setName(`Printer ${String(active+1).padStart(2,"0")}`);setModel("P1S");setStatus("working");setNotes("");};
+  const printerItems=printers.filter(p=>!isAccessory(p.model));
+  const active=printerItems.filter(p=>p.status!=="retired").length;
+  const workingPrinters=printerItems.filter(p=>p.status==="working").length;
+  const openNew=()=>{setEditing("new");setName(`Printer ${String(active+1).padStart(2,"0")}`);setModel("Bambu Lab A1");setStatus("working");setNotes("");};
   const openEdit=(p:Printer)=>{setEditing(p);setName(p.name);setModel(p.model);setStatus(p.status);setNotes(p.notes??"");};
-  const save=async()=>{if(!name.trim()||!model.trim())return Alert.alert("Name and model needed","Give the printer a simple name and choose its model.");setSaving(true);const payload={business_id:businessId,location_id:locationId,name:name.trim(),model:model.trim(),status,notes:notes.trim()||null,updated_at:new Date().toISOString()};const result=editing==="new"?await supabase.from("printers").insert(payload):await supabase.from("printers").update(payload).eq("id",editing!.id);setSaving(false);if(result.error)return Alert.alert("Printer not saved",result.error.message);setEditing(null);await load();};
-  const remove=()=>{if(!editing||editing==="new")return;Alert.alert("Remove this printer?","It will be permanently removed from the fleet list.",[{text:"Keep printer",style:"cancel"},{text:"Remove",style:"destructive",onPress:async()=>{const {error}=await supabase.from("printers").delete().eq("id",editing.id);if(error)return Alert.alert("Printer not removed",error.message);setEditing(null);await load();}}]);};
+  const save=async()=>{if(!name.trim()||!model.trim())return Alert.alert("Name and model needed","Give the equipment a simple name and choose its model.");setSaving(true);const payload={business_id:businessId,location_id:locationId,name:name.trim(),model:model.trim(),status,notes:notes.trim()||null,updated_at:new Date().toISOString()};const result=editing==="new"?await supabase.from("printers").insert(payload):await supabase.from("printers").update(payload).eq("id",editing!.id);setSaving(false);if(result.error)return Alert.alert("Equipment not saved",result.error.message);setEditing(null);await load();};
+  const remove=()=>{if(!editing||editing==="new")return;Alert.alert("Remove this equipment?","It will be permanently removed from the equipment list.",[{text:"Keep it",style:"cancel"},{text:"Remove",style:"destructive",onPress:async()=>{const {error}=await supabase.from("printers").delete().eq("id",editing.id);if(error)return Alert.alert("Equipment not removed",error.message);setEditing(null);await load();}}]);};
   if(editing)return <ScrollView contentContainerStyle={s.page}>
-    <Pressable style={s.back} onPress={()=>setEditing(null)}><Ionicons name="arrow-back" size={22} color="#111820"/><Text style={s.backText}>{editing==="new"?"Add printer":"Edit printer"}</Text></Pressable>
-    <View style={s.formCard}><Text style={s.formTitle}>{editing==="new"?"Add to your fleet":"Printer details"}</Text><Text style={s.help}>Keep it simple. You can change the status whenever something happens.</Text>
-      <Text style={s.label}>Printer name</Text><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Example: Printer 01"/>
-      <Text style={s.label}>Model</Text><TextInput style={s.input} value={model} onChangeText={setModel} placeholder="Search or type printer model"/><View style={[s.wrap,{marginTop:8}]}>{MODELS.filter(x=>x!=="Other").map(x=><Pressable key={x} style={[s.choice,model===x&&s.choiceOn]} onPress={()=>setModel(x)}><Text style={[s.choiceText,model===x&&s.choiceTextOn]}>{x}</Text></Pressable>)}</View>
+    <Pressable style={s.back} onPress={()=>setEditing(null)}><Ionicons name="arrow-back" size={22} color="#111820"/><Text style={s.backText}>{editing==="new"?"Add equipment":"Edit equipment"}</Text></Pressable>
+    <View style={s.formCard}><Text style={s.formTitle}>{editing==="new"?"Add printer or accessory":"Equipment details"}</Text><Text style={s.help}>Choose an item below or type another model. Change its status whenever needed.</Text>
+      <Text style={s.label}>Equipment name</Text><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Example: A1 Printer 01"/>
+      <Text style={s.label}>Model</Text><TextInput style={s.input} value={model} onChangeText={setModel} placeholder="Choose below or type another model"/><View style={[s.wrap,{marginTop:8}]}>{MODELS.filter(x=>x!=="Other").map(x=><Pressable key={x} style={[s.choice,model===x&&s.choiceOn]} onPress={()=>setModel(x)}><Text style={[s.choiceText,model===x&&s.choiceTextOn]}>{x.replace("Bambu Lab ","")}</Text></Pressable>)}</View>
       <Text style={s.label}>Current status</Text><View style={s.statusChoices}>{STATUSES.map(x=><Pressable key={x.id} style={[s.statusChoice,{backgroundColor:x.soft,borderColor:status===x.id?x.color:"transparent"}]} onPress={()=>setStatus(x.id)}><Ionicons name={x.icon} size={23} color={x.color}/><Text style={[s.statusChoiceText,{color:x.color}]}>{x.label}</Text>{status===x.id?<Ionicons name="checkmark" size={19} color={x.color}/>:null}</Pressable>)}</View>
       <Text style={s.label}>Note</Text><TextInput style={[s.input,s.notes]} value={notes} onChangeText={setNotes} placeholder="Example: Nozzle needs replacing" multiline/>
-      <Pressable style={[s.save,saving&&{opacity:.6}]} onPress={()=>void save()} disabled={saving}><Ionicons name="checkmark" size={21} color="#FFF"/><Text style={s.saveText}>{saving?"Saving…":"Save printer"}</Text></Pressable>
-      {editing!=="new"?<Pressable style={s.remove} onPress={remove}><Text style={s.removeText}>Remove printer</Text></Pressable>:null}
+      <Pressable style={[s.save,saving&&{opacity:.6}]} onPress={()=>void save()} disabled={saving}><Ionicons name="checkmark" size={21} color="#FFF"/><Text style={s.saveText}>{saving?"Saving…":"Save equipment"}</Text></Pressable>
+      {editing!=="new"?<Pressable style={s.remove} onPress={remove}><Text style={s.removeText}>Remove equipment</Text></Pressable>:null}
     </View>
   </ScrollView>;
   const columns=width>=1000?3:width>=680?2:1; const cardWidth=columns===3?"32.3%":columns===2?"49%":"100%";
   return <ScrollView contentContainerStyle={s.page}>
-    <View style={s.heading}><View style={{flex:1}}><Pressable style={s.back} onPress={onBack}><Ionicons name="arrow-back" size={22} color="#111820"/><Text style={s.backText}>Printers</Text></Pressable><Text style={s.help}>See your whole printer fleet at a glance.</Text></View><Pressable style={s.add} onPress={openNew}><Ionicons name="add" size={22} color="#FFF"/><Text style={s.addText}>Add printer</Text></Pressable></View>
-    <View style={s.hero}><View><Text style={s.kicker}>PRINTER FLEET</Text><Text style={s.heroValue}>{counts.working} of {active} working</Text><Text style={s.heroHelp}>{counts.under_repair||counts.needs_attention?`${counts.under_repair+counts.needs_attention} need attention`:`${active} active printers ready`}</Text></View><View style={s.heroIcon}><Ionicons name="hardware-chip-outline" size={34} color="#00AE42"/></View></View>
+    <View style={s.heading}><View style={{flex:1}}><Pressable style={s.back} onPress={onBack}><Ionicons name="arrow-back" size={22} color="#111820"/><Text style={s.backText}>Printers</Text></Pressable><Text style={s.help}>See printers and accessories at a glance.</Text></View><Pressable style={s.add} onPress={openNew}><Ionicons name="add" size={22} color="#FFF"/><Text style={s.addText}>Add equipment</Text></Pressable></View>
+    <View style={s.hero}><View><Text style={s.kicker}>PRINTER FLEET</Text><Text style={s.heroValue}>{workingPrinters} of {active} working</Text><Text style={s.heroHelp}>{printers.filter(p=>p.status==="under_repair"||p.status==="needs_attention").length||0} equipment items need attention</Text></View><View style={s.heroIcon}><Ionicons name="hardware-chip-outline" size={34} color="#00AE42"/></View></View>
     <View style={s.summary}>{STATUSES.slice(0,3).map(x=><View key={x.id} style={[s.summaryCard,{backgroundColor:x.soft}]}><Ionicons name={x.icon} size={20} color={x.color}/><Text style={[s.summaryNumber,{color:x.color}]}>{counts[x.id]}</Text><Text style={s.summaryLabel}>{x.short}</Text></View>)}</View>
-    <View style={s.sectionHead}><Text style={s.sectionTitle}>All printers</Text><Text style={s.count}>{printers.length}</Text></View>
+    <View style={s.sectionHead}><Text style={s.sectionTitle}>All equipment</Text><Text style={s.count}>{printers.length}</Text></View>
     {loading?<ActivityIndicator size="large" color="#00AE42"/>:printers.length?<View style={s.grid}>{printers.map(p=>{const st=statusInfo(p.status);return <Pressable key={p.id} style={[s.printerCard,{width:cardWidth}]} onPress={()=>openEdit(p)}><View style={s.cardTop}><View style={s.printerIcon}><Ionicons name="cube-outline" size={28} color="#111820"/></View><View style={[s.statusPill,{backgroundColor:st.soft}]}><View style={[s.dot,{backgroundColor:st.color}]}/><Text style={[s.statusText,{color:st.color}]}>{st.label}</Text></View></View><Text style={s.printerName}>{p.name}</Text><Text style={s.model}>{p.model}</Text>{p.notes?<Text style={s.printerNote} numberOfLines={2}>{p.notes}</Text>:<Text style={s.noNote}>No issue noted</Text>}<View style={s.cardFoot}><Text style={s.editText}>View or update</Text><Ionicons name="arrow-forward" size={18} color="#111820"/></View></Pressable>})}</View>:<View style={s.empty}><Ionicons name="hardware-chip-outline" size={38} color="#00AE42"/><Text style={s.emptyTitle}>Add your first printer</Text><Text style={s.help}>Name each machine so everyone knows which printer needs attention.</Text><Pressable style={s.emptyButton} onPress={openNew}><Text style={s.emptyButtonText}>Add printer</Text></Pressable></View>}
   </ScrollView>;
 }
