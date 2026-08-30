@@ -1950,7 +1950,7 @@ function Dashboard({
               <Text style={s.rowTitle}>{p.name}</Text>
               <Text style={s.rowHelp}>
                 {p.needs_stock_count
-                  ? "Stock count needed"
+                  ? "Please count this stock"
                   : `${p.quantity_on_hand} left — add stock soon`}
               </Text>
             </View>
@@ -2690,7 +2690,7 @@ function Inventory({
               <View style={s.variantLetter}><Text style={s.variantLetterText}>{item.letter}</Text></View>
               <View style={s.flex}>
                 <Text style={s.rowTitle}>Letter {item.letter}</Text>
-                <Text style={s.rowHelp}>{item.needs_stock_count ? "Stock count needed" : `${item.quantity_on_hand} currently in stock`}</Text>
+                <Text style={s.rowHelp}>{item.needs_stock_count ? "Please count this stock" : `${item.quantity_on_hand} in stock`}</Text>
               </View>
               <Ionicons name="chevron-forward" size={22} color={C.teal} />
             </Pressable>
@@ -2783,7 +2783,7 @@ function Inventory({
               onPress={() => setMode("stock_in")}
             />
             <Choice
-              label="Enter total stock"
+              label="Edit stock total"
               icon="keypad-outline"
               selected={mode === "set"}
               onPress={() => setMode("set")}
@@ -2806,7 +2806,7 @@ function Inventory({
             autoFocus
           />
           <BigButton
-            label={mode === "set" ? "Save total stock" : mode === "damage" ? "Remove from stock" : "Add stock"}
+            label={mode === "set" ? "Save new total" : mode === "damage" ? "Remove from stock" : "Add stock"}
             icon={mode === "damage" ? "warning-outline" : "add-circle-outline"}
             onPress={save}
             danger={mode === "damage"}
