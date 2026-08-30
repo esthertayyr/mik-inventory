@@ -801,6 +801,7 @@ function ShopApp({
           ))}
         </ScrollView>
       ) : null}
+      <View style={[s.workspace,width>=900&&s.desktopWorkspace]}>
       <View style={[s.content,width>=900&&s.desktopContent]}>{body}</View>
       <View style={[s.nav,width>=900&&s.desktopNav]}>
         {nav.map((item) => (
@@ -850,6 +851,7 @@ function ShopApp({
             </Text>
           </Pressable>
         ))}
+      </View>
       </View>
       <GuideModal visible={guideOpen} onClose={closeGuide} />
     </SafeAreaView>
@@ -3583,7 +3585,9 @@ const s = StyleSheet.create({
     alignSelf: "center",
     paddingHorizontal: 18,
   },
-  desktopContent:{order:2,paddingHorizontal:28},
+  workspace:{flex:1},
+  desktopWorkspace:{flexDirection:"column-reverse"},
+  desktopContent:{paddingHorizontal:28},
   nav: {
     minHeight: 76,
     paddingHorizontal: 8,
@@ -3596,7 +3600,7 @@ const s = StyleSheet.create({
     maxWidth: 1180,
     alignSelf: "center",
   },
-  desktopNav:{order:1,minHeight:62,paddingHorizontal:22,paddingBottom:0,borderTopWidth:0,borderBottomWidth:1},
+  desktopNav:{minHeight:62,paddingHorizontal:22,paddingBottom:0,borderTopWidth:0,borderBottomWidth:1},
   navItem: {
     flex: 1,
     minHeight: 70,
