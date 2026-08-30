@@ -908,7 +908,7 @@ function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   return <ScrollView contentContainerStyle={s.sellStartPage}>
     <Text style={s.pageTitle}>How are you selling?</Text>
     <Text style={s.subtitle}>Choose one to start.</Text>
-    <Pressable style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Shop sale</Text><Text style={s.sellModeHelp}>Normal everyday checkout</Text></View><Ionicons name="arrow-forward" size={23} color={C.green}/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Shop sale</Text><Text style={s.sellModeHelp}>Sell at your shop</Text></View><Ionicons name="arrow-forward" size={23} color={C.green}/></Pressable>
     <Pressable style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Event sale</Text><Text style={s.sellModeHelp}>Fast checkout for markets</Text></View><Ionicons name="arrow-forward" size={23} color={C.accent}/></Pressable>
     <Pressable style={s.earlierSale} onPress={()=>onOpen("missed")}><Ionicons name="calendar-outline" size={21} color={C.orange}/><View style={s.flex}><Text style={s.earlierSaleTitle}>Add an earlier sale</Text><Text style={s.earlierSaleHelp}>For sales entered on another day</Text></View><Ionicons name="chevron-forward" size={20} color={C.muted}/></Pressable>
   </ScrollView>;
@@ -917,8 +917,8 @@ function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
 function ProductionStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   return <ScrollView contentContainerStyle={s.sellStartPage}>
     <Text style={s.pageTitle}>Printers & Filament</Text><Text style={s.subtitle}>What do you want to check?</Text>
-    <Pressable style={[s.sellModeCard,{backgroundColor:"#EEF7F1"}]} onPress={()=>onOpen("printers")}><View style={[s.sellModeIcon,{backgroundColor:"#087A38"}]}><Ionicons name="hardware-chip" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Printers</Text><Text style={s.sellModeHelp}>Working, attention or repair</Text></View><Ionicons name="arrow-forward" size={23} color="#087A38"/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:"#F0F6F6"}]} onPress={()=>onOpen("filaments")}><View style={[s.sellModeIcon,{backgroundColor:"#315E68"}]}><Ionicons name="color-filter" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Filaments</Text><Text style={s.sellModeHelp}>Brands, materials and colours</Text></View><Ionicons name="arrow-forward" size={23} color="#315E68"/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:"#EEF7F1"}]} onPress={()=>onOpen("printers")}><View style={[s.sellModeIcon,{backgroundColor:"#087A38"}]}><Ionicons name="hardware-chip" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Printers</Text><Text style={s.sellModeHelp}>Check printer status</Text></View><Ionicons name="arrow-forward" size={23} color="#087A38"/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:"#F0F6F6"}]} onPress={()=>onOpen("filaments")}><View style={[s.sellModeIcon,{backgroundColor:"#315E68"}]}><Ionicons name="color-filter" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Filament</Text><Text style={s.sellModeHelp}>Check filament stock</Text></View><Ionicons name="arrow-forward" size={23} color="#315E68"/></Pressable>
   </ScrollView>;
 }
 
@@ -2668,8 +2668,8 @@ function Inventory({
           ? `${amount} damaged or lost recorded.`
           : `${amount} received into stock.`,
       [
-        { text: "Go home", onPress: onHome },
-        { text: "Update more stock" },
+        { text: "Home", onPress: onHome },
+        { text: "Update another" },
       ],
     );
   };
@@ -2723,7 +2723,7 @@ function Inventory({
                   {selected.variant_label ?? "Choice"} {item.name}
                 </Text>
                 <Text style={s.rowHelp}>
-                  {item.quantity_on_hand} currently in stock
+                  {item.quantity_on_hand} in stock
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={22} color={C.teal} />
@@ -2773,7 +2773,7 @@ function Inventory({
               ? (selected.alphabet_style?.letters.find((item) => item.letter === selectedLetter)?.quantity_on_hand ?? 0)
               : (selectedVariant?.quantity_on_hand ?? selected.quantity_on_hand)}
           </Text>
-          <Text style={s.stockLabel}>currently in stock</Text>
+          <Text style={s.stockLabel}>in stock</Text>
           <Text style={s.section}>What do you want to do?</Text>
           <View style={s.stockActionChoices}>
             <Choice
@@ -2864,7 +2864,7 @@ function Inventory({
           onPress={() => setStockView("out")}
         />
         <Chip
-          label="Count now"
+          label="Not counted"
           icon="checkbox-outline"
           selected={stockView === "count"}
           onPress={() => setStockView("count")}
