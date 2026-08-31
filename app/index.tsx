@@ -234,6 +234,7 @@ function Login() {
       email: `${authUsername}@login.mik.app`,
       password,
     });
+    if (!e) await supabase.rpc("record_login_activity");
     setBusy(false);
     if (e)
       setError("The username or password is not correct. Please try again.");
@@ -330,6 +331,7 @@ function PlatformAdmin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [openShop, setOpenShop] = useState<AdminShop | null>(null);
+  const [showActivity, setShowActivity] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -377,6 +379,8 @@ function PlatformAdmin() {
         onAdminExit={() => setOpenShop(null)}
       />
     );
+  if (showActivity)
+    return <OwnerActivityLog shops={shops} onBack={() => setShowActivity(false)} />;
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -397,6 +401,11 @@ function PlatformAdmin() {
           <Text style={s.heroLabel}>ACTIVE SHOP PROFILES</Text>
           <Text style={s.heroValue}>{shops.length}</Text>
         </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open shop activity log" style={s.activityButton} onPress={() => setShowActivity(true)}>
+          <View style={s.activityButtonIcon}><Ionicons name="time-outline" size={23} color={C.white} /></View>
+          <View style={s.flex}><Text style={s.activityButtonTitle}>Shop activity</Text><Text style={s.activityButtonHelp}>Sales, products, stock, orders and logins</Text></View>
+          <Ionicons name="chevron-forward" size={21} color={C.green} />
+        </Pressable>
         {showForm ? (
           <View style={s.editCard}>
             <Text style={s.editName}>Create a shop profile</Text>
@@ -3130,6 +3139,100 @@ function ShopProfile({
   );
 }
 
+type ActivityLog = {
+  id: number;
+  business_id: string | null;
+  actor_name: string;
+  action: string;
+  summary: string;
+  details: Record<string, any>;
+  created_at: string;
+  business: { name: string } | null;
+};
+
+function activityDetail(item: ActivityLog) {
+  if (item.action !== "product_updated") return "";
+  const before = item.details?.before ?? {};
+  const after = item.details?.after ?? {};
+  const changes: string[] = [];
+  if (before.name !== after.name) changes.push(`Name: ${before.name} → ${after.name}`);
+  if (before.regular_price !== after.regular_price) changes.push(`Price: ${peso(Number(before.regular_price ?? 0))} → ${peso(Number(after.regular_price ?? 0))}`);
+  if (before.sale_price !== after.sale_price) changes.push(`Sale price: ${before.sale_price == null ? "none" : peso(Number(before.sale_price))} → ${after.sale_price == null ? "none" : peso(Number(after.sale_price))}`);
+  return changes.join(" · ") || "Product details changed";
+}
+
+function activityIcon(action: string): Icon {
+  if (action.startsWith("sale_")) return "receipt-outline";
+  if (action.startsWith("product_")) return "cube-outline";
+  if (action === "stock_changed") return "layers-outline";
+  if (action.startsWith("order_")) return "clipboard-outline";
+  if (action === "login") return "log-in-outline";
+  return "storefront-outline";
+}
+
+function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () => void }) {
+  const [items, setItems] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [shopId, setShopId] = useState("all");
+  const [kind, setKind] = useState("all");
+  useEffect(() => {
+    setLoading(true);
+    supabase
+      .from("activity_logs")
+      .select("id,business_id,actor_name,action,summary,details,created_at,business:businesses(name)")
+      .order("created_at", { ascending: false })
+      .limit(300)
+      .then(({ data, error }) => {
+        if (error) Alert.alert("Activity not loaded", error.message);
+        setItems((data ?? []) as unknown as ActivityLog[]);
+        setLoading(false);
+      });
+  }, []);
+  const visible = items.filter((item) => {
+    const shopOk = shopId === "all" || item.business_id === shopId;
+    const kindOk = kind === "all" || (kind === "sales" ? item.action.startsWith("sale_") : kind === "products" ? item.action.startsWith("product_") || item.action === "stock_changed" : kind === "orders" ? item.action.startsWith("order_") : item.action === "login");
+    return shopOk && kindOk;
+  });
+  return (
+    <SafeAreaView style={s.app}>
+      <StatusBar style="dark" />
+      <View style={s.adminTop}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to owner account" style={s.backButton} onPress={onBack}>
+          <Ionicons name="arrow-back" size={23} color={C.ink} />
+        </Pressable>
+        <View style={s.flex}><Text style={s.kicker}>OWNER ONLY</Text><Text style={s.shopName}>Shop activity</Text></View>
+      </View>
+      <ScrollView contentContainerStyle={s.adminPage}>
+        <Text style={s.subtitle}>See what changed, who did it, and when.</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.activityFilters}>
+          <Chip label="All shops" selected={shopId === "all"} onPress={() => setShopId("all")} />
+          {shops.map((shop) => <Chip key={shop.id} label={shop.name} selected={shopId === shop.id} onPress={() => setShopId(shop.id)} />)}
+        </ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.activityFilters}>
+          {[{id:"all",label:"Everything"},{id:"sales",label:"Sales"},{id:"products",label:"Products & stock"},{id:"orders",label:"Orders"},{id:"login",label:"Logins"}].map((filter) => (
+            <Pressable accessibilityRole="button" key={filter.id} style={[s.activityFilter,kind===filter.id&&s.activityFilterOn]} onPress={() => setKind(filter.id)}>
+              <Text pointerEvents="none" style={[s.activityFilterText,kind===filter.id&&s.activityFilterTextOn]}>{filter.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        {loading ? <ActivityIndicator size="large" color={C.green} /> : visible.length ? visible.map((item) => {
+          const detail = activityDetail(item);
+          return (
+          <View key={item.id} style={s.activityRow}>
+            <View style={s.activityIcon}><Ionicons name={activityIcon(item.action)} size={21} color={C.green} /></View>
+            <View style={s.flex}>
+              <Text style={s.activitySummary}>{item.summary}</Text>
+              {detail ? <Text style={s.activityDetail}>{detail}</Text> : null}
+              <Text style={s.activityMeta}>{item.business?.name ?? "MIK owner account"} · {item.actor_name}</Text>
+              <Text style={s.activityTime}>{new Date(item.created_at).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" })}</Text>
+            </View>
+          </View>
+        )}) : <View style={s.empty}><Ionicons name="time-outline" size={32} color={C.green} /><Text style={s.activityEmptyTitle}>No activity found</Text><Text style={s.activityEmptyText}>Try another shop or activity type.</Text></View>}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 type GuideFlow = { icon: Icon; label: string };
 type GuideStep = { title: string; body: string; icon: Icon; flow: GuideFlow[] };
 const guideSteps: GuideStep[] = [
@@ -3830,6 +3933,23 @@ const s = StyleSheet.create({
     paddingBottom: 38,
   },
   adminHero: { padding: 20, borderRadius: 20, backgroundColor: C.dark },
+  activityButton:{minHeight:72,marginBottom:14,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  activityButtonIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.green},
+  activityButtonTitle:{color:C.ink,fontSize:16,fontWeight:"700"},
+  activityButtonHelp:{marginTop:2,color:C.muted,fontSize:13},
+  activityFilters:{gap:8,paddingVertical:10},
+  activityFilter:{minHeight:40,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white},
+  activityFilterOn:{borderColor:C.green,backgroundColor:C.green},
+  activityFilterText:{color:C.ink,fontSize:12,fontWeight:"700"},
+  activityFilterTextOn:{color:C.white},
+  activityRow:{marginTop:10,padding:14,flexDirection:"row",alignItems:"flex-start",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  activityIcon:{width:40,height:40,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.accentSoft},
+  activitySummary:{color:C.ink,fontSize:15,lineHeight:20,fontWeight:"700"},
+  activityDetail:{marginTop:4,color:C.ink,fontSize:12,lineHeight:18},
+  activityMeta:{marginTop:5,color:C.muted,fontSize:12,fontWeight:"600"},
+  activityTime:{marginTop:3,color:C.muted,fontSize:11},
+  activityEmptyTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
+  activityEmptyText:{color:C.muted,fontSize:13,textAlign:"center"},
   adminShop: {
     minHeight: 82,
     marginBottom: 9,
