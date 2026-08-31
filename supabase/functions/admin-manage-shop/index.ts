@@ -16,8 +16,7 @@ Deno.serve(async (request: Request) => {
 
   const url = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-  if (!url || !serviceKey || !anonKey) return reply({ error: 'Server setup is incomplete' }, 500);
+  if (!url || !serviceKey) return reply({ error: 'Server setup is incomplete' }, 500);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return reply({ error: 'Please sign in again' }, 401);
@@ -61,31 +60,6 @@ Deno.serve(async (request: Request) => {
       summary: `Login password changed for ${source.name}`,
     });
     return reply({ shopId, passwordChanged: true });
-  }
-
-  if (action === 'reset_passcode') {
-    const passcode = String(input.passcode ?? '');
-    if (!/^\d{4,8}$/.test(passcode)) return reply({ error: 'Use 4 to 8 numbers' }, 400);
-    const userClient = createClient(url, anonKey, {
-      auth: { persistSession: false },
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const { error } = await userClient.rpc('change_shop_passcode', {
-      p_business_id: shopId,
-      p_current_passcode: '',
-      p_new_passcode: passcode,
-    });
-    if (error) return reply({ error: error.message }, 400);
-    await admin.from('activity_logs').insert({
-      business_id: shopId,
-      actor_id: authData.user.id,
-      actor_name: 'Owner',
-      action: 'manager_passcode_changed',
-      entity_type: 'manager_passcode',
-      entity_id: shopId,
-      summary: `Sale-correction passcode changed for ${source.name}`,
-    });
-    return reply({ shopId, passcodeChanged: true });
   }
 
   if (action === 'set_status') {

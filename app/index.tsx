@@ -812,6 +812,10 @@ function ShopApp({
       <QuickStart
         locationId={locationId}
         onOpen={(next) => {
+          if (next === "products") {
+            setEditProductId(null);
+            setProductsBackScreen("home");
+          }
           setScreen(next);
           if (next === "dashboard") void reload();
         }}
@@ -1107,6 +1111,59 @@ function ProductionStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   </ScrollView>;
 }
 
+function PastSaleDatePicker({ value, onChange, onBack, onContinue }: { value: string; onChange: (value: string) => void; onBack: () => void; onContinue: () => void }) {
+  const selected = new Date(`${value}T12:00:00`);
+  const [month, setMonth] = useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1));
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const gridStart = new Date(first);
+  gridStart.setDate(first.getDate() - first.getDay());
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(gridStart);
+    day.setDate(gridStart.getDate() + index);
+    return day;
+  });
+  const today = localDateKey();
+  const nextMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
+  const canGoNext = nextMonth <= new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const chooseQuickDate = (daysAgo: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+    onChange(localDateKey(date));
+    setMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+  };
+  return (
+    <ScrollView contentContainerStyle={s.pastDatePage}>
+      <Back title="Add an earlier sale" onPress={onBack} />
+      <Text style={s.pageTitle}>When was the sale?</Text>
+      <Text style={s.subtitle}>Choose the original sale date before adding products.</Text>
+      <View style={s.pastQuickDates}>
+        <Pressable style={s.pastQuickDate} onPress={() => chooseQuickDate(1)}><Text style={s.pastQuickDateText}>Yesterday</Text></Pressable>
+        <Pressable style={s.pastQuickDate} onPress={() => chooseQuickDate(2)}><Text style={s.pastQuickDateText}>2 days ago</Text></Pressable>
+        <Pressable style={s.pastQuickDate} onPress={() => chooseQuickDate(7)}><Text style={s.pastQuickDateText}>1 week ago</Text></Pressable>
+      </View>
+      <View style={s.pastCalendar}>
+        <View style={s.pastCalendarTop}>
+          <Pressable accessibilityLabel="Previous month" style={s.pastMonthButton} onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}><Ionicons name="chevron-back" size={22} color={C.ink} /></Pressable>
+          <Text style={s.pastMonthTitle}>{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</Text>
+          <Pressable accessibilityLabel="Next month" disabled={!canGoNext} style={[s.pastMonthButton,!canGoNext&&{opacity:.3}]} onPress={() => canGoNext && setMonth(nextMonth)}><Ionicons name="chevron-forward" size={22} color={C.ink} /></Pressable>
+        </View>
+        <View style={s.pastWeekRow}>{["S","M","T","W","T","F","S"].map((day,index)=><Text key={`${day}-${index}`} style={s.pastWeekDay}>{day}</Text>)}</View>
+        <View style={s.pastDays}>
+          {days.map((day) => {
+            const key = localDateKey(day);
+            const disabled = key > today || day.getFullYear() < 2020;
+            const active = key === value;
+            const outside = day.getMonth() !== month.getMonth();
+            return <Pressable key={key} disabled={disabled} accessibilityLabel={friendlyLocalDate(key)} style={[s.pastDay,active&&s.pastDayOn]} onPress={() => onChange(key)}><Text style={[s.pastDayText,outside&&s.pastDayOutside,disabled&&s.pastDayDisabled,active&&s.pastDayTextOn]}>{day.getDate()}</Text></Pressable>;
+          })}
+        </View>
+      </View>
+      <View style={s.pastDateSelected}><Ionicons name="calendar" size={22} color={C.green}/><View style={s.flex}><Text style={s.pastDateSelectedLabel}>SALE DATE</Text><Text style={s.pastDateSelectedValue}>{friendlyLocalDate(value)}</Text></View></View>
+      <BigButton label="Continue to products" icon="arrow-forward" onPress={onContinue} />
+    </ScrollView>
+  );
+}
+
 function SaleScreen({
   products,
   categories,
@@ -1143,7 +1200,7 @@ function SaleScreen({
   const [saving, setSaving] = useState(false);
   const [recordPastSale, setRecordPastSale] = useState(startPastSale);
   const [pastSaleDate, setPastSaleDate] = useState(() => new Date().toLocaleDateString("en-CA"));
-  const [managerPasscode, setManagerPasscode] = useState("");
+  const [pastDateReady, setPastDateReady] = useState(!startPastSale);
   useEffect(() => onPendingChange(cart.length > 0), [cart.length, onPendingChange]);
   const categoryName = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? "Other";
@@ -1159,7 +1216,7 @@ function SaleScreen({
   const total = cart.reduce((n, x) => n + x.quantity * x.unitPrice, 0);
   const cashAmount = Number(cashReceived);
   const cashIsEnough =
-    payment !== "cash" ||
+    recordPastSale || payment !== "cash" ||
     (cashReceived.trim() !== "" && Number.isFinite(cashAmount) && cashAmount >= total);
   const changeDue = payment === "cash" && cashIsEnough ? cashAmount - total : 0;
   const count = cart.reduce((n, x) => n + x.quantity, 0);
@@ -1251,14 +1308,12 @@ function SaleScreen({
     if (!cart.length) return;
     if (recordPastSale && !/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate))
       return Alert.alert("Check the sale date", "Enter the date as YYYY-MM-DD, for example 2026-08-20.");
-    if (recordPastSale && !/^\d{4,8}$/.test(managerPasscode))
-      return Alert.alert("Enter the manager passcode", "Use the 4 to 8 digit shop passcode.");
-    if (payment === "cash" && !cashIsEnough)
+    if (!recordPastSale && payment === "cash" && !cashIsEnough)
       return Alert.alert(
         "Not enough cash",
         `The customer still needs to give ${peso(Math.max(0, total - (Number.isFinite(cashAmount) ? cashAmount : 0)))}.`,
       );
-    if (payment === "gcash" && !gcashReceived)
+    if (!recordPastSale && payment === "gcash" && !gcashReceived)
       return Alert.alert(
         "Check GCash first",
         "Confirm that the payment appeared in the shop’s GCash account.",
@@ -1275,7 +1330,7 @@ function SaleScreen({
           quantity: x.quantity,
         })),
         p_payment_method: payment,
-        p_payment_received: payment === "cash" || gcashReceived,
+        p_payment_received: recordPastSale || payment === "cash" || gcashReceived,
         p_payment_reference:
           payment === "gcash" ? paymentReference.trim() : null,
       };
@@ -1285,14 +1340,13 @@ function SaleScreen({
       ? await supabase.rpc("create_backdated_sale_with_choices", {
           ...saleParams,
           p_sale_date: pastSaleDate,
-          p_passcode: managerPasscode,
         })
       : await supabase.rpc("create_confirmed_sale_with_choices", saleParams);
     if (error) {
       setSaving(false);
       return Alert.alert(
         "Sale not saved",
-        error.message.includes("passcode") || error.message.includes("date")
+        error.message.includes("date")
           ? error.message
           : "Please check the stock and try again.",
       );
@@ -1311,17 +1365,30 @@ function SaleScreen({
     setCashReceived("");
     setRecordPastSale(false);
     setPastSaleDate(new Date().toLocaleDateString("en-CA"));
-    setManagerPasscode("");
     await onSaved();
     Alert.alert(
       "Sale completed",
-      `Saved for ${friendlyLocalDate(savedForDate)}\nReceipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? `Cash\nChange: ${peso(changeDue)}` : "GCash received"}.`,
-      [
-        { text: eventMode ? "See event sales" : "See sales today", onPress: () => onNavigate("dashboard") },
-        { text: eventMode ? "Next sale" : "Start next sale", onPress: () => onNavigate(eventMode ? "event_sale" : "sale") },
-      ],
+      `Saved for ${friendlyLocalDate(savedForDate)}\nReceipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? recordPastSale ? "Cash" : `Cash\nChange: ${peso(changeDue)}` : recordPastSale ? "GCash" : "GCash received"}.`,
+      recordPastSale
+        ? [
+            { text: "Done", onPress: () => onNavigate("sell_start") },
+            { text: "Add another earlier sale", onPress: () => { setRecordPastSale(true); setPastDateReady(false); } },
+          ]
+        : [
+            { text: eventMode ? "See event sales" : "See sales today", onPress: () => onNavigate("dashboard") },
+            { text: eventMode ? "Next sale" : "Start next sale", onPress: () => onNavigate(eventMode ? "event_sale" : "sale") },
+          ],
     );
   };
+  if (recordPastSale && !pastDateReady)
+    return (
+      <PastSaleDatePicker
+        value={pastSaleDate}
+        onChange={setPastSaleDate}
+        onBack={() => onNavigate("sell_start")}
+        onContinue={() => setPastDateReady(true)}
+      />
+    );
   if (review)
     return (
       <View style={s.flex}>
@@ -1402,7 +1469,7 @@ function SaleScreen({
               }}
             />
           </View>
-          {payment === "cash" ? (
+          {payment === "cash" && !recordPastSale ? (
             <View style={s.cashCalculator}>
               <View style={s.gcashHeading}>
                 <View style={s.cashIcon}>
@@ -1446,7 +1513,7 @@ function SaleScreen({
               </View>
             </View>
           ) : null}
-          {payment === "gcash" ? (
+          {payment === "gcash" && !recordPastSale ? (
             <View style={s.gcashCheck}>
               <View style={s.gcashHeading}>
                 <View style={s.gcashIcon}>
@@ -1490,32 +1557,23 @@ function SaleScreen({
               />
             </View>
           ) : null}
-          {!eventMode ? <View style={s.pastSaleCard}>
-            <Pressable style={s.pastSaleTop} onPress={() => setRecordPastSale((value) => !value)}>
+          {recordPastSale ? (
+            <View style={s.pastSaleSummary}>
               <View style={s.pastSaleIcon}><Ionicons name="calendar-outline" size={22} color={C.dark} /></View>
               <View style={s.flex}>
-                <Text style={s.rowTitle}>Was this sale from an earlier day?</Text>
-                <Text style={s.rowHelp}>Use this only when a sale was missed.</Text>
+                <Text style={s.rowTitle}>Save to {friendlyLocalDate(pastSaleDate)}</Text>
+                <Text style={s.rowHelp}>Only the payment type will be recorded for this earlier sale.</Text>
               </View>
-              <Ionicons name={recordPastSale ? "checkmark-circle" : "ellipse-outline"} size={27} color={recordPastSale ? C.accent : C.muted} />
-            </Pressable>
-            {recordPastSale ? (
-              <View style={s.pastSaleFields}>
-                <Label>Original sale date</Label>
-                <TextInput style={s.input} value={pastSaleDate} onChangeText={setPastSaleDate} placeholder="YYYY-MM-DD" maxLength={10} />
-                <Label>Manager passcode</Label>
-                <TextInput style={s.input} value={managerPasscode} onChangeText={setManagerPasscode} placeholder="4 to 8 numbers" keyboardType="number-pad" secureTextEntry maxLength={8} />
-                <Text style={s.rowHelp}>The entry will show on this date and be labelled as entered later.</Text>
-              </View>
-            ) : null}
-          </View> : null}
+              <Pressable style={s.changePastDateButton} onPress={() => { setReview(false); setPastDateReady(false); }}><Text style={s.changePastDateText}>Change date</Text></Pressable>
+            </View>
+          ) : null}
           <BigButton
             label={
               saving
                 ? "Saving sale…"
-                : payment === "gcash" && !gcashReceived
+                : !recordPastSale && payment === "gcash" && !gcashReceived
                   ? "Confirm GCash payment above"
-                  : payment === "cash" && !cashIsEnough
+                  : !recordPastSale && payment === "cash" && !cashIsEnough
                     ? "Enter cash received"
                   : `${recordPastSale ? "Record past sale" : "Complete sale"} · ${peso(total)}`
             }
@@ -1524,9 +1582,9 @@ function SaleScreen({
             disabled={
               saving ||
               !cart.length ||
-              (payment === "gcash" && !gcashReceived) ||
-              (payment === "cash" && !cashIsEnough) ||
-              (recordPastSale && (!/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate) || !/^\d{4,8}$/.test(managerPasscode)))
+              (!recordPastSale && payment === "gcash" && !gcashReceived) ||
+              (!recordPastSale && payment === "cash" && !cashIsEnough) ||
+              (recordPastSale && !/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate))
             }
           />
           <Text style={s.safe}>
@@ -2008,25 +2066,50 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
         setEventReminder(due ?? null);
       });
   }, [locationId]);
-  const actions: Array<{
+  type HomeAction = {
     title: string;
     help: string;
     icon: Icon;
     screen: Screen;
     color: string;
     soft: string;
-  }> = [
-    { title: "Sell", help: "Make a shop or event sale", icon: "cart", screen: "sell_start", color: C.green, soft: "#EEF2F6" },
-    { title: "Orders", help: orderSummary.active ? `${orderSummary.active} customer orders active` : "Track customer orders", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft },
-    { title: "Stock", help: "Count or update products", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
-    { title: "Sales", help: "View sales and receipts", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
-    { title: "Printers & Filament", help: "Check machines and materials", icon: "construct", screen: "production", color: "#087A38", soft: "#EEF7F1" },
-    { title: "Calendar", help: "Events, dates and reminders", icon: "calendar", screen: "calendar", color: "#4B5158", soft: "#F1F2F3" },
+  };
+  const groups: Array<{ title: string; help: string; actions: HomeAction[] }> = [
+    {
+      title: "Sales & customers", help: "Sell and follow customer work.", actions: [
+        { title: "Sell", help: "Start a shop or event sale", icon: "cart", screen: "sell_start", color: C.green, soft: "#EEF4F1" },
+        { title: "Sales today", help: "See today's total and receipts", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
+        { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active · ${orderSummary.urgent} due now` : "Track customer orders", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft },
+        { title: "Calendar", help: "Events and reminders", icon: "calendar", screen: "calendar", color: C.red, soft: C.redSoft },
+      ],
+    },
+    {
+      title: "Stock & products", help: "Keep products ready to sell.", actions: [
+        { title: "Stock", help: "Count or update stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
+        { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products", color: C.green, soft: C.accentSoft },
+        { title: "Price list", help: "View or print prices", icon: "receipt", screen: "price_list", color: C.accent, soft: "#F2F5F8" },
+      ],
+    },
+    {
+      title: "Production", help: "Check the equipment and materials used to make products.", actions: [
+        { title: "Printers", help: "See which printers are working", icon: "hardware-chip", screen: "printers", color: "#087A38", soft: "#EEF7F1" },
+        { title: "Filaments", help: "Track colours and spools", icon: "color-filter", screen: "filaments", color: C.purple, soft: C.purpleSoft },
+      ],
+    },
+    {
+      title: "Records & shop", help: "Review records or change shop details.", actions: [
+        { title: "Sales reports", help: "Daily, weekly or monthly", icon: "bar-chart", screen: "reports", color: C.green, soft: "#F2F5F8" },
+        { title: "Correct sale", help: "Cancel a wrong sale", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft },
+        { title: "Earlier sale", help: "Record a missed sale", icon: "calendar-number", screen: "missed", color: C.accent, soft: C.accentSoft },
+        { title: "Shop profile", help: "Change the shop logo", icon: "storefront", screen: "shop", color: "#4B5158", soft: "#F1F2F3" },
+        { title: "More & help", help: "Settings and simple guides", icon: "grid", screen: "more", color: "#4B5158", soft: "#F1F2F3" },
+      ],
+    },
   ];
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
-      <Text style={s.pageTitle}>What would you like to do?</Text>
-      <Text style={s.subtitle}>Tap one option.</Text>
+      <Text style={s.pageTitle}>Your shop</Text>
+      <Text style={s.subtitle}>Everything you need, grouped by task.</Text>
       {eventReminder ? (
         <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
           <View style={s.homeReminderIcon}><Ionicons name="notifications" size={23} color={C.white} /></View>
@@ -2038,27 +2121,28 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
           <Ionicons name="chevron-forward" size={22} color={C.green} />
         </Pressable>
       ) : null}
-      <View style={s.quickGrid}>
-        {actions.map((action) => (
-          <Pressable
-            key={action.title}
-            accessibilityRole="button"
-            accessibilityLabel={`${action.title}. ${action.help}`}
-            style={({ pressed }) => [s.quickCard, { backgroundColor: action.soft, width: width >= 920 ? "31.8%" : "48%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
-            onPress={() => onOpen(action.screen)}
-          >
-            <View pointerEvents="none" style={[s.quickIcon,{backgroundColor:action.color}]}>
-              <Ionicons name={action.icon} size={28} color={C.white} />
-            </View>
-            <Text pointerEvents="none" style={s.quickTitle}>{action.title}</Text>
-            <Text pointerEvents="none" style={s.quickHelp}>{action.help}</Text>
-            <View pointerEvents="none" style={s.quickGo}>
-              <Text style={[s.quickGoText,{color:action.color}]}>Open</Text>
-              <Ionicons name="arrow-forward" size={18} color={action.color} />
-            </View>
-          </Pressable>
-        ))}
-      </View>
+      {groups.map((group) => (
+        <View key={group.title} style={s.quickSection}>
+          <Text style={s.quickSectionTitle}>{group.title}</Text>
+          <Text style={s.quickSectionHelp}>{group.help}</Text>
+          <View style={s.quickGrid}>
+            {group.actions.map((action) => (
+              <Pressable
+                key={action.title}
+                accessibilityRole="button"
+                accessibilityLabel={`${action.title}. ${action.help}`}
+                style={({ pressed }) => [s.quickCard, { backgroundColor: action.soft, width: width >= 920 ? "23.8%" : "48%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
+                onPress={() => onOpen(action.screen)}
+              >
+                <View pointerEvents="none" style={[s.quickIcon,{backgroundColor:action.color}]}><Ionicons name={action.icon} size={25} color={C.white} /></View>
+                <Text pointerEvents="none" style={s.quickTitle}>{action.title}</Text>
+                <Text pointerEvents="none" style={s.quickHelp}>{action.help}</Text>
+                <View pointerEvents="none" style={s.quickGo}><Text style={[s.quickGoText,{color:action.color}]}>Open</Text><Ionicons name="arrow-forward" size={18} color={action.color} /></View>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ))}
     </ScrollView>
   );
 }
@@ -2069,11 +2153,9 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
   const [username, setUsername] = useState(duplicate ? "" : shop.login_username ?? "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [managerPasscode, setManagerPasscode] = useState("");
-  const [confirmPasscode, setConfirmPasscode] = useState("");
   const [copyStock, setCopyStock] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [securityBusy, setSecurityBusy] = useState<"password" | "passcode" | null>(null);
+  const [securityBusy, setSecurityBusy] = useState(false);
   const functionMessage = async (error: any) => {
     let message = error?.message ?? "Please try again.";
     try { message = (await error?.context?.json())?.error ?? message; } catch {}
@@ -2107,30 +2189,15 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
       return Alert.alert("Password is too short", "Use at least 6 characters.");
     if (password !== confirmPassword)
       return Alert.alert("Passwords do not match", "Type the same password twice.");
-    setSecurityBusy("password");
+    setSecurityBusy(true);
     const { error } = await supabase.functions.invoke("admin-manage-shop", {
       body: { action: "change_password", shopId: shop.id, password },
     });
-    setSecurityBusy(null);
+    setSecurityBusy(false);
     if (error) return Alert.alert("Password not changed", await functionMessage(error));
     setPassword("");
     setConfirmPassword("");
     Alert.alert("Login password changed", `${shop.name} can use the new password on the next login.`);
-  };
-  const changePasscode = async () => {
-    if (!/^\d{4,8}$/.test(managerPasscode))
-      return Alert.alert("Check the passcode", "Use 4 to 8 numbers.");
-    if (managerPasscode !== confirmPasscode)
-      return Alert.alert("Passcodes do not match", "Type the same passcode twice.");
-    setSecurityBusy("passcode");
-    const { error } = await supabase.functions.invoke("admin-manage-shop", {
-      body: { action: "reset_passcode", shopId: shop.id, passcode: managerPasscode },
-    });
-    setSecurityBusy(null);
-    if (error) return Alert.alert("Passcode not changed", await functionMessage(error));
-    setManagerPasscode("");
-    setConfirmPasscode("");
-    Alert.alert("Sale-correction passcode changed", "Use the new passcode when correcting or removing a sale.");
   };
   return (
     <SafeAreaView style={s.app}>
@@ -2163,15 +2230,7 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
             <TextInput style={s.input} value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry />
             <Label>Type new password again</Label>
             <TextInput style={s.input} value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repeat password" secureTextEntry />
-            <BigButton label={securityBusy === "password" ? "Changing password…" : "Change login password"} icon="key-outline" onPress={changePassword} disabled={securityBusy !== null} />
-            <View style={s.ownerSecurityDivider} />
-            <Text style={s.ownerSecurityTitle}>Change sale-correction passcode</Text>
-            <Text style={s.rowHelp}>This passcode protects correcting or removing a sale.</Text>
-            <Label>New passcode</Label>
-            <TextInput style={s.input} value={managerPasscode} onChangeText={setManagerPasscode} placeholder="4 to 8 numbers" keyboardType="number-pad" secureTextEntry maxLength={8} />
-            <Label>Type new passcode again</Label>
-            <TextInput style={s.input} value={confirmPasscode} onChangeText={setConfirmPasscode} placeholder="Repeat passcode" keyboardType="number-pad" secureTextEntry maxLength={8} />
-            <BigButton label={securityBusy === "passcode" ? "Changing passcode…" : "Change sale passcode"} icon="lock-closed-outline" onPress={changePasscode} disabled={securityBusy !== null} />
+            <BigButton label={securityBusy ? "Changing password…" : "Change login password"} icon="key-outline" onPress={changePassword} disabled={securityBusy} />
           </View>
         ) : null}
       </ScrollView>
@@ -2341,6 +2400,7 @@ function Products({
   onSaved: () => void;
   onBack: () => void;
 }) {
+  const { width } = useWindowDimensions();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Product | null>(null);
   const [openedInitial, setOpenedInitial] = useState(false);
@@ -3116,6 +3176,8 @@ function Inventory({
   onHome: () => void;
   onManageProducts: (productId?: string) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const stockColumns = width >= 900 ? 2 : 1;
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);
   const [categoryOpen, setCategoryOpen] = useState(false);
@@ -3365,92 +3427,68 @@ function Inventory({
     );
   return (
     <View style={s.flex}>
-      <View style={s.stockPageHeading}>
-        <View style={s.flex}>
-          <Text style={s.pageTitle}>Stock</Text>
-          <Text style={s.subtitle}>Tap a product to change its stock.</Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Edit products and prices"
-          style={s.stockManageButton}
-          onPress={() => onManageProducts()}
-        >
-          <Ionicons name="create-outline" size={20} color={C.white} />
-          <Text style={s.stockManageButtonText}>Edit products</Text>
-        </Pressable>
-      </View>
-      <Search value={search} onChange={setSearch} />
-      <View style={s.stockFilters}>
-      <Text style={s.stockFilterLabel}>Category</Text>
-      <Pressable style={s.stockCategoryPicker} onPress={() => setCategoryOpen((open) => !open)}>
-        <View style={s.stockCategoryPickerIcon}>
-          <Ionicons
-            name={category ? categoryIcon(categoryName(category)) : "apps"}
-            size={21}
-            color={C.accent}
-          />
-        </View>
-        <Text style={s.stockCategoryPickerText} numberOfLines={1}>
-          {category ? categoryName(category) : "All products"}
-        </Text>
-        <Text style={s.stockCategoryChange}>Change</Text>
-        <Ionicons name={categoryOpen ? "chevron-up" : "chevron-down"} size={20} color={C.muted} />
-      </Pressable>
-      {categoryOpen ? (
-        <View style={s.categoryMenu}>
-          <Pressable style={[s.categoryMenuRow,!category&&s.categoryMenuRowOn]} onPress={() => { setCategory(null); setCategoryOpen(false); }}><Ionicons name="apps" size={20} color={C.ink}/><Text style={s.categoryMenuText}>All products</Text>{!category?<Ionicons name="checkmark" size={20} color={C.accent}/>:null}</Pressable>
-          {categories.map((c) => (
-            <Pressable key={c.id} style={[s.categoryMenuRow,category===c.id&&s.categoryMenuRowOn]} onPress={() => { setCategory(c.id); setCategoryOpen(false); }}><Ionicons name={categoryIcon(c.name)} size={20} color={categoryTone(c.name).color}/><Text style={s.categoryMenuText}>{c.name}</Text>{category===c.id?<Ionicons name="checkmark" size={20} color={C.accent}/>:null}</Pressable>
-          ))}
-        </View>
-      ) : null}
-      <Text style={s.stockFilterLabel}>Show stock by</Text>
-      <View style={s.stockSortRow}>
-        <Chip
-          label="All"
-          icon="list"
-          selected={stockView === "all"}
-          onPress={() => setStockView("all")}
-        />
-        <Chip
-          label="Low first"
-          icon="arrow-down"
-          selected={stockView === "lowest"}
-          onPress={() => setStockView("lowest")}
-        />
-        <Chip
-          label="Zero"
-          icon="alert-circle"
-          selected={stockView === "out"}
-          onPress={() => setStockView("out")}
-        />
-        <Chip
-          label="Not counted"
-          icon="checkbox-outline"
-          selected={stockView === "count"}
-          onPress={() => setStockView("count")}
-        />
-      </View>
-      </View>
-      <Text style={s.stockResultCount}>
-        {filtered.length} {filtered.length === 1 ? "product" : "products"}
-      </Text>
       <FlatList
+        key={`stock-${stockColumns}`}
         data={filtered}
+        numColumns={stockColumns}
+        columnWrapperStyle={stockColumns === 2 ? s.stockGridRow : undefined}
         keyExtractor={(p) => p.id}
-        contentContainerStyle={s.list}
+        contentContainerStyle={s.stockListContent}
+        showsVerticalScrollIndicator
+        ListHeaderComponent={(
+          <View style={s.stockListHeader}>
+            <View style={s.stockPageHeading}>
+              <View style={s.flex}>
+                <Text style={s.pageTitle}>Stock</Text>
+                <Text style={s.subtitle}>Tap a product to change its stock.</Text>
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Edit products and prices" style={s.stockManageButton} onPress={() => onManageProducts()}>
+                <Ionicons name="create-outline" size={20} color={C.white} />
+                <Text style={s.stockManageButtonText}>Edit products</Text>
+              </Pressable>
+            </View>
+            <Search value={search} onChange={setSearch} />
+            <View style={[s.stockFilters, width >= 900 && s.stockFiltersDesktop]}>
+              <View style={s.stockFilterGroup}>
+                <Text style={s.stockFilterLabel}>Category</Text>
+                <Pressable style={s.stockCategoryPicker} onPress={() => setCategoryOpen((open) => !open)}>
+                  <View style={s.stockCategoryPickerIcon}><Ionicons name={category ? categoryIcon(categoryName(category)) : "apps"} size={21} color={C.accent} /></View>
+                  <Text style={s.stockCategoryPickerText} numberOfLines={1}>{category ? categoryName(category) : "All products"}</Text>
+                  <Text style={s.stockCategoryChange}>Change</Text>
+                  <Ionicons name={categoryOpen ? "chevron-up" : "chevron-down"} size={20} color={C.muted} />
+                </Pressable>
+                {categoryOpen ? (
+                  <View style={s.categoryMenu}>
+                    <Pressable style={[s.categoryMenuRow,!category&&s.categoryMenuRowOn]} onPress={() => { setCategory(null); setCategoryOpen(false); }}><Ionicons name="apps" size={20} color={C.ink}/><Text style={s.categoryMenuText}>All products</Text>{!category?<Ionicons name="checkmark" size={20} color={C.accent}/>:null}</Pressable>
+                    {categories.map((c) => <Pressable key={c.id} style={[s.categoryMenuRow,category===c.id&&s.categoryMenuRowOn]} onPress={() => { setCategory(c.id); setCategoryOpen(false); }}><Ionicons name={categoryIcon(c.name)} size={20} color={categoryTone(c.name).color}/><Text style={s.categoryMenuText}>{c.name}</Text>{category===c.id?<Ionicons name="checkmark" size={20} color={C.accent}/>:null}</Pressable>)}
+                  </View>
+                ) : null}
+              </View>
+              <View style={s.stockFilterGroup}>
+                <Text style={s.stockFilterLabel}>Show stock by</Text>
+                <View style={s.stockSortRow}>
+                  <Chip label="All" icon="list" selected={stockView === "all"} onPress={() => setStockView("all")} />
+                  <Chip label="Low first" icon="arrow-down" selected={stockView === "lowest"} onPress={() => setStockView("lowest")} />
+                  <Chip label="Zero" icon="alert-circle" selected={stockView === "out"} onPress={() => setStockView("out")} />
+                  <Chip label="Not counted" icon="checkbox-outline" selected={stockView === "count"} onPress={() => setStockView("count")} />
+                </View>
+              </View>
+            </View>
+            <Text style={s.stockResultCount}>{filtered.length} {filtered.length === 1 ? "product" : "products"}</Text>
+          </View>
+        )}
+        ListEmptyComponent={<Empty title="No products match this view" />}
         renderItem={({ item }) => {
           const quantityShown = shownStock(item);
           const low = quantityShown <= item.low_stock_threshold;
           const tone = categoryTone(categoryName(item.category_id));
           return (
             <Pressable
-              style={[s.listRow, { backgroundColor: C.white, borderLeftColor: tone.color, borderLeftWidth: 4 }]}
+              style={[s.listRow, s.stockProductRow, stockColumns === 2 && s.stockProductRowDesktop, { backgroundColor: C.white, borderLeftColor: tone.color, borderLeftWidth: 4 }]}
               onPress={() => setSelected(item)}
             >
               {item.image_url || placeholderImage(item.name) ? (
-                <Image source={item.image_url ? { uri: item.image_url } : placeholderImage(item.name)} style={s.stockListImage} />
+                <Image source={item.image_url ? { uri: item.image_url } : placeholderImage(item.name)} style={[s.stockListImage, stockColumns === 2 && s.stockListImageDesktop]} />
               ) : <View style={s.listIcon}>
                 <Ionicons
                   name={productIcon(item.name, categoryName(item.category_id))}
@@ -3487,7 +3525,7 @@ function Inventory({
               >
                 <Ionicons name="pencil-outline" size={19} color={C.accent} />
               </Pressable>
-              <Ionicons name="chevron-forward" size={19} color={C.muted} />
+              {stockColumns === 1 ? <Ionicons name="chevron-forward" size={19} color={C.muted} /> : null}
             </Pressable>
           );
         }}
@@ -3808,7 +3846,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: "Correct or add a missed sale",
-    body: "Tap Sell to add an earlier sale. To cancel a wrong sale, open More, then Correct a sale. A manager passcode protects both actions.",
+    body: "Tap Sell to add an earlier sale. Choose its date first, add the products, then select Cash or GCash. To cancel a wrong sale, open More, then Correct a sale.",
     icon: "return-up-back",
     flow: [
       { icon: "home-outline", label: "Home" },
@@ -4544,9 +4582,10 @@ const s = StyleSheet.create({
     minHeight: 42,
     marginTop: 18,
     paddingHorizontal: 12,
-    flexDirection: "column",
-    alignItems: "stretch",
-    gap: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
     borderWidth: 1,
     borderColor: "#E8CCD3",
     borderRadius: 10,
@@ -4562,8 +4601,8 @@ const s = StyleSheet.create({
   statusTextPaused:{color:C.red},
   clearSaleText: { color: C.red, fontSize: 13, fontWeight: "700" },
   quickCard: {
-    minHeight: 172,
-    padding: 18,
+    minHeight: 148,
+    padding: 15,
     borderWidth:1,
     borderColor:C.border,
     borderRadius: 18,
@@ -4574,17 +4613,17 @@ const s = StyleSheet.create({
     elevation: 1,
   },
   quickIcon: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
   },
-  quickTitle: { marginTop: 13, color: C.ink, fontSize: 18, lineHeight: 22, fontWeight: "700", letterSpacing:-.3 },
-  quickHelp: { marginTop: 6, flex: 1, color: C.muted, fontSize: 13, lineHeight: 18, fontWeight: "500" },
+  quickTitle: { marginTop: 11, color: C.ink, fontSize: 17, lineHeight: 21, fontWeight: "700", letterSpacing:-.25 },
+  quickHelp: { marginTop: 4, flex: 1, color: C.muted, fontSize: 12.5, lineHeight: 17, fontWeight: "500" },
   quickGo: {
     minHeight: 38,
-    marginTop: 12,
+    marginTop: 9,
     paddingHorizontal: 0,
     flexDirection: "row",
     alignItems: "center",
@@ -4703,6 +4742,13 @@ const s = StyleSheet.create({
   stockManageButtonText:{color:C.white,fontSize:14,fontWeight:"700"},
   stockEditButton:{width:42,height:42,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
   stockFilters:{marginTop:12,padding:14,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:"#F8F9FA"},
+  stockFiltersDesktop:{flexDirection:"row",alignItems:"flex-start",gap:14,paddingVertical:10},
+  stockFilterGroup:{flex:1,minWidth:0},
+  stockListContent:{paddingBottom:32},
+  stockListHeader:{paddingBottom:4},
+  stockGridRow:{gap:12},
+  stockProductRow:{width:"100%"},
+  stockProductRowDesktop:{width:"49%",minHeight:96,padding:14},
   stockCategoryPicker: {
     minHeight: 52,
     paddingHorizontal: 12,
@@ -5221,6 +5267,7 @@ const s = StyleSheet.create({
     backgroundColor: C.accentSoft,
   },
   stockListImage:{width:52,height:52,borderWidth:1,borderColor:C.border,borderRadius:12,resizeMode:"contain",backgroundColor:C.white},
+  stockListImageDesktop:{width:68,height:68,borderRadius:14},
   listImage: { width: 58, height: 58, borderRadius: 16, resizeMode: "cover" },
   manageCategoryButton: { minHeight: 48, marginTop: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 16, backgroundColor: C.soft },
   manageCategoryText: { color: C.dark, fontSize: 14, fontWeight: "700" },
@@ -5541,10 +5588,30 @@ const s = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: C.white,
   },
-  pastSaleCard: { marginTop: 14, padding: 14, borderWidth: 1, borderColor: C.border, borderRadius: 20, backgroundColor: C.white },
-  pastSaleTop: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 10 },
+  pastDatePage:{width:"100%",maxWidth:620,alignSelf:"center",paddingBottom:40},
+  pastQuickDates:{marginTop:16,flexDirection:"row",gap:8},
+  pastQuickDate:{flex:1,minHeight:44,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:11,backgroundColor:C.white},
+  pastQuickDateText:{color:C.dark,fontSize:12,fontWeight:"700"},
+  pastCalendar:{marginTop:12,padding:14,borderWidth:1,borderColor:C.border,borderRadius:18,backgroundColor:C.white},
+  pastCalendarTop:{minHeight:46,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},
+  pastMonthButton:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.soft},
+  pastMonthTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
+  pastWeekRow:{marginTop:7,flexDirection:"row"},
+  pastWeekDay:{width:"14.2857%",paddingVertical:7,color:C.muted,fontSize:11,fontWeight:"700",textAlign:"center"},
+  pastDays:{flexDirection:"row",flexWrap:"wrap"},
+  pastDay:{width:"14.2857%",aspectRatio:1,alignItems:"center",justifyContent:"center",borderRadius:12},
+  pastDayOn:{backgroundColor:C.green},
+  pastDayText:{color:C.ink,fontSize:14,fontWeight:"600"},
+  pastDayOutside:{color:"#B6BDC3"},
+  pastDayDisabled:{color:"#D8DCDF"},
+  pastDayTextOn:{color:C.white,fontWeight:"700"},
+  pastDateSelected:{minHeight:72,marginTop:12,padding:13,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:"#C9D8CF",borderRadius:14,backgroundColor:"#F1F6F3"},
+  pastDateSelectedLabel:{color:C.green,fontSize:10,fontWeight:"700",letterSpacing:1.1},
+  pastDateSelectedValue:{marginTop:3,color:C.ink,fontSize:17,fontWeight:"700"},
+  pastSaleSummary:{marginTop:14,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  changePastDateButton:{minHeight:40,paddingHorizontal:10,alignItems:"center",justifyContent:"center",borderRadius:10,backgroundColor:C.soft},
+  changePastDateText:{color:C.green,fontSize:11,fontWeight:"700"},
   pastSaleIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: C.soft },
-  pastSaleFields: { marginTop: 6, paddingTop: 4, borderTopWidth: 1, borderTopColor: C.border },
   cashIcon: {
     width: 48,
     height: 48,

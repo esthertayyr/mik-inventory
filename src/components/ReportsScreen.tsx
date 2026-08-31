@@ -8,8 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text as RNText,
-  TextInput as RNTextInput,
-  type TextInputProps,
   type TextProps,
   View,
 } from "react-native";
@@ -21,7 +19,6 @@ import { peso } from "@/src/lib/format";
 
 const APP_FONT = Platform.select({ web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", ios: "System", android: "sans-serif", default: "System" });
 function Text({ style, ...props }: TextProps) { return <RNText {...props} style={[{ fontFamily: APP_FONT }, style]} />; }
-function TextInput({ style, ...props }: TextInputProps) { return <RNTextInput {...props} style={[{ fontFamily: APP_FONT }, style]} />; }
 
 const publicShopName = (value: string | null | undefined) =>
   value?.toLowerCase().includes("sebu") ? "Pixelbug" : value ?? "";
@@ -190,7 +187,6 @@ export function ReportsScreen({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [voidTarget, setVoidTarget] = useState<SaleRecord | null>(null);
-  const [managerPasscode, setManagerPasscode] = useState("");
   const [voiding, setVoiding] = useState(false);
   const range = useMemo(
     () => bounds(period, offset, exactDate),
@@ -425,17 +421,14 @@ export function ReportsScreen({
     }
   };
   const confirmVoid = async () => {
-    if (!voidTarget || !/^\d{4,8}$/.test(managerPasscode))
-      return Alert.alert("Enter the manager passcode", "Use the 4 to 8 digit shop passcode.");
+    if (!voidTarget) return;
     setVoiding(true);
-    const { error: voidError } = await supabase.rpc("void_sale_with_passcode", {
+    const { error: voidError } = await supabase.rpc("void_sale", {
       p_sale_id: voidTarget.id,
-      p_passcode: managerPasscode,
     });
     setVoiding(false);
     if (voidError) return Alert.alert("Sale not corrected", voidError.message);
     setVoidTarget(null);
-    setManagerPasscode("");
     await load();
     Alert.alert("Sale removed from totals", "The original entry remains in the history as cancelled and its stock was restored.");
   };
@@ -449,7 +442,7 @@ export function ReportsScreen({
             <Ionicons name="return-up-back" size={26} color="#FFF" />
             <View style={s.correctionGuideText}>
               <Text style={s.correctionGuideTitle}>Choose the wrong sale below</Text>
-              <Text style={s.correctionGuideHelp}>Tap “Remove / correct”, then enter the manager passcode. Stock will be restored automatically.</Text>
+              <Text style={s.correctionGuideHelp}>Tap “Remove / correct”, then confirm. Stock will be restored automatically and the change will remain in the activity history.</Text>
             </View>
           </View>
         </>
@@ -639,9 +632,8 @@ export function ReportsScreen({
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>Correct this sale?</Text>
             <Text style={s.modalHelp}>SALE-{voidTarget?.receipt_number} will be marked cancelled, removed from totals, and its stock restored. It will not be permanently deleted.</Text>
-            <TextInput style={s.passcodeInput} value={managerPasscode} onChangeText={setManagerPasscode} keyboardType="number-pad" secureTextEntry maxLength={8} placeholder="Manager passcode" />
             <Pressable style={s.confirmVoid} onPress={confirmVoid} disabled={voiding}><Text style={s.confirmVoidText}>{voiding ? "Correcting…" : "Confirm correction"}</Text></Pressable>
-            <Pressable style={s.cancelVoid} onPress={() => { setVoidTarget(null); setManagerPasscode(""); }}><Text style={s.cancelVoidText}>Keep sale</Text></Pressable>
+            <Pressable style={s.cancelVoid} onPress={() => setVoidTarget(null)}><Text style={s.cancelVoidText}>Keep sale</Text></Pressable>
           </View>
         </View>
       </Modal>
@@ -683,7 +675,6 @@ const s = StyleSheet.create({
   modalCard: { width: "100%", maxWidth: 420, padding: 22, borderWidth: 1, borderColor: "#E0E3E7", borderRadius: 12, backgroundColor: "#FFF" },
   modalTitle: { color: "#11151A", fontSize: 23, fontWeight: "700" },
   modalHelp: { marginTop: 7, color: "#697582", fontSize: 15, lineHeight: 22 },
-  passcodeInput: { minHeight: 56, marginTop: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: "#DDE2E5", borderRadius: 10, color: "#16283A", fontSize: 20, textAlign: "center", letterSpacing: 4 },
   confirmVoid: { minHeight: 54, marginTop: 12, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#65243A" },
   confirmVoidText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
   cancelVoid: { minHeight: 48, alignItems: "center", justifyContent: "center" },
