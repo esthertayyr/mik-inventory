@@ -2462,6 +2462,7 @@ function Products({
                 .from("products")
                 .select("id")
                 .neq("id", selected.id)
+                .eq("active", true)
                 .like("image_url", `%/${selected.id}/main.jpg%`)
                 .limit(1);
               if (referenceError || (imageUsers?.length ?? 0) > 0) imageRemoved = false;
