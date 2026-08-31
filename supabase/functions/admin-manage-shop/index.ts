@@ -16,7 +16,8 @@ Deno.serve(async (request: Request) => {
 
   const url = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!url || !serviceKey) return reply({ error: 'Server setup is incomplete' }, 500);
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!url || !serviceKey || !anonKey) return reply({ error: 'Server setup is incomplete' }, 500);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return reply({ error: 'Please sign in again' }, 401);
@@ -30,21 +31,71 @@ Deno.serve(async (request: Request) => {
   const shopId = String(input.shopId ?? '');
   const shopName = String(input.shopName ?? '').trim();
   const username = String(input.username ?? '').trim().toLowerCase();
-  if (!shopId || !shopName || !validUsername(username)) return reply({ error: 'Check the shop name and username' }, 400);
+  if (!shopId) return reply({ error: 'Shop profile not found' }, 400);
 
   const { data: source, error: sourceError } = await admin.from('businesses').select('*').eq('id', shopId).maybeSingle();
   if (sourceError || !source) return reply({ error: 'Shop profile not found' }, 404);
+
+  const findShopUser = async () => {
+    const { data: members } = await admin.from('business_memberships').select('user_id').eq('business_id', shopId);
+    const memberIds = (members ?? []).map((item) => item.user_id);
+    const { data: admins } = memberIds.length ? await admin.from('platform_admins').select('user_id').in('user_id', memberIds) : { data: [] };
+    const adminIds = new Set((admins ?? []).map((item) => item.user_id));
+    return memberIds.find((id) => !adminIds.has(id));
+  };
+
+  if (action === 'change_password') {
+    const password = String(input.password ?? '');
+    if (password.length < 6) return reply({ error: 'Password must have at least 6 characters' }, 400);
+    const shopUserId = await findShopUser();
+    if (!shopUserId) return reply({ error: 'Shop login not found' }, 404);
+    const { error } = await admin.auth.admin.updateUserById(shopUserId, { password });
+    if (error) return reply({ error: error.message }, 400);
+    await admin.from('activity_logs').insert({
+      business_id: shopId,
+      actor_id: authData.user.id,
+      actor_name: 'Owner',
+      action: 'login_password_changed',
+      entity_type: 'shop_login',
+      entity_id: shopUserId,
+      summary: `Login password changed for ${source.name}`,
+    });
+    return reply({ shopId, passwordChanged: true });
+  }
+
+  if (action === 'reset_passcode') {
+    const passcode = String(input.passcode ?? '');
+    if (!/^\d{4,8}$/.test(passcode)) return reply({ error: 'Use 4 to 8 numbers' }, 400);
+    const userClient = createClient(url, anonKey, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { error } = await userClient.rpc('change_shop_passcode', {
+      p_business_id: shopId,
+      p_current_passcode: '',
+      p_new_passcode: passcode,
+    });
+    if (error) return reply({ error: error.message }, 400);
+    await admin.from('activity_logs').insert({
+      business_id: shopId,
+      actor_id: authData.user.id,
+      actor_name: 'Owner',
+      action: 'manager_passcode_changed',
+      entity_type: 'manager_passcode',
+      entity_id: shopId,
+      summary: `Sale-correction passcode changed for ${source.name}`,
+    });
+    return reply({ shopId, passcodeChanged: true });
+  }
+
+  if (!shopName || !validUsername(username)) return reply({ error: 'Check the shop name and username' }, 400);
   const { data: sourceLocation } = await admin.from('locations').select('id').eq('business_id', shopId).eq('active', true).order('created_at').limit(1).maybeSingle();
   if (!sourceLocation) return reply({ error: 'Source shop location not found' }, 404);
   const { data: usernameOwner } = await admin.from('businesses').select('id').ilike('login_username', username).maybeSingle();
   if (usernameOwner && (action !== 'update' || usernameOwner.id !== shopId)) return reply({ error: 'This username is already in use' }, 409);
 
   if (action === 'update') {
-    const { data: members } = await admin.from('business_memberships').select('user_id').eq('business_id', shopId);
-    const memberIds = (members ?? []).map((item) => item.user_id);
-    const { data: admins } = memberIds.length ? await admin.from('platform_admins').select('user_id').in('user_id', memberIds) : { data: [] };
-    const adminIds = new Set((admins ?? []).map((item) => item.user_id));
-    const shopUserId = memberIds.find((id) => !adminIds.has(id));
+    const shopUserId = await findShopUser();
     if (!shopUserId) return reply({ error: 'Shop login not found' }, 404);
 
     const { data: oldUser } = await admin.auth.admin.getUserById(shopUserId);

@@ -1888,8 +1888,17 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
   const [name, setName] = useState(duplicate ? `${shop.name} Copy` : shop.name);
   const [username, setUsername] = useState(duplicate ? "" : shop.login_username ?? "");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [managerPasscode, setManagerPasscode] = useState("");
+  const [confirmPasscode, setConfirmPasscode] = useState("");
   const [copyStock, setCopyStock] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [securityBusy, setSecurityBusy] = useState<"password" | "passcode" | null>(null);
+  const functionMessage = async (error: any) => {
+    let message = error?.message ?? "Please try again.";
+    try { message = (await error?.context?.json())?.error ?? message; } catch {}
+    return message;
+  };
   const save = async () => {
     const clean = username.trim().toLowerCase();
     if (!name.trim()) return Alert.alert("Enter a shop name");
@@ -1913,6 +1922,36 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
         : `The shop can now sign in with ${clean}. Products, stock, sales and orders were kept.`,
     );
   };
+  const changePassword = async () => {
+    if (password.length < 6)
+      return Alert.alert("Password is too short", "Use at least 6 characters.");
+    if (password !== confirmPassword)
+      return Alert.alert("Passwords do not match", "Type the same password twice.");
+    setSecurityBusy("password");
+    const { error } = await supabase.functions.invoke("admin-manage-shop", {
+      body: { action: "change_password", shopId: shop.id, password },
+    });
+    setSecurityBusy(null);
+    if (error) return Alert.alert("Password not changed", await functionMessage(error));
+    setPassword("");
+    setConfirmPassword("");
+    Alert.alert("Login password changed", `${shop.name} can use the new password on the next login.`);
+  };
+  const changePasscode = async () => {
+    if (!/^\d{4,8}$/.test(managerPasscode))
+      return Alert.alert("Check the passcode", "Use 4 to 8 numbers.");
+    if (managerPasscode !== confirmPasscode)
+      return Alert.alert("Passcodes do not match", "Type the same passcode twice.");
+    setSecurityBusy("passcode");
+    const { error } = await supabase.functions.invoke("admin-manage-shop", {
+      body: { action: "reset_passcode", shopId: shop.id, passcode: managerPasscode },
+    });
+    setSecurityBusy(null);
+    if (error) return Alert.alert("Passcode not changed", await functionMessage(error));
+    setManagerPasscode("");
+    setConfirmPasscode("");
+    Alert.alert("Sale-correction passcode changed", "Use the new passcode when correcting or removing a sale.");
+  };
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -1926,9 +1965,35 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
           <Text style={s.rowHelp}>{duplicate ? "The new shop will have its own login, stock, sales and orders." : "Existing products, stock, sales and orders will not be removed."}</Text>
           <Label>Shop name</Label><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Shop name" />
           <Label>Login username</Label><TextInput style={s.input} value={username} onChangeText={setUsername} placeholder="New username" autoCapitalize="none" autoCorrect={false} />
-          {duplicate ? <><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry /><Pressable accessibilityRole="button" style={[s.copyStockChoice,copyStock&&s.copyStockChoiceOn]} onPress={() => setCopyStock((value) => !value)}><Ionicons name={copyStock?"checkbox":"square-outline"} size={23} color={copyStock?C.white:C.green}/><View style={s.flex}><Text style={[s.copyStockTitle,copyStock&&{color:C.white}]}>Copy current stock numbers</Text><Text style={[s.copyStockHelp,copyStock&&{color:"#E8F0EC"}]}>{copyStock?"The new shop receives the same counts.":"Recommended off: new shop starts at zero."}</Text></View></Pressable></> : <View style={s.note}><Ionicons name="information-circle" size={22} color={C.green}/><Text style={s.noteText}>The password stays the same. The old username stops working after this change.</Text></View>}
+          {duplicate ? <><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry /><Pressable accessibilityRole="button" style={[s.copyStockChoice,copyStock&&s.copyStockChoiceOn]} onPress={() => setCopyStock((value) => !value)}><Ionicons name={copyStock?"checkbox":"square-outline"} size={23} color={copyStock?C.white:C.green}/><View style={s.flex}><Text style={[s.copyStockTitle,copyStock&&{color:C.white}]}>Copy current stock numbers</Text><Text style={[s.copyStockHelp,copyStock&&{color:"#E8F0EC"}]}>{copyStock?"The new shop receives the same counts.":"Recommended off: new shop starts at zero."}</Text></View></Pressable></> : <View style={s.note}><Ionicons name="information-circle" size={22} color={C.green}/><Text style={s.noteText}>Changing the username does not change the password.</Text></View>}
           <BigButton label={busy ? duplicate ? "Duplicating shop…" : "Saving profile…" : duplicate ? "Duplicate shop" : "Save profile"} icon={duplicate?"copy-outline":"save-outline"} onPress={save} disabled={busy} />
         </View>
+        {!duplicate ? (
+          <View style={s.ownerSecurityCard}>
+            <View style={s.ownerSecurityHeading}>
+              <View style={s.ownerSecurityIcon}><Ionicons name="shield-checkmark-outline" size={24} color={C.white} /></View>
+              <View style={s.flex}>
+                <Text style={s.editName}>Login & security</Text>
+                <Text style={s.rowHelp}>New secrets are never shown or stored as readable text.</Text>
+              </View>
+            </View>
+            <Text style={s.ownerSecurityTitle}>Change login password</Text>
+            <Text style={s.rowHelp}>This changes the password used to sign in to this shop.</Text>
+            <Label>New password</Label>
+            <TextInput style={s.input} value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry />
+            <Label>Type new password again</Label>
+            <TextInput style={s.input} value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repeat password" secureTextEntry />
+            <BigButton label={securityBusy === "password" ? "Changing password…" : "Change login password"} icon="key-outline" onPress={changePassword} disabled={securityBusy !== null} />
+            <View style={s.ownerSecurityDivider} />
+            <Text style={s.ownerSecurityTitle}>Change sale-correction passcode</Text>
+            <Text style={s.rowHelp}>This passcode protects correcting or removing a sale.</Text>
+            <Label>New passcode</Label>
+            <TextInput style={s.input} value={managerPasscode} onChangeText={setManagerPasscode} placeholder="4 to 8 numbers" keyboardType="number-pad" secureTextEntry maxLength={8} />
+            <Label>Type new passcode again</Label>
+            <TextInput style={s.input} value={confirmPasscode} onChangeText={setConfirmPasscode} placeholder="Repeat passcode" keyboardType="number-pad" secureTextEntry maxLength={8} />
+            <BigButton label={securityBusy === "passcode" ? "Changing passcode…" : "Change sale passcode"} icon="lock-closed-outline" onPress={changePasscode} disabled={securityBusy !== null} />
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -3391,6 +3456,7 @@ function activityIcon(action: string): Icon {
   if (action === "stock_changed") return "layers-outline";
   if (action.startsWith("order_")) return "clipboard-outline";
   if (action === "login") return "log-in-outline";
+  if (action.includes("password") || action.includes("passcode")) return "shield-checkmark-outline";
   return "storefront-outline";
 }
 
@@ -3414,7 +3480,7 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
   }, []);
   const visible = items.filter((item) => {
     const shopOk = shopId === "all" || item.business_id === shopId;
-    const kindOk = kind === "all" || (kind === "sales" ? item.action.startsWith("sale_") : kind === "products" ? item.action.startsWith("product_") || item.action === "stock_changed" : kind === "orders" ? item.action.startsWith("order_") : item.action === "login");
+    const kindOk = kind === "all" || (kind === "sales" ? item.action.startsWith("sale_") : kind === "products" ? item.action.startsWith("product_") || item.action === "stock_changed" : kind === "orders" ? item.action.startsWith("order_") : kind === "security" ? item.action.includes("password") || item.action.includes("passcode") : item.action === "login");
     return shopOk && kindOk;
   });
   return (
@@ -3433,7 +3499,7 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
           {shops.map((shop) => <Chip key={shop.id} label={shop.name} selected={shopId === shop.id} onPress={() => setShopId(shop.id)} />)}
         </ScrollView>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.activityFilters}>
-          {[{id:"all",label:"Everything"},{id:"sales",label:"Sales"},{id:"products",label:"Products & stock"},{id:"orders",label:"Orders"},{id:"login",label:"Logins"}].map((filter) => (
+          {[{id:"all",label:"Everything"},{id:"sales",label:"Sales"},{id:"products",label:"Products & stock"},{id:"orders",label:"Orders"},{id:"login",label:"Logins"},{id:"security",label:"Security"}].map((filter) => (
             <Pressable accessibilityRole="button" key={filter.id} style={[s.activityFilter,kind===filter.id&&s.activityFilterOn]} onPress={() => setKind(filter.id)}>
               <Text pointerEvents="none" style={[s.activityFilterText,kind===filter.id&&s.activityFilterTextOn]}>{filter.label}</Text>
             </Pressable>
@@ -4175,6 +4241,11 @@ const s = StyleSheet.create({
   activityEmptyTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
   activityEmptyText:{color:C.muted,fontSize:13,textAlign:"center"},
   copyStockChoice:{minHeight:74,marginTop:18,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.green,borderRadius:12,backgroundColor:C.white},
+  ownerSecurityCard:{marginTop:18,padding:18,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:C.white},
+  ownerSecurityHeading:{flexDirection:"row",alignItems:"center",gap:12,marginBottom:8},
+  ownerSecurityIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:C.green},
+  ownerSecurityTitle:{marginTop:18,color:C.ink,fontSize:17,fontWeight:"700"},
+  ownerSecurityDivider:{height:1,marginTop:24,backgroundColor:C.border},
   copyStockChoiceOn:{backgroundColor:C.green},
   copyStockTitle:{color:C.ink,fontSize:14,fontWeight:"700"},
   copyStockHelp:{marginTop:3,color:C.muted,fontSize:12},
