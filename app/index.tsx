@@ -2338,15 +2338,29 @@ function Products({
     });
     if (!result.canceled) {
       const asset = result.assets[0];
-      const resized = await ImageManipulator.manipulateAsync(
+      const resizeFor = (limit: number) =>
+        Math.max(asset.width, asset.height) > limit
+          ? [asset.width >= asset.height ? { resize: { width: limit } } : { resize: { height: limit } }]
+          : [];
+      let resized = await ImageManipulator.manipulateAsync(
         asset.uri,
-        [
-          asset.width >= asset.height
-            ? { resize: { width: 1000 } }
-            : { resize: { height: 1000 } },
-        ],
-        { compress: 0.78, format: ImageManipulator.SaveFormat.JPEG },
+        resizeFor(900),
+        { compress: 0.72, format: ImageManipulator.SaveFormat.JPEG },
       );
+      let compressedBytes = (await (await fetch(resized.uri)).arrayBuffer()).byteLength;
+      if (compressedBytes > 700 * 1024) {
+        resized = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          resizeFor(720),
+          { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        compressedBytes = (await (await fetch(resized.uri)).arrayBuffer()).byteLength;
+      }
+      if (compressedBytes > 1024 * 1024)
+        return Alert.alert(
+          "Photo is still too large",
+          "Choose a smaller photo or take a normal phone screenshot of it, then try again.",
+        );
       setPickedUri(resized.uri);
       setPickedMime("image/jpeg");
     }
@@ -2436,12 +2450,39 @@ function Products({
               .from("products")
               .update({ active: false })
               .eq("id", selected.id);
-            setSaving(false);
-            if (error)
+            if (error) {
+              setSaving(false);
               return Alert.alert("Product not deleted", error.message);
+            }
+
+            let imageRemoved = true;
+            if (selected.image_url?.includes("/storage/v1/object/public/product-images/")) {
+              const productImagePath = `${businessId}/${selected.id}/main.jpg`;
+              const { data: imageUsers, error: referenceError } = await supabase
+                .from("products")
+                .select("id")
+                .neq("id", selected.id)
+                .like("image_url", `%/${selected.id}/main.jpg%`)
+                .limit(1);
+              if (referenceError || (imageUsers?.length ?? 0) > 0) imageRemoved = false;
+              else {
+                const { error: removeError } = await supabase.storage
+                  .from("product-images")
+                  .remove([productImagePath]);
+                imageRemoved = !removeError;
+              }
+            }
+            if (imageRemoved)
+              await supabase.from("products").update({ image_url: null }).eq("id", selected.id);
+            setSaving(false);
             await onSaved();
             reset();
-            Alert.alert("Product deleted", "Past sales were not changed.");
+            Alert.alert(
+              "Product deleted",
+              imageRemoved
+                ? "Its stored photo was removed. Past sales were not changed."
+                : "Past sales were not changed. The photo was kept because another product may still use it.",
+            );
           },
         },
       ],
@@ -2483,10 +2524,20 @@ function Products({
                 error?.message ?? "Please try again.",
               );
             }
+            let copiedImageUrl = selected.image_url;
+            if (selected.image_url?.includes("/storage/v1/object/public/product-images/")) {
+              const sourcePath = `${businessId}/${selected.id}/main.jpg`;
+              const copyPath = `${businessId}/${createdId}/main.jpg`;
+              const { error: imageCopyError } = await supabase.storage
+                .from("product-images")
+                .copy(sourcePath, copyPath);
+              if (!imageCopyError)
+                copiedImageUrl = `${supabase.storage.from("product-images").getPublicUrl(copyPath).data.publicUrl}?v=${Date.now()}`;
+            }
             const { error: copyError } = await supabase
               .from("products")
               .update({
-                image_url: selected.image_url,
+                image_url: copiedImageUrl,
                 low_stock_threshold: selected.low_stock_threshold,
                 letters_required: selected.letters_required,
                 alphabet_style_id: selected.alphabet_style?.id ?? null,
