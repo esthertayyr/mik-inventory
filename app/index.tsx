@@ -804,10 +804,10 @@ function ShopApp({
               : current?.name ?? "Shop location"}
           </Text>
         </View>
-        {width < 900 ? <Pressable style={s.headerHome} onPress={() => setScreen("home")} accessibilityLabel="Go to home page">
+        {width < 900 ? <Pressable style={s.headerHome} onPress={() => setScreen("home")} accessibilityLabel="Go to home page" accessibilityRole="button">
           <Ionicons name="home" size={19} color={C.white} />
           <Text style={s.headerHomeText}>Home</Text>
-        </Pressable> : <Text style={s.desktopBrand}>MIK</Text>}
+        </Pressable> : null}
       </View>
       {locations.length > 1 ? (
         <ScrollView
@@ -832,13 +832,15 @@ function ShopApp({
         {nav.map((item) => (
           <Pressable
             key={item.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${item.label}`}
             style={[s.navItem,width>=900&&s.desktopNavItem]}
             onPress={() => {
               const openScreen = () => {
                 setScreen(item.id);
                 if (item.id === "dashboard") void reload();
               };
-              if ((screen === "sale" || screen === "missed") && saleInProgress && item.id !== "sale")
+              if ((screen === "sale" || screen === "missed" || screen === "event_sale") && saleInProgress && item.id !== "sale")
                 Alert.alert(
                   "Keep this unfinished sale?",
                   "Leaving now will clear the selected products.",
@@ -866,6 +868,7 @@ function ShopApp({
               />
             </View>
             <Text
+              pointerEvents="none"
               style={[
                 s.navText,
                 selected === item.id && s.navTextOn,
@@ -908,9 +911,9 @@ function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   return <ScrollView contentContainerStyle={s.sellStartPage}>
     <Text style={s.pageTitle}>How are you selling?</Text>
     <Text style={s.subtitle}>Choose one to start.</Text>
-    <Pressable style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Shop sale</Text><Text style={s.sellModeHelp}>Sell at your shop</Text></View><Ionicons name="arrow-forward" size={23} color={C.green}/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Event sale</Text><Text style={s.sellModeHelp}>Fast checkout for markets</Text></View><Ionicons name="arrow-forward" size={23} color={C.accent}/></Pressable>
-    <Pressable style={s.earlierSale} onPress={()=>onOpen("missed")}><Ionicons name="calendar-outline" size={21} color={C.orange}/><View style={s.flex}><Text style={s.earlierSaleTitle}>Add an earlier sale</Text><Text style={s.earlierSaleHelp}>For sales entered on another day</Text></View><Ionicons name="chevron-forward" size={20} color={C.muted}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open shop sale" style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop sale</Text><Text style={s.sellModeHelp}>Sell at your shop</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.green}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open event sale" style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event sale</Text><Text style={s.sellModeHelp}>Fast checkout for markets</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.accent}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Add an earlier sale" style={s.earlierSale} onPress={()=>onOpen("missed")}><Ionicons pointerEvents="none" name="calendar-outline" size={21} color={C.orange}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Add an earlier sale</Text><Text style={s.earlierSaleHelp}>For sales entered on another day</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
   </ScrollView>;
 }
 
@@ -1810,12 +1813,12 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
             style={({ pressed }) => [s.quickCard, { backgroundColor: action.soft, width: width >= 920 ? "31.8%" : "48%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
             onPress={() => onOpen(action.screen)}
           >
-            <View style={[s.quickIcon,{backgroundColor:action.color}]}>
+            <View pointerEvents="none" style={[s.quickIcon,{backgroundColor:action.color}]}>
               <Ionicons name={action.icon} size={28} color={C.white} />
             </View>
-            <Text style={s.quickTitle}>{action.title}</Text>
-            <Text style={s.quickHelp}>{action.help}</Text>
-            <View style={s.quickGo}>
+            <Text pointerEvents="none" style={s.quickTitle}>{action.title}</Text>
+            <Text pointerEvents="none" style={s.quickHelp}>{action.help}</Text>
+            <View pointerEvents="none" style={s.quickGo}>
               <Text style={[s.quickGoText,{color:action.color}]}>Open</Text>
               <Ionicons name="arrow-forward" size={18} color={action.color} />
             </View>
@@ -2154,6 +2157,33 @@ function Products({
         await onSaved();
       } },
     ]);
+  const deleteProduct = () => {
+    if (!selected) return;
+    Alert.alert(
+      "Delete this product?",
+      `${selected.name} will disappear from Sell and Stock. Past sales will stay safe.`,
+      [
+        { text: "Keep product", style: "cancel" },
+        {
+          text: "Delete product",
+          style: "destructive",
+          onPress: async () => {
+            setSaving(true);
+            const { error } = await supabase
+              .from("products")
+              .update({ active: false })
+              .eq("id", selected.id);
+            setSaving(false);
+            if (error)
+              return Alert.alert("Product not deleted", error.message);
+            await onSaved();
+            reset();
+            Alert.alert("Product deleted", "Past sales were not changed.");
+          },
+        },
+      ],
+    );
+  };
   const save = async () => {
     const cleanName = name.trim();
     const prices = numbers();
@@ -2476,6 +2506,18 @@ function Products({
             onPress={save}
             disabled={saving}
           />
+          {!creating ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Delete product"
+              style={s.deleteProductButton}
+              onPress={deleteProduct}
+              disabled={saving}
+            >
+              <Ionicons name="trash-outline" size={20} color={C.red} />
+              <Text style={s.deleteProductText}>Delete product</Text>
+            </Pressable>
+          ) : null}
         </View>
       </ScrollView>
     );
@@ -4498,6 +4540,8 @@ const s = StyleSheet.create({
   smallActionDanger: { backgroundColor: C.redSoft },
   cancelCategory: { minHeight: 44, alignItems: "center", justifyContent: "center" },
   cancelCategoryText: { color: C.muted, fontSize: 14, fontWeight: "700" },
+  deleteProductButton:{minHeight:52,marginTop:12,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,borderWidth:1,borderColor:"#E7CBD2",borderRadius:10,backgroundColor:"#FFF7F8"},
+  deleteProductText:{color:C.red,fontSize:15,fontWeight:"700"},
   listMissingPhoto: {
     width: 52,
     height: 52,
