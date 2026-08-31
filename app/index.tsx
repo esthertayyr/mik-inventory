@@ -289,7 +289,7 @@ function Login() {
     <SafeAreaView style={s.login}>
       <StatusBar style="dark" />
       <View style={[s.loginShell, wide && s.loginShellWide]}>
-        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK · SIMPLE SHOPKEEPING</Text><Text style={s.loginEditorialTitle}>Your shop, beautifully organised.</Text><Text style={s.loginEditorialBody}>Sales, stock and customer orders—clear enough to understand at a glance.</Text><View style={s.loginEditorialRule}/><Text style={s.loginEditorialQuote}>Made for busy hands and calm decisions.</Text></View> : null}
+        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK · SIMPLE SHOPKEEPING</Text><Text style={s.loginEditorialTitle}>Your shop, beautifully organised.</Text><Text style={s.loginEditorialBody}>Sales, stock and customer orders. Clear enough to understand at a glance.</Text><View style={s.loginEditorialRule}/><Text style={s.loginEditorialQuote}>Made for busy hands and calm decisions.</Text></View> : null}
         <View style={[s.loginCard, wide && s.loginCardWide]}>
         <Image
           source={require("../assets/mik-logo.png")}
@@ -329,7 +329,7 @@ function Login() {
         </Pressable>
         </View>
       </View>
-      <Text style={s.loginCredit}>Work produced by faith, labour prompted by love, and endurance inspired by hope. — 1 Thessalonians 1:3 · Made by ET for JM</Text>
+      <Text style={s.loginCredit}>Whatever you do, work at it with all your heart. · Colossians 3:23 · by Esther</Text>
       <GuideModal visible={guideOpen} onClose={() => setGuideOpen(false)} />
     </SafeAreaView>
   );
@@ -1312,7 +1312,7 @@ function SaleScreen({
     await onSaved();
     Alert.alert(
       "Sale completed",
-      `Saved for ${friendlyLocalDate(savedForDate)}\nReceipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? `Cash\nChange: ${peso(changeDue)}` : "GCash — received"}.`,
+      `Saved for ${friendlyLocalDate(savedForDate)}\nReceipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? `Cash\nChange: ${peso(changeDue)}` : "GCash received"}.`,
       [
         { text: eventMode ? "See event sales" : "See sales today", onPress: () => onNavigate("dashboard") },
         { text: eventMode ? "Next sale" : "Start next sale", onPress: () => onNavigate(eventMode ? "event_sale" : "sale") },
@@ -1435,7 +1435,7 @@ function SaleScreen({
                 </Text>
                 <Text style={s.changeValue}>
                   {cashReceived.trim() === ""
-                    ? "—"
+                    ? "Enter cash"
                     : cashIsEnough
                       ? peso(changeDue)
                       : peso(Math.max(0, total - (Number.isFinite(cashAmount) ? cashAmount : 0)))}
@@ -1565,7 +1565,7 @@ function SaleScreen({
               <View style={s.eventBanner}>
                 <Ionicons name="flash" size={22} color={C.accent} />
                 <View style={s.flex}>
-                  <Text style={s.eventBannerTitle}>Event mode — fast checkout</Text>
+                  <Text style={s.eventBannerTitle}>Event mode: fast checkout</Text>
                   <Text style={s.eventBannerText}>
                     Tap the clicker and choose how many. No letters are selected now. The clicker base stock updates after payment. Count the remaining A–Z keycaps after the event, and take a photo of sold items to help with counting.
                   </Text>
@@ -2275,7 +2275,7 @@ function Dashboard({
               <Text style={s.rowHelp}>
                 {p.needs_stock_count
                   ? "Please count this stock"
-                  : `${p.quantity_on_hand} left — add stock soon`}
+                  : `${p.quantity_on_hand} left. Add stock soon`}
               </Text>
             </View>
           </View>
