@@ -77,6 +77,30 @@ function confirmDestructive(
   ]);
 }
 
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function friendlyLocalDate(value = localDateKey()) {
+  const date = new Date(`${value}T12:00:00`);
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function greetingForNow() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
 const C = {
   ink: "#101318",
   muted: "#626A73",
@@ -852,7 +876,7 @@ function ShopApp({
       </View>
     );
   else if (screen === "sell_start")
-    body = <SellStart onOpen={setScreen} />;
+    body = <SellStart businessId={business!.id} onOpen={setScreen} />;
   else if (screen === "production")
     body = <ProductionStart onOpen={setScreen} />;
   else if (screen === "correct")
@@ -1031,8 +1055,38 @@ function NoShopProfile() {
   );
 }
 
-function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
+function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)=>void}) {
+  const today = localDateKey();
+  const [welcomeVisible,setWelcomeVisible] = useState(false);
+  const welcomeKey = `mik-sale-welcome-${businessId}-${today}`;
+  useEffect(() => {
+    AsyncStorage.getItem(welcomeKey)
+      .then((seen) => setWelcomeVisible(seen !== "done"))
+      .catch(() => setWelcomeVisible(true));
+  }, [welcomeKey]);
+  const closeWelcome = async () => {
+    setWelcomeVisible(false);
+    await AsyncStorage.setItem(welcomeKey,"done").catch(() => undefined);
+  };
+  const start = async (screen:Screen) => {
+    await closeWelcome();
+    onOpen(screen);
+  };
   return <ScrollView contentContainerStyle={s.sellStartPage}>
+    <Modal visible={welcomeVisible} transparent animationType="fade" onRequestClose={() => void closeWelcome()}>
+      <SafeAreaView style={s.saleWelcomeOverlay}>
+        <View style={s.saleWelcomeCard}>
+          <View style={s.saleWelcomeIcon}><Ionicons name="sunny-outline" size={34} color={C.white}/></View>
+          <Text style={s.saleWelcomeTitle}>{greetingForNow()} 👋</Text>
+          <Text style={s.saleWelcomeDate}>{friendlyLocalDate(today)}</Text>
+          <Text style={s.saleWelcomeHelp}>Sales entered now will be recorded under today.</Text>
+          <Pressable accessibilityRole="button" style={s.saleWelcomePrimary} onPress={() => void start("sale")}><Ionicons name="storefront" size={22} color={C.white}/><Text style={s.saleWelcomePrimaryText}>Start shop sale</Text></Pressable>
+          <Pressable accessibilityRole="button" style={s.saleWelcomeSecondary} onPress={() => void start("event_sale")}><Ionicons name="flash" size={22} color={C.accent}/><Text style={s.saleWelcomeSecondaryText}>Start event sale</Text></Pressable>
+          <Pressable accessibilityRole="button" style={s.saleWelcomeLater} onPress={() => void closeWelcome()}><Text style={s.saleWelcomeLaterText}>Choose later</Text></Pressable>
+        </View>
+      </SafeAreaView>
+    </Modal>
+    <View style={s.sellTodayCard}><Ionicons name="calendar-outline" size={22} color={C.green}/><View style={s.flex}><Text style={s.sellTodayLabel}>RECORDING FOR TODAY</Text><Text style={s.sellTodayDate}>{friendlyLocalDate(today)}</Text></View></View>
     <Text style={s.pageTitle}>How are you selling?</Text>
     <Text style={s.subtitle}>Choose one to start.</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="Open shop sale" style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop sale</Text><Text style={s.sellModeHelp}>Sell at your shop</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.green}/></Pressable>
@@ -1206,6 +1260,7 @@ function SaleScreen({
         "Check GCash first",
         "Confirm that the payment appeared in the shop’s GCash account.",
       );
+    const savedForDate = recordPastSale ? pastSaleDate : localDateKey();
     setSaving(true);
     const saleParams = {
         p_location_id: locationId,
@@ -1257,7 +1312,7 @@ function SaleScreen({
     await onSaved();
     Alert.alert(
       "Sale completed",
-      `Receipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? `Cash\nChange: ${peso(changeDue)}` : "GCash — received"}.`,
+      `Saved for ${friendlyLocalDate(savedForDate)}\nReceipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? `Cash\nChange: ${peso(changeDue)}` : "GCash — received"}.`,
       [
         { text: eventMode ? "See event sales" : "See sales today", onPress: () => onNavigate("dashboard") },
         { text: eventMode ? "Next sale" : "Start next sale", onPress: () => onNavigate(eventMode ? "event_sale" : "sale") },
@@ -1491,6 +1546,12 @@ function SaleScreen({
         ]}
         ListHeaderComponent={
           <>
+            {!startPastSale ? (
+              <View style={s.saleDateBar}>
+                <Ionicons name="calendar-outline" size={20} color={C.green} />
+                <View style={s.flex}><Text style={s.saleDateBarLabel}>{eventMode ? "EVENT SALE · RECORDING FOR TODAY" : "SHOP SALE · RECORDING FOR TODAY"}</Text><Text style={s.saleDateBarValue}>{friendlyLocalDate()}</Text></View>
+              </View>
+            ) : null}
             {startPastSale ? (
               <View style={s.missedBanner}>
                 <Ionicons name="calendar" size={24} color={C.white} />
@@ -4514,6 +4575,24 @@ const s = StyleSheet.create({
   eventModeNoteText:{flex:1,color:C.muted,fontSize:13,lineHeight:19},
   eventModeNoteStrong:{color:C.ink,fontWeight:"700"},
   sellStartPage:{paddingTop:6,paddingBottom:40},
+  saleWelcomeOverlay:{flex:1,padding:20,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(13,23,34,.62)"},
+  saleWelcomeCard:{width:"100%",maxWidth:430,padding:26,borderRadius:24,backgroundColor:C.white,shadowColor:"#000",shadowOpacity:.18,shadowRadius:24,shadowOffset:{width:0,height:10},elevation:8},
+  saleWelcomeIcon:{width:58,height:58,marginBottom:20,alignItems:"center",justifyContent:"center",borderRadius:18,backgroundColor:C.green},
+  saleWelcomeTitle:{color:C.ink,fontSize:29,lineHeight:35,fontWeight:"700",letterSpacing:-.7},
+  saleWelcomeDate:{marginTop:7,color:C.accent,fontSize:17,lineHeight:24,fontWeight:"700"},
+  saleWelcomeHelp:{marginTop:8,marginBottom:20,color:C.muted,fontSize:15,lineHeight:22},
+  saleWelcomePrimary:{minHeight:58,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderRadius:15,backgroundColor:C.green},
+  saleWelcomePrimaryText:{color:C.white,fontSize:16,fontWeight:"700"},
+  saleWelcomeSecondary:{minHeight:56,marginTop:10,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderWidth:1,borderColor:C.accent,borderRadius:15,backgroundColor:C.white},
+  saleWelcomeSecondaryText:{color:C.accent,fontSize:16,fontWeight:"700"},
+  saleWelcomeLater:{minHeight:44,marginTop:7,alignItems:"center",justifyContent:"center"},
+  saleWelcomeLaterText:{color:C.muted,fontSize:14,fontWeight:"600"},
+  sellTodayCard:{marginBottom:18,padding:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  sellTodayLabel:{color:C.muted,fontSize:11,fontWeight:"700",letterSpacing:.7},
+  sellTodayDate:{marginTop:3,color:C.ink,fontSize:15,fontWeight:"700"},
+  saleDateBar:{marginBottom:14,paddingVertical:11,paddingHorizontal:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
+  saleDateBarLabel:{color:C.muted,fontSize:10,fontWeight:"700",letterSpacing:.55},
+  saleDateBarValue:{marginTop:2,color:C.ink,fontSize:14,fontWeight:"700"},
   sellModeCard:{minHeight:108,marginTop:12,padding:17,flexDirection:"row",alignItems:"center",gap:14,borderWidth:1,borderColor:C.border,borderRadius:16},
   sellModeIcon:{width:56,height:56,alignItems:"center",justifyContent:"center",borderRadius:15},
   sellModeTitle:{color:C.ink,fontSize:21,fontWeight:"700"},
