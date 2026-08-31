@@ -59,6 +59,22 @@ function TextInput({ style, ...props }: TextInputProps) {
   return <RNTextInput {...props} style={[{ fontFamily: APP_FONT }, style]} />;
 }
 
+function confirmDestructive(
+  title: string,
+  message: string,
+  confirmLabel: string,
+  onConfirm: () => void,
+) {
+  if (Platform.OS === "web") {
+    if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: "Cancel", style: "cancel" },
+    { text: confirmLabel, style: "destructive", onPress: onConfirm },
+  ]);
+}
+
 const C = {
   ink: "#101318",
   muted: "#626A73",
@@ -894,13 +910,11 @@ function ShopApp({
                 if (item.id === "dashboard") void reload();
               };
               if ((screen === "sale" || screen === "missed" || screen === "event_sale") && saleInProgress && item.id !== "sale")
-                Alert.alert(
+                confirmDestructive(
                   "Keep this unfinished sale?",
                   "Leaving now will clear the selected products.",
-                  [
-                    { text: "Stay on sale", style: "cancel" },
-                    { text: "Leave and clear", style: "destructive", onPress: () => { setSaleInProgress(false); openScreen(); } },
-                  ],
+                  "Leave and clear",
+                  () => { setSaleInProgress(false); openScreen(); },
                 );
               else openScreen();
             }}
@@ -1448,10 +1462,21 @@ function SaleScreen({
                 <Pressable
                   accessibilityLabel="Clear this sale"
                   style={s.clearSaleButton}
-                  onPress={() => Alert.alert("Clear this sale?", "All selected products will be removed.", [
-                    { text: "Keep sale", style: "cancel" },
-                    { text: "Clear sale", style: "destructive", onPress: () => { setCart([]); setChoosing(null); setChosenLetters([]); setChosenDesign(null); } },
-                  ])}
+                  onPress={() => confirmDestructive(
+                    "Clear this sale?",
+                    "All selected products will be removed.",
+                    "Clear sale",
+                    () => {
+                      setCart([]);
+                      setChoosing(null);
+                      setChosenLetters([]);
+                      setChosenDesign(null);
+                      setReview(false);
+                      setCashReceived("");
+                      setGcashReceived(false);
+                      setPaymentReference("");
+                    },
+                  )}
                 >
                   <Ionicons name="close-circle-outline" size={20} color={C.red} />
                   <Text style={s.clearSaleText}>Clear sale</Text>
