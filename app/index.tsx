@@ -226,14 +226,18 @@ function Login() {
     }
     setBusy(true);
     setError("");
-    // Keep the existing Supabase identity behind the scenes while presenting the
-    // shop's new, friendlier username. This avoids replacing the account and
-    // preserves all memberships, products, stock and sales history.
-    const authUsername = clean === "pixelbug" ? "sebu3d" : clean;
-    const { error: e } = await supabase.auth.signInWithPassword({
-      email: `${authUsername}@login.mik.app`,
+    let { error: e } = await supabase.auth.signInWithPassword({
+      email: `${clean}@login.mik.app`,
       password,
     });
+    // The first Pixelbug profile originally used a hidden legacy login. Keep a
+    // safe fallback until the Owner saves its username through the new portal.
+    if (e && clean === "pixelbug") {
+      ({ error: e } = await supabase.auth.signInWithPassword({
+        email: "sebu3d@login.mik.app",
+        password,
+      }));
+    }
     if (!e) await supabase.rpc("record_login_activity");
     setBusy(false);
     if (e)
@@ -332,6 +336,7 @@ function PlatformAdmin() {
   const [password, setPassword] = useState("");
   const [openShop, setOpenShop] = useState<AdminShop | null>(null);
   const [showActivity, setShowActivity] = useState(false);
+  const [manageShop, setManageShop] = useState<{ shop: AdminShop; mode: "edit" | "duplicate" } | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -379,6 +384,8 @@ function PlatformAdmin() {
         onAdminExit={() => setOpenShop(null)}
       />
     );
+  if (manageShop)
+    return <AdminShopForm shop={manageShop.shop} mode={manageShop.mode} onBack={() => setManageShop(null)} onDone={async () => { setManageShop(null); await load(); }} />;
   if (showActivity)
     return <OwnerActivityLog shops={shops} onBack={() => setShowActivity(false)} />;
   return (
@@ -475,6 +482,22 @@ function PlatformAdmin() {
               <View style={s.statusPill}>
                 <Text style={s.statusText}>ACTIVE</Text>
               </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${shop.name}`}
+                style={s.adminSignout}
+                onPress={() => setManageShop({ shop, mode: "edit" })}
+              >
+                <Ionicons name="create-outline" size={21} color={C.dark} />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Duplicate ${shop.name}`}
+                style={s.adminSignout}
+                onPress={() => setManageShop({ shop, mode: "duplicate" })}
+              >
+                <Ionicons name="copy-outline" size={21} color={C.accent} />
+              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${shop.name}`}
@@ -921,7 +944,8 @@ function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
     <Text style={s.pageTitle}>How are you selling?</Text>
     <Text style={s.subtitle}>Choose one to start.</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="Open shop sale" style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop sale</Text><Text style={s.sellModeHelp}>Sell at your shop</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.green}/></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open event sale" style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event sale</Text><Text style={s.sellModeHelp}>Fast checkout for markets</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.accent}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open event sale" style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event sale</Text><Text style={s.sellModeHelp}>Fast checkout · no letter selection</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.accent}/></Pressable>
+    <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={21} color={C.accent}/><Text style={s.eventModeNoteText}><Text style={s.eventModeNoteStrong}>What is Event Sale? </Text>Clickers go directly to payment without choosing letters. After the event, count the remaining A–Z keycaps. Tip: take a photo of sold items to help with counting.</Text></View>
     <Pressable accessibilityRole="button" accessibilityLabel="Add an earlier sale" style={s.earlierSale} onPress={()=>onOpen("missed")}><Ionicons pointerEvents="none" name="calendar-outline" size={21} color={C.orange}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Add an earlier sale</Text><Text style={s.earlierSaleHelp}>For sales entered on another day</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
   </ScrollView>;
 }
@@ -1390,7 +1414,7 @@ function SaleScreen({
                 <View style={s.flex}>
                   <Text style={s.eventBannerTitle}>Event mode — fast checkout</Text>
                   <Text style={s.eventBannerText}>
-                    Tap the clicker and choose how many. No letters are selected now. The clicker base stock updates after payment; count the A–Z keycaps after the event.
+                    Tap the clicker and choose how many. No letters are selected now. The clicker base stock updates after payment. Count the remaining A–Z keycaps after the event, and take a photo of sold items to help with counting.
                   </Text>
                 </View>
               </View>
@@ -1835,6 +1859,57 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: "edit" | "duplicate"; onBack: () => void; onDone: () => Promise<void> }) {
+  const duplicate = mode === "duplicate";
+  const [name, setName] = useState(duplicate ? `${shop.name} Copy` : shop.name);
+  const [username, setUsername] = useState(duplicate ? "" : shop.login_username ?? "");
+  const [password, setPassword] = useState("");
+  const [copyStock, setCopyStock] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    const clean = username.trim().toLowerCase();
+    if (!name.trim()) return Alert.alert("Enter a shop name");
+    if (!/^[a-z0-9._-]{3,30}$/.test(clean)) return Alert.alert("Check the username", "Use 3–30 letters, numbers, dots, dashes or underscores.");
+    if (duplicate && password.length < 6) return Alert.alert("Password is too short", "Use at least 6 characters.");
+    setBusy(true);
+    const { data, error } = await supabase.functions.invoke("admin-manage-shop", {
+      body: { action: mode === "edit" ? "update" : "duplicate", shopId: shop.id, shopName: name.trim(), username: clean, password, copyStock },
+    });
+    setBusy(false);
+    if (error) {
+      let message = error.message;
+      try { message = (await error.context?.json())?.error ?? message; } catch {}
+      return Alert.alert(duplicate ? "Shop not duplicated" : "Profile not updated", message);
+    }
+    await onDone();
+    Alert.alert(
+      duplicate ? "Shop duplicated" : "Profile updated",
+      duplicate
+        ? `${data?.copiedProducts ?? 0} products and prices were copied. ${copyStock ? "Current stock numbers were copied." : "Stock starts at zero for the new shop."}`
+        : `The shop can now sign in with ${clean}. Products, stock, sales and orders were kept.`,
+    );
+  };
+  return (
+    <SafeAreaView style={s.app}>
+      <StatusBar style="dark" />
+      <View style={s.adminTop}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to owner account" style={s.backButton} onPress={onBack}><Ionicons name="arrow-back" size={23} color={C.ink} /></Pressable>
+        <View style={s.flex}><Text style={s.kicker}>OWNER</Text><Text style={s.shopName}>{duplicate ? "Duplicate shop" : "Edit profile"}</Text></View>
+      </View>
+      <ScrollView contentContainerStyle={s.adminPage}>
+        <View style={s.editCard}>
+          <Text style={s.editName}>{duplicate ? `Copy products and prices from ${shop.name}` : "Change the shop name or login username"}</Text>
+          <Text style={s.rowHelp}>{duplicate ? "The new shop will have its own login, stock, sales and orders." : "Existing products, stock, sales and orders will not be removed."}</Text>
+          <Label>Shop name</Label><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Shop name" />
+          <Label>Login username</Label><TextInput style={s.input} value={username} onChangeText={setUsername} placeholder="New username" autoCapitalize="none" autoCorrect={false} />
+          {duplicate ? <><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry /><Pressable accessibilityRole="button" style={[s.copyStockChoice,copyStock&&s.copyStockChoiceOn]} onPress={() => setCopyStock((value) => !value)}><Ionicons name={copyStock?"checkbox":"square-outline"} size={23} color={copyStock?C.white:C.green}/><View style={s.flex}><Text style={[s.copyStockTitle,copyStock&&{color:C.white}]}>Copy current stock numbers</Text><Text style={[s.copyStockHelp,copyStock&&{color:"#E8F0EC"}]}>{copyStock?"The new shop receives the same counts.":"Recommended off: new shop starts at zero."}</Text></View></Pressable></> : <View style={s.note}><Ionicons name="information-circle" size={22} color={C.green}/><Text style={s.noteText}>The password stays the same. The old username stops working after this change.</Text></View>}
+          <BigButton label={busy ? duplicate ? "Duplicating shop…" : "Saving profile…" : duplicate ? "Duplicate shop" : "Save profile"} icon={duplicate?"copy-outline":"save-outline"} onPress={save} disabled={busy} />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -3950,6 +4025,10 @@ const s = StyleSheet.create({
   activityTime:{marginTop:3,color:C.muted,fontSize:11},
   activityEmptyTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
   activityEmptyText:{color:C.muted,fontSize:13,textAlign:"center"},
+  copyStockChoice:{minHeight:74,marginTop:18,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.green,borderRadius:12,backgroundColor:C.white},
+  copyStockChoiceOn:{backgroundColor:C.green},
+  copyStockTitle:{color:C.ink,fontSize:14,fontWeight:"700"},
+  copyStockHelp:{marginTop:3,color:C.muted,fontSize:12},
   adminShop: {
     minHeight: 82,
     marginBottom: 9,
@@ -4070,6 +4149,9 @@ const s = StyleSheet.create({
   eventBanner:{marginBottom:14,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:"#DDE8E1",borderRadius:11,backgroundColor:C.accentSoft},
   eventBannerTitle:{color:C.accentDark,fontSize:15,fontWeight:"700"},
   eventBannerText:{marginTop:2,color:C.muted,fontSize:13},
+  eventModeNote:{marginTop:8,padding:12,flexDirection:"row",alignItems:"flex-start",gap:9,borderWidth:1,borderColor:"#DCE7E2",borderRadius:12,backgroundColor:C.white},
+  eventModeNoteText:{flex:1,color:C.muted,fontSize:13,lineHeight:19},
+  eventModeNoteStrong:{color:C.ink,fontWeight:"700"},
   sellStartPage:{paddingTop:6,paddingBottom:40},
   sellModeCard:{minHeight:108,marginTop:12,padding:17,flexDirection:"row",alignItems:"center",gap:14,borderWidth:1,borderColor:C.border,borderRadius:16},
   sellModeIcon:{width:56,height:56,alignItems:"center",justifyContent:"center",borderRadius:15},
