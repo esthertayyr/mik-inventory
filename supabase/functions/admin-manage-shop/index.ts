@@ -88,6 +88,32 @@ Deno.serve(async (request: Request) => {
     return reply({ shopId, passcodeChanged: true });
   }
 
+  if (action === 'set_status') {
+    const status = String(input.status ?? '');
+    if (!['active', 'inactive'].includes(status)) return reply({ error: 'Check the shop status' }, 400);
+    const shopUserId = await findShopUser();
+    if (!shopUserId) return reply({ error: 'Shop login not found' }, 404);
+    const { error: authError } = await admin.auth.admin.updateUserById(shopUserId, {
+      ban_duration: status === 'inactive' ? '876000h' : 'none',
+    });
+    if (authError) return reply({ error: authError.message }, 400);
+    const { error: businessError } = await admin.from('businesses').update({ status }).eq('id', shopId);
+    if (businessError) {
+      await admin.auth.admin.updateUserById(shopUserId, { ban_duration: status === 'inactive' ? 'none' : '876000h' });
+      return reply({ error: businessError.message }, 400);
+    }
+    await admin.from('activity_logs').insert({
+      business_id: shopId,
+      actor_id: authData.user.id,
+      actor_name: 'Owner',
+      action: status === 'inactive' ? 'shop_paused' : 'shop_reactivated',
+      entity_type: 'businesses',
+      entity_id: shopId,
+      summary: `${source.name} ${status === 'inactive' ? 'paused' : 'reactivated'} by owner`,
+    });
+    return reply({ shopId, status });
+  }
+
   if (!shopName || !validUsername(username)) return reply({ error: 'Check the shop name and username' }, 400);
   const { data: sourceLocation } = await admin.from('locations').select('id').eq('business_id', shopId).eq('active', true).order('created_at').limit(1).maybeSingle();
   if (!sourceLocation) return reply({ error: 'Source shop location not found' }, 404);

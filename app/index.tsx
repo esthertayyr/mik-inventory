@@ -22,6 +22,8 @@ import { useFonts } from "expo-font";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { StatusBar } from "expo-status-bar";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/src/lib/supabase";
@@ -341,6 +343,7 @@ type AdminShop = {
   login_username: string | null;
   status: string;
   created_at: string;
+  last_login?: string | null;
 };
 function PlatformAdmin() {
   const [shops, setShops] = useState<AdminShop[]>([]);
@@ -353,15 +356,28 @@ function PlatformAdmin() {
   const [openShop, setOpenShop] = useState<AdminShop | null>(null);
   const [showActivity, setShowActivity] = useState(false);
   const [manageShop, setManageShop] = useState<{ shop: AdminShop; mode: "edit" | "duplicate" } | null>(null);
+  const [ownerStats, setOwnerStats] = useState({ salesToday: 0, activeOrders: 0, lowStock: 0 });
+  const [exporting, setExporting] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("businesses")
-      .select("id,name,logo_url,slug,login_username,status,created_at")
-      .eq("status", "active")
-      .order("created_at");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [{ data, error }, { data: loginRows }, { data: todaySales }, { data: activeOrders }, { data: stockRows }] = await Promise.all([
+      supabase.from("businesses").select("id,name,logo_url,slug,login_username,status,created_at").order("created_at"),
+      supabase.from("activity_logs").select("business_id,created_at").eq("action", "login").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("sales").select("total,status").eq("status", "completed").gte("created_at", today.toISOString()),
+      supabase.from("external_orders").select("id,status").not("status", "in", "(completed,cancelled)"),
+      supabase.from("inventory_levels").select("quantity_on_hand,product:products!inner(low_stock_threshold,active)").eq("product.active", true),
+    ]);
     if (error) Alert.alert("Shops not loaded", error.message);
-    setShops((data ?? []) as AdminShop[]);
+    const lastLogin = new Map<string, string>();
+    for (const row of loginRows ?? []) if (row.business_id && !lastLogin.has(row.business_id)) lastLogin.set(row.business_id, row.created_at);
+    setShops(((data ?? []) as AdminShop[]).map((shop) => ({ ...shop, last_login: lastLogin.get(shop.id) ?? null })));
+    setOwnerStats({
+      salesToday: (todaySales ?? []).reduce((sum, sale) => sum + Number(sale.total), 0),
+      activeOrders: activeOrders?.length ?? 0,
+      lowStock: (stockRows ?? []).filter((row: any) => row.quantity_on_hand <= Number(row.product?.low_stock_threshold ?? 0)).length,
+    });
     setLoading(false);
   }, []);
   useEffect(() => {
@@ -393,6 +409,38 @@ function PlatformAdmin() {
       `${clean} can now log in to this shop.`,
     );
   };
+  const setShopStatus = (shop: AdminShop) => {
+    const pausing = shop.status === "active";
+    const run = async () => {
+      const { error } = await supabase.functions.invoke("admin-manage-shop", {
+        body: { action: "set_status", shopId: shop.id, status: pausing ? "inactive" : "active" },
+      });
+      if (error) {
+        let message = error.message;
+        try { message = (await error.context?.json())?.error ?? message; } catch {}
+        return Alert.alert("Shop status not changed", message);
+      }
+      await load();
+      Alert.alert(pausing ? "Shop paused" : "Shop reactivated", pausing ? "This shop cannot start a new login until you reactivate it." : "This shop can sign in again.");
+    };
+    if (pausing) confirmDestructive("Pause this shop?", `${shop.name} will be blocked from new logins. Its data will remain safe.`, "Pause shop", () => void run());
+    else void run();
+  };
+  const exportOwnerSales = async () => {
+    setExporting(true);
+    const { data, error } = await supabase.from("sales").select("receipt_number,created_at,payment_method,total,status,business:businesses(name)").order("created_at", { ascending: false });
+    setExporting(false);
+    if (error) return Alert.alert("Export not created", error.message);
+    const cell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = [["Shop", "Date", "Receipt", "Payment", "Total", "Status"], ...(data ?? []).map((sale: any) => [sale.business?.name ?? "", sale.created_at, `SALE-${sale.receipt_number}`, String(sale.payment_method).toUpperCase(), sale.total, String(sale.status).toUpperCase()])];
+    const csv = "\uFEFF" + rows.map((row) => row.map(cell).join(",")).join("\n");
+    const filename = `mik-all-shops-sales-${new Date().toLocaleDateString("en-CA")}.csv`;
+    if (Platform.OS === "web") {
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a"); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url); return;
+    }
+    const file = new File(Paths.cache, filename); file.create(); file.write(csv); await Sharing.shareAsync(file.uri);
+  };
   if (openShop)
     return (
       <ShopApp
@@ -422,12 +470,21 @@ function PlatformAdmin() {
       <ScrollView contentContainerStyle={s.adminPage}>
         <View style={s.adminHero}>
           <Text style={s.heroLabel}>ACTIVE SHOP PROFILES</Text>
-          <Text style={s.heroValue}>{shops.length}</Text>
+          <Text style={s.heroValue}>{shops.filter((shop) => shop.status === "active").length}</Text>
+        </View>
+        <View style={s.ownerStatsRow}>
+          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>SALES TODAY</Text><Text style={s.ownerStatValue}>{peso(ownerStats.salesToday)}</Text></View>
+          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>ACTIVE ORDERS</Text><Text style={s.ownerStatValue}>{ownerStats.activeOrders}</Text></View>
+          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>LOW STOCK</Text><Text style={s.ownerStatValue}>{ownerStats.lowStock}</Text></View>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Open shop activity log" style={s.activityButton} onPress={() => setShowActivity(true)}>
           <View style={s.activityButtonIcon}><Ionicons name="time-outline" size={23} color={C.white} /></View>
           <View style={s.flex}><Text style={s.activityButtonTitle}>Shop activity</Text><Text style={s.activityButtonHelp}>Sales, products, stock, orders and logins</Text></View>
           <Ionicons name="chevron-forward" size={21} color={C.green} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Export all shop sales" style={s.ownerExportButton} onPress={() => void exportOwnerSales()} disabled={exporting}>
+          <Ionicons name="download-outline" size={22} color={C.accent} />
+          <View style={s.flex}><Text style={s.ownerExportTitle}>{exporting ? "Preparing export…" : "Export all shop sales"}</Text><Text style={s.rowHelp}>One Excel-ready CSV for every shop</Text></View>
         </Pressable>
         {showForm ? (
           <View style={s.editCard}>
@@ -473,55 +530,55 @@ function PlatformAdmin() {
             onPress={() => setShowForm(true)}
           />
         )}
-        <Text style={s.section}>Active shops</Text>
+        <Text style={s.section}>All shops</Text>
         {loading ? (
           <ActivityIndicator color={C.green} />
         ) : (
           shops.map((shop) => (
             <View key={shop.id} style={s.adminShop}>
-              <View style={s.shopAvatar}>
-                <Ionicons name="storefront" size={24} color={C.green} />
+              <View style={s.adminShopTop}>
+                <View style={s.shopAvatar}><Ionicons name="storefront" size={24} color={C.green} /></View>
+                <View style={s.flex}>
+                  <Text style={s.rowTitle}>{shop.name}</Text>
+                  <Text style={s.rowHelp}><Ionicons name="person-circle-outline" size={14} color={C.muted} />{" "}{shop.slug === "sebu3d" ? "pixelbug" : shop.login_username ?? "No username connected"}</Text>
+                  <Text style={s.adminLastLogin}>{shop.last_login ? `Last login: ${new Date(shop.last_login).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}` : "No login recorded yet"}</Text>
+                </View>
+                <View style={[s.statusPill, shop.status !== "active" && s.statusPillPaused]}><Text style={[s.statusText, shop.status !== "active" && s.statusTextPaused]}>{shop.status === "active" ? "ACTIVE" : "PAUSED"}</Text></View>
               </View>
-              <View style={s.flex}>
-                <Text style={s.rowTitle}>{shop.name}</Text>
-                <Text style={s.rowHelp}>
-                  <Ionicons
-                    name="person-circle-outline"
-                    size={14}
-                    color={C.muted}
-                  />{" "}
-                  {shop.slug === "sebu3d"
-                    ? "pixelbug"
-                    : shop.login_username ?? "No username connected"}
-                </Text>
-              </View>
-              <View style={s.statusPill}>
-                <Text style={s.statusText}>ACTIVE</Text>
-              </View>
+              <View style={s.adminShopActions}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Edit ${shop.name}`}
-                style={s.adminSignout}
+                style={s.adminShopAction}
                 onPress={() => setManageShop({ shop, mode: "edit" })}
               >
-                <Ionicons name="create-outline" size={21} color={C.dark} />
+                <Ionicons name="create-outline" size={20} color={C.dark} /><Text style={s.adminShopActionText}>Edit</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Duplicate ${shop.name}`}
-                style={s.adminSignout}
+                style={s.adminShopAction}
                 onPress={() => setManageShop({ shop, mode: "duplicate" })}
               >
-                <Ionicons name="copy-outline" size={21} color={C.accent} />
+                <Ionicons name="copy-outline" size={20} color={C.accent} /><Text style={s.adminShopActionText}>Copy</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={shop.status === "active" ? `Pause ${shop.name}` : `Reactivate ${shop.name}`}
+                style={s.adminShopAction}
+                onPress={() => setShopStatus(shop)}
+              >
+                <Ionicons name={shop.status === "active" ? "pause-circle-outline" : "play-circle-outline"} size={21} color={shop.status === "active" ? C.red : C.accent} /><Text style={s.adminShopActionText}>{shop.status === "active" ? "Pause" : "Activate"}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${shop.name}`}
-                style={s.adminSignout}
+                style={[s.adminShopAction, s.adminShopActionPrimary]}
                 onPress={() => setOpenShop(shop)}
               >
-                <Ionicons name="enter-outline" size={22} color={C.green} />
+                <Ionicons name="enter-outline" size={21} color={C.white} /><Text style={[s.adminShopActionText, { color: C.white }]}>Open</Text>
               </Pressable>
+              </View>
             </View>
           ))
         )}
@@ -4248,6 +4305,12 @@ const s = StyleSheet.create({
     paddingBottom: 38,
   },
   adminHero: { padding: 20, borderRadius: 20, backgroundColor: C.dark },
+  ownerStatsRow:{marginVertical:12,flexDirection:"row",gap:8},
+  ownerStatCard:{flex:1,minWidth:0,padding:12,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.white},
+  ownerStatLabel:{color:C.muted,fontSize:9,fontWeight:"700",letterSpacing:.6},
+  ownerStatValue:{marginTop:6,color:C.ink,fontSize:18,fontWeight:"700"},
+  ownerExportButton:{minHeight:68,marginBottom:14,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  ownerExportTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
   activityButton:{minHeight:72,marginBottom:14,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   activityButtonIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.green},
   activityButtonTitle:{color:C.ink,fontSize:16,fontWeight:"700"},
@@ -4331,14 +4394,22 @@ const s = StyleSheet.create({
     minHeight: 42,
     marginTop: 18,
     paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "column",
+    alignItems: "stretch",
     gap: 6,
     borderWidth: 1,
     borderColor: "#E8CCD3",
     borderRadius: 10,
     backgroundColor: C.white,
   },
+  adminShopTop:{flexDirection:"row",alignItems:"center",gap:11},
+  adminShopActions:{paddingTop:10,flexDirection:"row",gap:7,borderTopWidth:1,borderTopColor:C.border},
+  adminShopAction:{flex:1,minHeight:42,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:5,borderRadius:10,backgroundColor:C.soft},
+  adminShopActionPrimary:{backgroundColor:C.green},
+  adminShopActionText:{color:C.dark,fontSize:11,fontWeight:"700"},
+  adminLastLogin:{marginTop:3,color:C.muted,fontSize:11},
+  statusPillPaused:{backgroundColor:C.redSoft},
+  statusTextPaused:{color:C.red},
   clearSaleText: { color: C.red, fontSize: 13, fontWeight: "700" },
   quickCard: {
     minHeight: 172,
