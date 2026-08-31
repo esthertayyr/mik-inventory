@@ -2456,20 +2456,23 @@ function Products({
             }
 
             let imageRemoved = true;
-            if (selected.image_url?.includes("/storage/v1/object/public/product-images/")) {
-              const productImagePath = `${businessId}/${selected.id}/main.jpg`;
+            const storageMarker = "/storage/v1/object/public/product-images/";
+            if (selected.image_url?.includes(storageMarker)) {
+              const storedImagePath = decodeURIComponent(
+                selected.image_url.split(storageMarker)[1].split("?")[0],
+              );
               const { data: imageUsers, error: referenceError } = await supabase
                 .from("products")
                 .select("id")
                 .neq("id", selected.id)
                 .eq("active", true)
-                .like("image_url", `%/${selected.id}/main.jpg%`)
+                .like("image_url", `%${storageMarker}${storedImagePath}%`)
                 .limit(1);
               if (referenceError || (imageUsers?.length ?? 0) > 0) imageRemoved = false;
               else {
                 const { error: removeError } = await supabase.storage
                   .from("product-images")
-                  .remove([productImagePath]);
+                  .remove([storedImagePath]);
                 imageRemoved = !removeError;
               }
             }
@@ -2525,20 +2528,10 @@ function Products({
                 error?.message ?? "Please try again.",
               );
             }
-            let copiedImageUrl = selected.image_url;
-            if (selected.image_url?.includes("/storage/v1/object/public/product-images/")) {
-              const sourcePath = `${businessId}/${selected.id}/main.jpg`;
-              const copyPath = `${businessId}/${createdId}/main.jpg`;
-              const { error: imageCopyError } = await supabase.storage
-                .from("product-images")
-                .copy(sourcePath, copyPath);
-              if (!imageCopyError)
-                copiedImageUrl = `${supabase.storage.from("product-images").getPublicUrl(copyPath).data.publicUrl}?v=${Date.now()}`;
-            }
             const { error: copyError } = await supabase
               .from("products")
               .update({
-                image_url: copiedImageUrl,
+                image_url: selected.image_url,
                 low_stock_threshold: selected.low_stock_threshold,
                 letters_required: selected.letters_required,
                 alphabet_style_id: selected.alphabet_style?.id ?? null,
