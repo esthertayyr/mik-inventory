@@ -252,7 +252,7 @@ function Login() {
         <Image
           source={require("../assets/mik-logo.png")}
           style={s.brandLogo}
-          resizeMode="contain"
+          resizeMode="cover"
         />
         <Text style={s.loginTitle}>Welcome back.</Text>
         <Text style={s.centerHelp}>Sign in to manage your shop.</Text>
@@ -536,6 +536,8 @@ function ShopApp({
   const [needsSetup, setNeedsSetup] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [saleInProgress, setSaleInProgress] = useState(false);
+  const [editProductId, setEditProductId] = useState<string | null>(null);
+  const [productsBackScreen, setProductsBackScreen] = useState<Screen>("more");
   const loadData = useCallback(
     async (businessId: string, selectedLocationId: string) => {
       const start = new Date();
@@ -747,6 +749,11 @@ function ShopApp({
         locationId={locationId}
         onSaved={reload}
         onHome={() => setScreen("home")}
+        onManageProducts={(productId) => {
+          setEditProductId(productId ?? null);
+          setProductsBackScreen("inventory");
+          setScreen("products");
+        }}
       />
     );
   else if (screen === "products")
@@ -756,8 +763,12 @@ function ShopApp({
         locationId={locationId}
         products={products}
         categories={categories}
+        initialProductId={editProductId}
         onSaved={reload}
-        onBack={() => setScreen("more")}
+        onBack={() => {
+          setEditProductId(null);
+          setScreen(productsBackScreen);
+        }}
       />
     );
   else if (screen === "reports")
@@ -794,7 +805,11 @@ function ShopApp({
         categories={categories}
         business={business!}
         onBack={() => setScreen("home")}
-        onEdit={() => setScreen("products")}
+        onEdit={() => {
+          setEditProductId(null);
+          setProductsBackScreen("price_list");
+          setScreen("products");
+        }}
       />
     );
   else
@@ -802,7 +817,13 @@ function ShopApp({
       <More
         profile={profile}
         business={business!}
-        onOpen={setScreen}
+        onOpen={(next) => {
+          if (next === "products") {
+            setEditProductId(null);
+            setProductsBackScreen("more");
+          }
+          setScreen(next);
+        }}
         onGuide={() => setGuideOpen(true)}
       />
     );
@@ -2063,6 +2084,7 @@ function Products({
   locationId,
   products,
   categories,
+  initialProductId,
   onSaved,
   onBack,
 }: {
@@ -2070,11 +2092,13 @@ function Products({
   locationId: string;
   products: Product[];
   categories: Category[];
+  initialProductId?: string | null;
   onSaved: () => void;
   onBack: () => void;
 }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Product | null>(null);
+  const [openedInitial, setOpenedInitial] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -2123,6 +2147,14 @@ function Products({
     setChoiceText(p.variants.map((v) => v.name).join(", "));
     setPickedUri(null);
   };
+  useEffect(() => {
+    if (!initialProductId || openedInitial || selected || creating) return;
+    const product = products.find((item) => item.id === initialProductId);
+    if (product) {
+      open(product);
+      setOpenedInitial(true);
+    }
+  }, [initialProductId, openedInitial, products]);
   const startCreate = () => {
     reset();
     setCreating(true);
@@ -2263,6 +2295,82 @@ function Products({
             await onSaved();
             reset();
             Alert.alert("Product deleted", "Past sales were not changed.");
+          },
+        },
+      ],
+    );
+  };
+  const duplicateProduct = () => {
+    if (!selected) return;
+    Alert.alert(
+      "Duplicate this product?",
+      `A new copy of ${selected.name} will be created with zero stock.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Duplicate",
+          onPress: async () => {
+            setSaving(true);
+            const { data: createdId, error } = await supabase.rpc(
+              "create_product_with_choices",
+              {
+                p_business_id: businessId,
+                p_location_id: locationId,
+                p_name: `${selected.name} copy`,
+                p_category_id: selected.category_id,
+                p_regular_price: selected.regular_price,
+                p_sale_price: selected.sale_price,
+                p_starting_stock: 0,
+                p_variant_label: selected.variants.length
+                  ? selected.variant_label ?? "Choice"
+                  : null,
+                p_variants: selected.variants.map((variant) => ({
+                  name: variant.name,
+                })),
+              },
+            );
+            if (error || !createdId) {
+              setSaving(false);
+              return Alert.alert(
+                "Product not duplicated",
+                error?.message ?? "Please try again.",
+              );
+            }
+            const { error: copyError } = await supabase
+              .from("products")
+              .update({
+                image_url: selected.image_url,
+                low_stock_threshold: selected.low_stock_threshold,
+                letters_required: selected.letters_required,
+                alphabet_style_id: selected.alphabet_style?.id ?? null,
+              })
+              .eq("id", createdId);
+            if (!copyError && selected.variants.length) {
+              const { data: copiedVariants } = await supabase
+                .from("product_variants")
+                .select("id,name")
+                .eq("product_id", createdId);
+              for (const copied of copiedVariants ?? []) {
+                const source = selected.variants.find(
+                  (variant) => variant.name === copied.name,
+                );
+                if (
+                  source?.price_override !== null &&
+                  source?.price_override !== undefined
+                )
+                  await supabase
+                    .from("product_variants")
+                    .update({ price_override: source.price_override })
+                    .eq("id", copied.id);
+              }
+            }
+            setSaving(false);
+            await onSaved();
+            reset();
+            Alert.alert(
+              "Product duplicated",
+              "The copy has zero stock. Open it to change its name, photo, or price.",
+            );
           },
         },
       ],
@@ -2591,16 +2699,31 @@ function Products({
             disabled={saving}
           />
           {!creating ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Delete product"
-              style={s.deleteProductButton}
-              onPress={deleteProduct}
-              disabled={saving}
-            >
-              <Ionicons name="trash-outline" size={20} color={C.red} />
-              <Text style={s.deleteProductText}>Delete product</Text>
-            </Pressable>
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Duplicate product"
+                style={s.duplicateProductButton}
+                onPress={duplicateProduct}
+                disabled={saving}
+              >
+                <Ionicons name="copy-outline" size={20} color={C.accent} />
+                <View style={s.flex}>
+                  <Text style={s.duplicateProductText}>Duplicate product</Text>
+                  <Text style={s.rowHelp}>Copy details with zero stock</Text>
+                </View>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Delete product"
+                style={s.deleteProductButton}
+                onPress={deleteProduct}
+                disabled={saving}
+              >
+                <Ionicons name="trash-outline" size={20} color={C.red} />
+                <Text style={s.deleteProductText}>Delete product</Text>
+              </Pressable>
+            </>
           ) : null}
         </View>
       </ScrollView>
@@ -2694,12 +2817,14 @@ function Inventory({
   locationId,
   onSaved,
   onHome,
+  onManageProducts,
 }: {
   products: Product[];
   categories: Category[];
   locationId: string;
   onSaved: () => void;
   onHome: () => void;
+  onManageProducts: (productId?: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string | null>(null);
@@ -2950,8 +3075,21 @@ function Inventory({
     );
   return (
     <View style={s.flex}>
-      <Text style={s.pageTitle}>Stock</Text>
-      <Text style={s.subtitle}>Choose a product to update its stock.</Text>
+      <View style={s.stockPageHeading}>
+        <View style={s.flex}>
+          <Text style={s.pageTitle}>Stock</Text>
+          <Text style={s.subtitle}>Tap a product to change its stock.</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Edit products and prices"
+          style={s.stockManageButton}
+          onPress={() => onManageProducts()}
+        >
+          <Ionicons name="create-outline" size={20} color={C.white} />
+          <Text style={s.stockManageButtonText}>Edit products</Text>
+        </Pressable>
+      </View>
       <Search value={search} onChange={setSearch} />
       <View style={s.stockFilters}>
       <Text style={s.stockFilterLabel}>Category</Text>
@@ -3048,6 +3186,17 @@ function Inventory({
                 </Text>
                 <Text style={[s.stockNumLabel, low && s.low]}>left</Text>
               </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${item.name}`}
+                style={s.stockEditButton}
+                onPress={(event) => {
+                  event.stopPropagation();
+                  onManageProducts(item.id);
+                }}
+              >
+                <Ionicons name="pencil-outline" size={19} color={C.accent} />
+              </Pressable>
               <Ionicons name="chevron-forward" size={19} color={C.muted} />
             </Pressable>
           );
@@ -3771,7 +3920,7 @@ const s = StyleSheet.create({
     elevation: 0,
   },
   loginCardWide:{width:"48%",justifyContent:"center",paddingHorizontal:52,borderWidth:0},
-  brandLogo: { width: 96, height: 96, alignSelf: "center" },
+  brandLogo: { width: 220, height: 100, alignSelf: "center" },
   logo: {
     width: 76,
     height: 76,
@@ -4214,6 +4363,10 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+  stockPageHeading:{flexDirection:"row",alignItems:"center",gap:12},
+  stockManageButton:{minHeight:46,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:12,backgroundColor:C.green},
+  stockManageButtonText:{color:C.white,fontSize:14,fontWeight:"700"},
+  stockEditButton:{width:42,height:42,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
   stockFilters:{marginTop:12,padding:14,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:"#F8F9FA"},
   stockCategoryPicker: {
     minHeight: 52,
@@ -4742,6 +4895,8 @@ const s = StyleSheet.create({
   smallActionDanger: { backgroundColor: C.redSoft },
   cancelCategory: { minHeight: 44, alignItems: "center", justifyContent: "center" },
   cancelCategoryText: { color: C.muted, fontSize: 14, fontWeight: "700" },
+  duplicateProductButton:{minHeight:58,marginTop:12,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},
+  duplicateProductText:{color:C.accent,fontSize:16,fontWeight:"700"},
   deleteProductButton:{minHeight:52,marginTop:12,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,borderWidth:1,borderColor:"#E7CBD2",borderRadius:10,backgroundColor:"#FFF7F8"},
   deleteProductText:{color:C.red,fontSize:15,fontWeight:"700"},
   listMissingPhoto: {
