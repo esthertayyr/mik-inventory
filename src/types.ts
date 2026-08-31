@@ -9,6 +9,7 @@ export type Screen =
   | "orders"
   | "printers"
   | "filaments"
+  | "calendar"
   | "price_list"
   | "production"
   | "missed"

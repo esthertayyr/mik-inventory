@@ -32,6 +32,7 @@ import { ReportsScreen } from "@/src/components/ReportsScreen";
 import { OrdersScreen } from "@/src/components/OrdersScreen";
 import { PrintersScreen } from "@/src/components/PrintersScreen";
 import { FilamentsScreen } from "@/src/components/FilamentsScreen";
+import { CalendarScreen, type ShopEvent } from "@/src/components/CalendarScreen";
 import type {
   Business,
   CartItem,
@@ -895,6 +896,8 @@ function ShopApp({
     body = <PrintersScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
   else if (screen === "filaments")
     body = <FilamentsScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
+  else if (screen === "calendar")
+    body = <CalendarScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
   else if (screen === "price_list")
     body = (
       <PriceList
@@ -925,7 +928,7 @@ function ShopApp({
       />
     );
   const selected =
-    screen === "products" || screen === "reports" || screen === "shop" || screen === "printers" || screen === "filaments" || screen === "price_list"
+    screen === "products" || screen === "reports" || screen === "shop" || screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "price_list"
       ? "more"
       : screen === "production"
         ? "home"
@@ -1970,7 +1973,9 @@ function SaleScreen({
 function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (screen: Screen) => void }) {
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
+  const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
   useEffect(() => {
+    setEventReminder(null);
     supabase
       .from("external_orders")
       .select("status,target_date")
@@ -1980,6 +1985,27 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
         const todayValue = new Date().toLocaleDateString("en-CA");
         const urgent = (data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status) && o.target_date && o.target_date <= todayValue).length;
         setOrderSummary({ active, urgent });
+      });
+    const today = localDateKey();
+    const end = new Date();
+    end.setDate(end.getDate() + 30);
+    supabase
+      .from("shop_events")
+      .select("id,business_id,location_id,title,event_date,start_time,venue,notes,remind_days_before,status,created_at,updated_at")
+      .eq("location_id", locationId)
+      .eq("status", "planned")
+      .gte("event_date", today)
+      .lte("event_date", localDateKey(end))
+      .order("event_date")
+      .order("start_time")
+      .then(({ data }) => {
+        const due = ((data ?? []) as ShopEvent[]).find((event) => {
+          const eventDate = new Date(`${event.event_date}T12:00:00`);
+          const now = new Date(`${today}T12:00:00`);
+          const daysAway = Math.round((eventDate.getTime() - now.getTime()) / 86400000);
+          return daysAway <= event.remind_days_before;
+        });
+        setEventReminder(due ?? null);
       });
   }, [locationId]);
   const actions: Array<{
@@ -1995,12 +2021,23 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     { title: "Stock", help: "Count or update products", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
     { title: "Sales", help: "View sales and receipts", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
     { title: "Printers & Filament", help: "Check machines and materials", icon: "construct", screen: "production", color: "#087A38", soft: "#EEF7F1" },
-    { title: "More", help: "Prices, reports and shop settings", icon: "grid", screen: "more", color: "#4B5158", soft: "#F1F2F3" },
+    { title: "Calendar", help: "Events, dates and reminders", icon: "calendar", screen: "calendar", color: "#4B5158", soft: "#F1F2F3" },
   ];
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
       <Text style={s.pageTitle}>What would you like to do?</Text>
       <Text style={s.subtitle}>Tap one option.</Text>
+      {eventReminder ? (
+        <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
+          <View style={s.homeReminderIcon}><Ionicons name="notifications" size={23} color={C.white} /></View>
+          <View style={s.flex}>
+            <Text style={s.homeReminderLabel}>{eventReminder.event_date === localDateKey() ? "TODAY" : "COMING UP"}</Text>
+            <Text style={s.homeReminderTitle} numberOfLines={2}>{eventReminder.title}</Text>
+            <Text style={s.homeReminderMeta}>{friendlyLocalDate(eventReminder.event_date)}{eventReminder.start_time ? ` · ${eventReminder.start_time.slice(0, 5)}` : ""}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color={C.green} />
+        </Pressable>
+      ) : null}
       <View style={s.quickGrid}>
         {actions.map((action) => (
           <Pressable
@@ -3508,6 +3545,7 @@ function More({
       <Menu icon="receipt-outline" title="Price list" help="View, print or check selling prices" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("price_list")} />
       <Menu icon="hardware-chip-outline" title="Printers" help="See which printers are working" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("printers")} />
       <Menu icon="color-filter-outline" title="Filaments" help="Track materials, colours and spools" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("filaments")} />
+      <Menu icon="calendar-outline" title="Calendar" help="Plan events and see reminders" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("calendar")} />
       <Menu
         icon="bar-chart-outline"
         title="Sales reports"
@@ -3641,6 +3679,7 @@ function activityDetail(item: ActivityLog) {
 function activityIcon(action: string): Icon {
   if (action.startsWith("sale_")) return "receipt-outline";
   if (action.startsWith("product_")) return "cube-outline";
+  if (action.startsWith("event_")) return "calendar-outline";
   if (action === "stock_changed") return "layers-outline";
   if (action.startsWith("order_")) return "clipboard-outline";
   if (action === "login") return "log-in-outline";
@@ -4495,6 +4534,11 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     gap: 12,
   },
+  homeReminder:{marginTop:16,minHeight:88,padding:14,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:"#C9D8CF",borderRadius:16,backgroundColor:"#F1F6F3"},
+  homeReminderIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:C.green},
+  homeReminderLabel:{color:C.green,fontSize:10,fontWeight:"700",letterSpacing:1.2},
+  homeReminderTitle:{marginTop:3,color:C.ink,fontSize:17,lineHeight:21,fontWeight:"700"},
+  homeReminderMeta:{marginTop:3,color:C.muted,fontSize:12,fontWeight:"600"},
   saleTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   clearSaleButton: {
     minHeight: 42,
