@@ -2071,38 +2071,44 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     help: string;
     icon: Icon;
     screen: Screen;
+  };
+  type HomeGroup = {
+    title: string;
+    help: string;
     color: string;
     soft: string;
+    border: string;
+    actions: HomeAction[];
   };
-  const groups: Array<{ title: string; help: string; actions: HomeAction[] }> = [
+  const groups: HomeGroup[] = [
     {
-      title: "Sales & customers", help: "Sell and follow customer work.", actions: [
-        { title: "Sell", help: "Start a shop or event sale", icon: "cart", screen: "sell_start", color: C.green, soft: "#EEF4F1" },
-        { title: "Sales today", help: "See today's total and receipts", icon: "today", screen: "dashboard", color: C.accent, soft: C.accentSoft },
-        { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active · ${orderSummary.urgent} due now` : "Track customer orders", icon: "clipboard", screen: "orders", color: C.purple, soft: C.purpleSoft },
-        { title: "Calendar", help: "Events and reminders", icon: "calendar", screen: "calendar", color: C.red, soft: C.redSoft },
+      title: "Sales & customers", help: "Sell and follow customer work.", color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB", actions: [
+        { title: "Sell", help: "Start a shop or event sale", icon: "cart", screen: "sell_start" },
+        { title: "Sales today", help: "See today's total and receipts", icon: "today", screen: "dashboard" },
+        { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active · ${orderSummary.urgent} due now` : "Track customer orders", icon: "clipboard", screen: "orders" },
+        { title: "Calendar", help: "Events and reminders", icon: "calendar", screen: "calendar" },
       ],
     },
     {
-      title: "Stock & products", help: "Keep products ready to sell.", actions: [
-        { title: "Stock", help: "Count or update stock", icon: "cube", screen: "inventory", color: C.teal, soft: C.tealSoft },
-        { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products", color: C.green, soft: C.accentSoft },
-        { title: "Price list", help: "View or print prices", icon: "receipt", screen: "price_list", color: C.accent, soft: "#F2F5F8" },
+      title: "Stock & products", help: "Keep products ready to sell.", color: "#264A3B", soft: "#F0F5F2", border: "#D6E3DC", actions: [
+        { title: "Stock", help: "Count or update stock", icon: "cube", screen: "inventory" },
+        { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products" },
+        { title: "Price list", help: "View or print prices", icon: "receipt", screen: "price_list" },
       ],
     },
     {
-      title: "Production", help: "Check the equipment and materials used to make products.", actions: [
-        { title: "Printers", help: "See which printers are working", icon: "hardware-chip", screen: "printers", color: "#087A38", soft: "#EEF7F1" },
-        { title: "Filaments", help: "Track colours and spools", icon: "color-filter", screen: "filaments", color: C.purple, soft: C.purpleSoft },
+      title: "Production", help: "Check the equipment and materials used to make products.", color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE", actions: [
+        { title: "Printers", help: "See which printers are working", icon: "hardware-chip", screen: "printers" },
+        { title: "Filaments", help: "Track colours and spools", icon: "color-filter", screen: "filaments" },
       ],
     },
     {
-      title: "Records & shop", help: "Review records or change shop details.", actions: [
-        { title: "Sales reports", help: "Daily, weekly or monthly", icon: "bar-chart", screen: "reports", color: C.green, soft: "#F2F5F8" },
-        { title: "Correct sale", help: "Cancel a wrong sale", icon: "return-up-back", screen: "correct", color: C.red, soft: C.redSoft },
-        { title: "Earlier sale", help: "Record a missed sale", icon: "calendar-number", screen: "missed", color: C.accent, soft: C.accentSoft },
-        { title: "Shop profile", help: "Change the shop logo", icon: "storefront", screen: "shop", color: "#4B5158", soft: "#F1F2F3" },
-        { title: "More & help", help: "Settings and simple guides", icon: "grid", screen: "more", color: "#4B5158", soft: "#F1F2F3" },
+      title: "Records & shop", help: "Review records or change shop details.", color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3", actions: [
+        { title: "Sales reports", help: "Daily, weekly or monthly", icon: "bar-chart", screen: "reports" },
+        { title: "Correct sale", help: "Cancel a wrong sale", icon: "return-up-back", screen: "correct" },
+        { title: "Earlier sale", help: "Record a missed sale", icon: "calendar-number", screen: "missed" },
+        { title: "Shop profile", help: "Change the shop logo", icon: "storefront", screen: "shop" },
+        { title: "More & help", help: "Settings and simple guides", icon: "grid", screen: "more" },
       ],
     },
   ];
@@ -2123,7 +2129,10 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
       ) : null}
       {groups.map((group) => (
         <View key={group.title} style={s.quickSection}>
-          <Text style={s.quickSectionTitle}>{group.title}</Text>
+          <View style={s.quickSectionHeading}>
+            <View style={[s.quickSectionMark,{backgroundColor:group.color}]} />
+            <Text style={s.quickSectionTitle}>{group.title}</Text>
+          </View>
           <Text style={s.quickSectionHelp}>{group.help}</Text>
           <View style={s.quickGrid}>
             {group.actions.map((action) => (
@@ -2131,13 +2140,13 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
                 key={action.title}
                 accessibilityRole="button"
                 accessibilityLabel={`${action.title}. ${action.help}`}
-                style={({ pressed }) => [s.quickCard, { backgroundColor: action.soft, width: width >= 920 ? "23.8%" : "48%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
+                style={({ pressed }) => [s.quickCard, { backgroundColor: group.soft, borderColor: group.border, width: width >= 920 ? "23.8%" : "48%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
                 onPress={() => onOpen(action.screen)}
               >
-                <View pointerEvents="none" style={[s.quickIcon,{backgroundColor:action.color}]}><Ionicons name={action.icon} size={25} color={C.white} /></View>
+                <View pointerEvents="none" style={[s.quickIcon,{backgroundColor:group.color}]}><Ionicons name={action.icon} size={25} color={C.white} /></View>
                 <Text pointerEvents="none" style={s.quickTitle}>{action.title}</Text>
                 <Text pointerEvents="none" style={s.quickHelp}>{action.help}</Text>
-                <View pointerEvents="none" style={s.quickGo}><Text style={[s.quickGoText,{color:action.color}]}>Open</Text><Ionicons name="arrow-forward" size={18} color={action.color} /></View>
+                <View pointerEvents="none" style={s.quickGo}><Text style={[s.quickGoText,{color:group.color}]}>Open</Text><Ionicons name="arrow-forward" size={18} color={group.color} /></View>
               </Pressable>
             ))}
           </View>
@@ -3560,48 +3569,64 @@ function More({
   onOpen: (x: Screen) => void;
   onGuide: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean };
+  const groups: Array<{ title: string; color: string; soft: string; border: string; tools: MoreTool[] }> = [
+    {
+      title: "Stock & products", color: "#264A3B", soft: "#F0F5F2", border: "#D6E3DC", tools: [
+        { icon: "storefront-outline", title: "Shop profile & logo", help: business.logo_url ? "Replace this shop's logo" : "Add this shop's logo", screen: "shop" },
+        { icon: "pricetags-outline", title: "Products & prices", help: "Add products or change prices", screen: "products" },
+        { icon: "receipt-outline", title: "Price list", help: "View or print selling prices", screen: "price_list" },
+      ],
+    },
+    {
+      title: "Production", color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE", tools: [
+        { icon: "hardware-chip-outline", title: "Printers", help: "See which printers are working", screen: "printers" },
+        { icon: "color-filter-outline", title: "Filaments", help: "Track colours and spools", screen: "filaments" },
+      ],
+    },
+    {
+      title: "Records & planning", color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB", tools: [
+        { icon: "calendar-outline", title: "Calendar", help: "Plan events and see reminders", screen: "calendar" },
+        { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports" },
+        { icon: "return-up-back-outline", title: "Correct a sale", help: "Cancel a wrong sale", screen: "correct" },
+        { icon: "calendar-number-outline", title: "Earlier sale", help: "Record a missed sale", screen: "missed" },
+      ],
+    },
+    {
+      title: "Help", color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3", tools: [
+        { icon: "help-circle-outline", title: "How to use Mik", help: "Replay the step-by-step guide", guide: true },
+      ],
+    },
+  ];
   return (
     <ScrollView contentContainerStyle={s.scroll}>
       <Text style={s.pageTitle}>More</Text>
-      <Text style={s.subtitle}>Simple tools for this shop.</Text>
-      <Menu
-        icon="storefront-outline"
-        title="Shop profile & logo"
-        help={business.logo_url ? "Replace this shop's logo" : "Add this shop's logo"}
-        color={C.muted}
-        soft="#F1F2F3"
-        onPress={() => onOpen("shop")}
-      />
-      <Menu
-        icon="pricetags-outline"
-        title="Products & prices"
-        help="View products and change prices"
-        color={C.muted}
-        soft="#F1F2F3"
-        onPress={() => onOpen("products")}
-      />
-      <Menu icon="receipt-outline" title="Price list" help="View, print or check selling prices" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("price_list")} />
-      <Menu icon="hardware-chip-outline" title="Printers" help="See which printers are working" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("printers")} />
-      <Menu icon="color-filter-outline" title="Filaments" help="Track materials, colours and spools" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("filaments")} />
-      <Menu icon="calendar-outline" title="Calendar" help="Plan events and see reminders" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("calendar")} />
-      <Menu
-        icon="bar-chart-outline"
-        title="Sales reports"
-        help="Daily, weekly or monthly reports"
-        color={C.muted}
-        soft="#F1F2F3"
-        onPress={() => onOpen("reports")}
-      />
-      <Menu icon="return-up-back-outline" title="Correct a sale" help="Cancel a wrong sale and restore stock" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("correct")} />
-      <Menu icon="calendar-outline" title="Add an earlier sale" help="Record products sold on another day" color={C.muted} soft="#F1F2F3" onPress={() => onOpen("missed")} />
-      <Menu
-        icon="help-circle-outline"
-        title="How to use Mik"
-        help="Replay the simple step-by-step guide"
-        color={C.muted}
-        soft="#F1F2F3"
-        onPress={onGuide}
-      />
+      <Text style={s.subtitle}>Shop tools, grouped by topic.</Text>
+      {groups.map((group) => (
+        <View key={group.title} style={s.quickSection}>
+          <View style={s.quickSectionHeading}>
+            <View style={[s.quickSectionMark,{backgroundColor:group.color}]} />
+            <Text style={s.quickSectionTitle}>{group.title}</Text>
+          </View>
+          <View style={s.quickGrid}>
+            {group.tools.map((tool) => (
+              <Pressable
+                key={tool.title}
+                accessibilityRole="button"
+                accessibilityLabel={`${tool.title}. ${tool.help}`}
+                style={({pressed})=>[s.moreToolCard,{width:width>=920?"31.8%":"48%",backgroundColor:group.soft,borderColor:group.border},pressed&&{opacity:.82,transform:[{scale:.985}]}]}
+                onPress={() => tool.guide ? onGuide() : tool.screen && onOpen(tool.screen)}
+              >
+                <View style={[s.quickIcon,{backgroundColor:group.color}]}><Ionicons name={tool.icon} size={24} color={C.white}/></View>
+                <Text style={s.quickTitle}>{tool.title}</Text>
+                <Text style={s.quickHelp}>{tool.help}</Text>
+                <View style={s.quickGo}><Text style={[s.quickGoText,{color:group.color}]}>Open</Text><Ionicons name="arrow-forward" size={18} color={group.color}/></View>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ))}
       <Text style={s.section}>Shop login</Text>
       <View style={s.account}>
         <View style={s.avatar}>
@@ -4564,6 +4589,8 @@ const s = StyleSheet.create({
   scroll: { paddingBottom: 34 },
   quickScroll: { paddingHorizontal: 4, paddingTop: 18, paddingBottom: 34 },
   quickSection:{marginTop:24},
+  quickSectionHeading:{flexDirection:"row",alignItems:"center",gap:9},
+  quickSectionMark:{width:5,height:22,borderRadius:3},
   quickSectionTitle:{color:C.ink,fontSize:18,fontWeight:"700",letterSpacing:-.25},
   quickSectionHelp:{marginTop:3,color:C.muted,fontSize:13,lineHeight:18},
   quickGrid: {
@@ -4611,6 +4638,17 @@ const s = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
+  },
+  moreToolCard:{
+    minHeight:148,
+    padding:15,
+    borderWidth:1,
+    borderRadius:18,
+    shadowColor:"#0D1722",
+    shadowOpacity:.045,
+    shadowRadius:10,
+    shadowOffset:{width:0,height:4},
+    elevation:1,
   },
   quickIcon: {
     width: 44,
