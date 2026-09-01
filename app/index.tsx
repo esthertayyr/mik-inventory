@@ -850,6 +850,7 @@ function ShopApp({
         products={products}
         sales={sales}
         onSell={() => setScreen("sale")}
+        onPrintQueue={() => setScreen("print_queue")}
       />
     );
   else if (screen === "stock_start")
@@ -2291,10 +2292,12 @@ function Dashboard({
   products,
   sales,
   onSell,
+  onPrintQueue,
 }: {
   products: Product[];
   sales: Sale[];
   onSell: () => void;
+  onPrintQueue: () => void;
 }) {
   const day = sales.filter((x) => x.status === "completed");
   const total = day.reduce((n, x) => n + Number(x.total), 0);
@@ -2318,6 +2321,10 @@ function Dashboard({
   const sold = [...map]
     .map(([name, quantity]) => ({ name, quantity }))
     .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
+  const printAgain = sold.map((item) => {
+    const product = products.find((p) => item.name === p.name || item.name.startsWith(`${p.name} ·`));
+    return product ? { ...item, left: product.quantity_on_hand } : null;
+  }).filter((item): item is {name:string;quantity:number;left:number} => Boolean(item && item.left <= Math.max(3,item.quantity)));
   return (
     <ScrollView contentContainerStyle={s.scroll}>
       <Text style={s.pageTitle}>Today</Text>
@@ -2368,6 +2375,7 @@ function Dashboard({
       ) : (
         <Empty title="No products sold yet" />
       )}
+      {printAgain.length ? <View style={[s.note,{marginTop:18}]}><Ionicons name="sparkles" size={22} color={SECTION.production.color}/><View style={s.flex}><Text style={s.rowTitle}>What to print next</Text><Text style={s.noteText}>{printAgain.slice(0,3).map(item=>`${item.name}: ${item.quantity} sold, ${item.left} left`).join("\n")}</Text><Pressable style={s.inlineLink} onPress={onPrintQueue}><Text style={[s.inlineLinkText,{color:SECTION.production.color}]}>Open Print Queue</Text><Ionicons name="arrow-forward" size={17} color={SECTION.production.color}/></Pressable></View></View>:null}
       <Text style={s.section}>Today’s sales</Text>
       {day.length ? (
         day.map((sale) => (
@@ -5349,6 +5357,8 @@ const s = StyleSheet.create({
     backgroundColor: C.soft,
   },
   noteText: { flex: 1, color: C.dark, fontSize: 14, lineHeight: 20 },
+  inlineLink:{alignSelf:"flex-start",minHeight:38,marginTop:7,flexDirection:"row",alignItems:"center",gap:6},
+  inlineLinkText:{fontSize:13,fontWeight:"700"},
   list: { paddingVertical: 10, paddingBottom: 28 },
   listRow: {
     minHeight: 78,
