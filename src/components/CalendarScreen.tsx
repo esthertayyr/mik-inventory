@@ -18,13 +18,13 @@ import { supabase } from "@/src/lib/supabase";
 const C = {
   ink: "#111820",
   muted: "#68717B",
-  green: "#244B3B",
-  navy: "#142C47",
+  green: "#795C2D",
+  navy: "#795C2D",
   ruby: "#733342",
   white: "#FFFFFF",
   line: "#E0E4E7",
-  pale: "#F1F6F3",
-  paleBlue: "#EEF2F6",
+  pale: "#F8F6F1",
+  paleBlue: "#F8F6F1",
   paleRed: "#F8EFF1",
 };
 
@@ -61,12 +61,15 @@ function parseDate(value: string) {
 }
 
 function readableDate(value: string, weekday = true) {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: weekday ? "short" : undefined,
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(parseDate(value));
+  const match = value.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : value;
+}
+
+function editableDate(value: string) {
+  const match = value.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return value;
+  const iso = `${match[3]}-${match[2]}-${match[1]}`;
+  return validDate(iso) ? iso : value;
 }
 
 function readableTime(value: string | null) {
@@ -156,7 +159,7 @@ export function CalendarScreen({ businessId, locationId, onBack }: { businessId:
 
   const save = async () => {
     if (!draft.title.trim()) return Alert.alert("Add an event name", "For example: Weekend market.");
-    if (!validDate(draft.event_date)) return Alert.alert("Check the date", "Use YYYY-MM-DD, for example 2026-09-12.");
+    if (!validDate(draft.event_date)) return Alert.alert("Check the date", "Use DD-MM-YYYY, for example 12-09-2026.");
     if (!validTime(draft.start_time)) return Alert.alert("Check the time", "Use 24-hour time, for example 14:30. You can also leave it blank.");
     setSaving(true);
     const values = {
@@ -267,7 +270,7 @@ export function CalendarScreen({ businessId, locationId, onBack }: { businessId:
               (selectedEvents.length ? selectedEvents : upcoming).map((event) => (
                 <Pressable key={event.id} style={[styles.eventCard, event.status === "completed" && styles.eventDone]} onPress={() => openEdit(event)}>
                   <View style={styles.eventDateBox}>
-                    <Text style={styles.eventMonth}>{parseDate(event.event_date).toLocaleDateString("en-US", { month: "short" }).toUpperCase()}</Text>
+                    <Text style={styles.eventMonth}>{event.event_date.slice(5,7)}-{event.event_date.slice(0,4)}</Text>
                     <Text style={styles.eventDay}>{parseDate(event.event_date).getDate()}</Text>
                   </View>
                   <View style={styles.flex}>
@@ -298,10 +301,10 @@ export function CalendarScreen({ businessId, locationId, onBack }: { businessId:
               <Pressable accessibilityLabel="Close" style={styles.close} onPress={() => setFormOpen(false)}><Ionicons name="close" size={24} color={C.ink} /></Pressable>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.formScroll}>
-              <Text style={styles.label}>Event name</Text>
+              <Text style={styles.label}>Event name · Required</Text>
               <TextInput style={styles.input} value={draft.title} onChangeText={(title) => setDraft((d) => ({ ...d, title }))} placeholder="Example: Weekend market" maxLength={120} />
-              <Text style={styles.label}>Date</Text>
-              <TextInput style={styles.input} value={draft.event_date} onChangeText={(event_date) => setDraft((d) => ({ ...d, event_date }))} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" maxLength={10} />
+              <Text style={styles.label}>Date · Required</Text>
+              <TextInput style={styles.input} value={readableDate(draft.event_date)} onChangeText={(event_date) => setDraft((d) => ({ ...d, event_date: editableDate(event_date) }))} placeholder="DD-MM-YYYY" keyboardType="numbers-and-punctuation" maxLength={10} />
               <View style={styles.dateChoices}>
                 {[{ label: "Today", add: 0 }, { label: "Tomorrow", add: 1 }, { label: "Next week", add: 7 }].map((option) => (
                   <Pressable key={option.label} style={styles.dateChoice} onPress={() => { const next = new Date(); next.setDate(next.getDate() + option.add); setDraft((d) => ({ ...d, event_date: dateKey(next) })); }}><Text style={styles.dateChoiceText}>{option.label}</Text></Pressable>

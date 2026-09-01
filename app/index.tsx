@@ -86,13 +86,13 @@ function localDateKey(date = new Date()) {
 }
 
 function friendlyLocalDate(value = localDateKey()) {
-  const date = new Date(`${value}T12:00:00`);
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
+  const match = value.slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : value;
+}
+
+function friendlyDateTime(value: string) {
+  const date = new Date(value);
+  return `${friendlyLocalDate(localDateKey(date))} · ${date.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 function greetingForNow() {
@@ -123,6 +123,13 @@ const C = {
   red: "#65243A",
   redSoft: "#F8F4F5",
 };
+const SECTION = {
+  sales: { color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB" },
+  stock: { color: "#264A3B", soft: "#F0F5F2", border: "#D6E3DC" },
+  production: { color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE" },
+  records: { color: "#795C2D", soft: "#F8F6F1", border: "#E7DFD0" },
+  settings: { color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3" },
+} as const;
 type Icon = keyof typeof Ionicons.glyphMap;
 function categoryIcon(name: string): Icon {
   const n = name.toLowerCase();
@@ -199,36 +206,36 @@ const ownerNav: {
     id: "home",
     label: "Home",
     icon: "home-outline",
-    color: C.green,
+    color: SECTION.settings.color,
     soft: C.soft,
   },
   {
     id: "sell_start",
     label: "Sell",
     icon: "cart-outline",
-    color: C.green,
-    soft: C.soft,
+    color: SECTION.sales.color,
+    soft: SECTION.sales.soft,
   },
   {
     id: "orders",
     label: "Orders",
     icon: "clipboard-outline",
-    color: C.purple,
-    soft: C.purpleSoft,
+    color: SECTION.sales.color,
+    soft: SECTION.sales.soft,
   },
   {
     id: "inventory",
     label: "Stock",
     icon: "cube-outline",
-    color: C.teal,
-    soft: C.tealSoft,
+    color: SECTION.stock.color,
+    soft: SECTION.stock.soft,
   },
   {
     id: "more",
     label: "More",
     icon: "grid-outline",
-    color: C.purple,
-    soft: C.purpleSoft,
+    color: SECTION.settings.color,
+    soft: SECTION.settings.soft,
   },
 ];
 
@@ -459,7 +466,7 @@ function PlatformAdmin() {
     const cell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
     const rows = [["Shop", "Date", "Receipt", "Payment", "Total", "Status"], ...(data ?? []).map((sale: any) => [sale.business?.name ?? "", sale.created_at, `SALE-${sale.receipt_number}`, String(sale.payment_method).toUpperCase(), sale.total, String(sale.status).toUpperCase()])];
     const csv = "\uFEFF" + rows.map((row) => row.map(cell).join(",")).join("\n");
-    const filename = `mik-all-shops-sales-${new Date().toLocaleDateString("en-CA")}.csv`;
+    const filename = `mik-all-shops-sales-${friendlyLocalDate()}.csv`;
     if (Platform.OS === "web") {
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a"); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url); return;
@@ -566,7 +573,7 @@ function PlatformAdmin() {
                 <View style={s.flex}>
                   <Text style={s.rowTitle}>{shop.name}</Text>
                   <Text style={s.rowHelp}><Ionicons name="person-circle-outline" size={14} color={C.muted} />{" "}{shop.slug === "sebu3d" ? "pixelbug" : shop.login_username ?? "No username connected"}</Text>
-                  <Text style={s.adminLastLogin}>{shop.last_login ? `Last login: ${new Date(shop.last_login).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}` : "No login recorded yet"}</Text>
+                  <Text style={s.adminLastLogin}>{shop.last_login ? `Last login: ${friendlyDateTime(shop.last_login)}` : "No login recorded yet"}</Text>
                 </View>
                 <View style={[s.statusPill, shop.status !== "active" && s.statusPillPaused]}><Text style={[s.statusText, shop.status !== "active" && s.statusTextPaused]}>{shop.status === "active" ? "ACTIVE" : "PAUSED"}</Text></View>
               </View>
@@ -1106,8 +1113,8 @@ function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)
 function ProductionStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   return <ScrollView contentContainerStyle={s.sellStartPage}>
     <Text style={s.pageTitle}>Printers & Filament</Text><Text style={s.subtitle}>What do you want to check?</Text>
-    <Pressable style={[s.sellModeCard,{backgroundColor:"#EEF7F1"}]} onPress={()=>onOpen("printers")}><View style={[s.sellModeIcon,{backgroundColor:"#087A38"}]}><Ionicons name="hardware-chip" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Printers</Text><Text style={s.sellModeHelp}>Check printer status</Text></View><Ionicons name="arrow-forward" size={23} color="#087A38"/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:"#F0F6F6"}]} onPress={()=>onOpen("filaments")}><View style={[s.sellModeIcon,{backgroundColor:"#315E68"}]}><Ionicons name="color-filter" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Filament</Text><Text style={s.sellModeHelp}>Check filament stock</Text></View><Ionicons name="arrow-forward" size={23} color="#315E68"/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("printers")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="hardware-chip" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Printers</Text><Text style={s.sellModeHelp}>Check printer status</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("filaments")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="color-filter" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Filament</Text><Text style={s.sellModeHelp}>Check filament stock</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
   </ScrollView>;
 }
 
@@ -1158,8 +1165,8 @@ function PastSaleDatePicker({ value, onChange, onBack, onContinue }: { value: st
           })}
         </View>
       </View>
-      <View style={s.pastDateSelected}><Ionicons name="calendar" size={22} color={C.green}/><View style={s.flex}><Text style={s.pastDateSelectedLabel}>SALE DATE</Text><Text style={s.pastDateSelectedValue}>{friendlyLocalDate(value)}</Text></View></View>
-      <BigButton label="Continue to products" icon="arrow-forward" onPress={onContinue} />
+      <View style={s.pastDateSelected}><Ionicons name="calendar" size={22} color={SECTION.records.color}/><View style={s.flex}><Text style={s.pastDateSelectedLabel}>SALE DATE</Text><Text style={s.pastDateSelectedValue}>{friendlyLocalDate(value)}</Text></View></View>
+      <BigButton label="Continue to products" icon="arrow-forward" color={SECTION.records.color} onPress={onContinue} />
     </ScrollView>
   );
 }
@@ -1199,7 +1206,7 @@ function SaleScreen({
   const [review, setReview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [recordPastSale, setRecordPastSale] = useState(startPastSale);
-  const [pastSaleDate, setPastSaleDate] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [pastSaleDate, setPastSaleDate] = useState(() => localDateKey());
   const [pastDateReady, setPastDateReady] = useState(!startPastSale);
   useEffect(() => onPendingChange(cart.length > 0), [cart.length, onPendingChange]);
   const categoryName = (id: string | null) =>
@@ -1307,7 +1314,7 @@ function SaleScreen({
   const complete = async () => {
     if (!cart.length) return;
     if (recordPastSale && !/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate))
-      return Alert.alert("Check the sale date", "Enter the date as YYYY-MM-DD, for example 2026-08-20.");
+      return Alert.alert("Check the sale date", "Choose the original sale date before continuing.");
     if (!recordPastSale && payment === "cash" && !cashIsEnough)
       return Alert.alert(
         "Not enough cash",
@@ -1364,7 +1371,7 @@ function SaleScreen({
     setPaymentReference("");
     setCashReceived("");
     setRecordPastSale(false);
-    setPastSaleDate(new Date().toLocaleDateString("en-CA"));
+    setPastSaleDate(localDateKey());
     await onSaved();
     Alert.alert(
       "Sale completed",
@@ -2040,7 +2047,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
       .eq("location_id", locationId)
       .then(({ data }) => {
         const active = (data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status)).length;
-        const todayValue = new Date().toLocaleDateString("en-CA");
+        const todayValue = localDateKey();
         const urgent = (data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status) && o.target_date && o.target_date <= todayValue).length;
         setOrderSummary({ active, urgent });
       });
@@ -2082,7 +2089,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
   };
   const groups: HomeGroup[] = [
     {
-      title: "Sales & customers", help: "Sell and follow customer work.", color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB", actions: [
+      title: "Sales & customers", help: "Sell and follow customer work.", ...SECTION.sales, actions: [
         { title: "Sell", help: "Start a shop or event sale", icon: "cart", screen: "sell_start" },
         { title: "Sales today", help: "See today's total and receipts", icon: "today", screen: "dashboard" },
         { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active · ${orderSummary.urgent} due now` : "Track customer orders", icon: "clipboard", screen: "orders" },
@@ -2090,23 +2097,27 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
       ],
     },
     {
-      title: "Stock & products", help: "Keep products ready to sell.", color: "#264A3B", soft: "#F0F5F2", border: "#D6E3DC", actions: [
+      title: "Stock & products", help: "Keep products ready to sell.", ...SECTION.stock, actions: [
         { title: "Stock", help: "Count or update stock", icon: "cube", screen: "inventory" },
         { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products" },
         { title: "Price list", help: "View or print prices", icon: "receipt", screen: "price_list" },
       ],
     },
     {
-      title: "Production", help: "Check the equipment and materials used to make products.", color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE", actions: [
+      title: "Production", help: "Check the equipment and materials used to make products.", ...SECTION.production, actions: [
         { title: "Printers", help: "See which printers are working", icon: "hardware-chip", screen: "printers" },
         { title: "Filaments", help: "Track colours and spools", icon: "color-filter", screen: "filaments" },
       ],
     },
     {
-      title: "Records & shop", help: "Review records or change shop details.", color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3", actions: [
+      title: "Records & planning", help: "Review sales records and important dates.", ...SECTION.records, actions: [
         { title: "Sales reports", help: "Daily, weekly or monthly", icon: "bar-chart", screen: "reports" },
         { title: "Correct sale", help: "Cancel a wrong sale", icon: "return-up-back", screen: "correct" },
         { title: "Earlier sale", help: "Record a missed sale", icon: "calendar-number", screen: "missed" },
+      ],
+    },
+    {
+      title: "Shop & help", help: "Change shop details or get help.", ...SECTION.settings, actions: [
         { title: "Shop profile", help: "Change the shop logo", icon: "storefront", screen: "shop" },
         { title: "More & help", help: "Settings and simple guides", icon: "grid", screen: "more" },
       ],
@@ -2124,7 +2135,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
             <Text style={s.homeReminderTitle} numberOfLines={2}>{eventReminder.title}</Text>
             <Text style={s.homeReminderMeta}>{friendlyLocalDate(eventReminder.event_date)}{eventReminder.start_time ? ` · ${eventReminder.start_time.slice(0, 5)}` : ""}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={22} color={C.green} />
+          <Ionicons name="chevron-forward" size={22} color={SECTION.records.color} />
         </Pressable>
       ) : null}
       {groups.map((group) => (
@@ -2738,12 +2749,15 @@ function Products({
   const save = async () => {
     const cleanName = name.trim();
     const prices = numbers();
-    if (!cleanName) return Alert.alert("Enter a product name");
+    if (!cleanName) return Alert.alert("Product name needed", "Enter a short name that the cashier will recognise.");
+    if (!categoryId) return Alert.alert("Category needed", "Choose where this product should appear on the Sell screen.");
     if (!prices)
       return Alert.alert(
         "Check the price",
         "Enter a valid price or leave the sale price empty.",
       );
+    if (!extraAlphabetMode && prices.r === null)
+      return Alert.alert("Normal price needed", "Enter the product's usual selling price. The sale price can stay empty.");
     if (extraAlphabetMode) {
       const designs = extraAlphabetDesigns();
       if (!designs.length || designs.some((design) => design.price < 20 || design.price > 50))
@@ -2752,11 +2766,6 @@ function Products({
           "Use one line per design, such as Normal: 20 or Superman: 50. Each price must be from ₱20 to ₱50.",
         );
     }
-    if (creating && !pickedUri)
-      return Alert.alert(
-        "Add a product photo",
-        "Choose a clear photo so the cashier can recognise this item.",
-      );
     setSaving(true);
     if (creating) {
       const stock = Number(startingStock);
@@ -2892,6 +2901,10 @@ function Products({
           onPress={reset}
         />
         <View style={s.editCard}>
+          <View style={s.requiredNote}>
+            <Ionicons name="information-circle-outline" size={21} color={SECTION.stock.color}/>
+            <Text style={s.requiredNoteText}><Text style={s.requiredNoteStrong}>Required:</Text> product name, category and normal price. <Text style={s.requiredNoteStrong}>Optional:</Text> photo, sale price and choices.</Text>
+          </View>
           <View style={s.productPhoto}>
             {image || placeholder ? (
               <Image source={image ? { uri: image } : placeholder} style={s.productPhotoImage} />
@@ -2902,18 +2915,19 @@ function Products({
             )}
           </View>
           <BigButton
-            label={image ? "Change product photo" : "Choose product photo"}
+            label={image ? "Change product photo · Optional" : "Add product photo · Optional"}
             icon="camera-outline"
+            color={SECTION.stock.color}
             onPress={chooseImage}
           />
-          <Label>Product name</Label>
+          <Label>Product name · Required</Label>
           <TextInput
             style={s.input}
             value={name}
             onChangeText={setName}
             placeholder="Example: Blue keychain"
           />
-          <Label>Category</Label>
+          <Label>Category · Required</Label>
           <Pressable style={s.manageCategoryButton} onPress={() => setManagingCategories(true)}>
             <Ionicons name="settings-outline" size={20} color={C.dark} />
             <Text style={s.manageCategoryText}>Add or manage categories</Text>
@@ -2948,9 +2962,9 @@ function Products({
             </View>
           ) : (
             <>
-              <Label>Normal price</Label>
+              <Label>Normal price · Required</Label>
               <TextInput style={s.priceInput} keyboardType="decimal-pad" value={regular} onChangeText={setRegular} placeholder="0.00" />
-              <Label>Sale price (optional)</Label>
+              <Label>Sale price · Optional</Label>
               <TextInput style={s.priceInput} keyboardType="decimal-pad" value={sale} onChangeText={setSale} placeholder="Leave empty when not on sale" />
             </>
           )}
@@ -2979,7 +2993,7 @@ function Products({
               </View>
               {hasChoices ? (
                 <>
-                  <Label>Choice name</Label>
+                  <Label>Choice name · Required when choices are on</Label>
                   <TextInput
                     style={s.input}
                     value={choiceLabel}
@@ -2990,7 +3004,7 @@ function Products({
                     <Ionicons name="text-outline" size={22} color={C.green} />
                     <Text style={s.alphabetText}>Use letters A to Z</Text>
                   </Pressable>
-                  <Label>Choices</Label>
+                  <Label>Choices · Required when choices are on</Label>
                   <TextInput
                     style={[s.input, s.choiceInput]}
                     value={choiceText}
@@ -3023,8 +3037,8 @@ function Products({
             <>
               <Label>
                 {hasChoices
-                  ? "Starting stock for each choice"
-                  : "Starting stock at this shop"}
+                  ? "Starting stock for each choice · Required"
+                  : "Starting stock at this shop · Required"}
               </Label>
               <TextInput
                 style={s.qtyInput}
@@ -3039,8 +3053,8 @@ function Products({
             <Ionicons name="information-circle" size={22} color={C.green} />
             <Text style={s.noteText}>
               {creating
-                ? "A photo is required so the cashier can match the real item. "
-                : "A sale price is charged automatically when entered."}
+                ? "A photo is optional. Without one, Mik shows “Product photo needed” until a photo is added."
+                : "A sale price is used automatically when entered. The photo can be added or changed later."}
             </Text>
           </View>
           <BigButton
@@ -3054,6 +3068,7 @@ function Products({
                   : "Save changes"
             }
             icon={creating ? "add-circle-outline" : "save-outline"}
+            color={SECTION.stock.color}
             onPress={save}
             disabled={saving}
           />
@@ -3095,7 +3110,7 @@ function Products({
         <View style={s.editCard}>
           <Text style={s.rowTitle}>{editingCategory ? "Rename category" : "Add a category"}</Text>
           <TextInput style={s.input} value={categoryName} onChangeText={setCategoryName} placeholder="Example: Keychains" />
-          <BigButton label={categoryBusy ? "Saving…" : editingCategory ? "Save category name" : "Add category"} icon="add-circle-outline" onPress={saveCategory} disabled={categoryBusy} />
+          <BigButton label={categoryBusy ? "Saving…" : editingCategory ? "Save category name" : "Add category"} icon="add-circle-outline" color={SECTION.stock.color} onPress={saveCategory} disabled={categoryBusy} />
           {editingCategory ? <Pressable style={s.cancelCategory} onPress={() => { setEditingCategory(null); setCategoryName(""); }}><Text style={s.cancelCategoryText}>Cancel rename</Text></Pressable> : null}
         </View>
         <Text style={[s.rowTitle, { marginTop: 20 }]}>Current categories</Text>
@@ -3116,6 +3131,7 @@ function Products({
       <BigButton
         label="Create a new product"
         icon="add-circle-outline"
+        color={SECTION.stock.color}
         onPress={startCreate}
       />
       <Pressable style={s.manageCategoryButton} onPress={startExtraAlphabet}>
@@ -3428,6 +3444,7 @@ function Inventory({
           <BigButton
             label={mode === "set" ? "Save new number" : mode === "damage" ? "Remove from stock" : "Add stock"}
             icon={mode === "damage" ? "warning-outline" : "add-circle-outline"}
+            color={SECTION.stock.color}
             onPress={save}
             danger={mode === "damage"}
           />
@@ -3573,20 +3590,19 @@ function More({
   type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean };
   const groups: Array<{ title: string; color: string; soft: string; border: string; tools: MoreTool[] }> = [
     {
-      title: "Stock & products", color: "#264A3B", soft: "#F0F5F2", border: "#D6E3DC", tools: [
-        { icon: "storefront-outline", title: "Shop profile & logo", help: business.logo_url ? "Replace this shop's logo" : "Add this shop's logo", screen: "shop" },
+      title: "Stock & products", ...SECTION.stock, tools: [
         { icon: "pricetags-outline", title: "Products & prices", help: "Add products or change prices", screen: "products" },
         { icon: "receipt-outline", title: "Price list", help: "View or print selling prices", screen: "price_list" },
       ],
     },
     {
-      title: "Production", color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE", tools: [
+      title: "Production", ...SECTION.production, tools: [
         { icon: "hardware-chip-outline", title: "Printers", help: "See which printers are working", screen: "printers" },
         { icon: "color-filter-outline", title: "Filaments", help: "Track colours and spools", screen: "filaments" },
       ],
     },
     {
-      title: "Records & planning", color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB", tools: [
+      title: "Records & planning", ...SECTION.records, tools: [
         { icon: "calendar-outline", title: "Calendar", help: "Plan events and see reminders", screen: "calendar" },
         { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports" },
         { icon: "return-up-back-outline", title: "Correct a sale", help: "Cancel a wrong sale", screen: "correct" },
@@ -3594,7 +3610,8 @@ function More({
       ],
     },
     {
-      title: "Help", color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3", tools: [
+      title: "Shop & help", ...SECTION.settings, tools: [
+        { icon: "storefront-outline", title: "Shop profile & logo", help: business.logo_url ? "Replace this shop's logo" : "Add this shop's logo", screen: "shop" },
         { icon: "help-circle-outline", title: "How to use Mik", help: "Replay the step-by-step guide", guide: true },
       ],
     },
@@ -3709,6 +3726,7 @@ function ShopProfile({
         <BigButton
           label={saving ? "Saving logo…" : business.logo_url ? "Replace shop logo" : "Upload shop logo"}
           icon="image-outline"
+          color={SECTION.settings.color}
           onPress={chooseLogo}
           disabled={saving}
         />
@@ -4161,17 +4179,20 @@ function BigButton({
   disabled,
   icon,
   danger,
+  color,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   icon?: Icon;
   danger?: boolean;
+  color?: string;
 }) {
   return (
     <Pressable
       style={[
         s.bigButton,
+        color && { backgroundColor: color },
         danger && { backgroundColor: C.red },
         disabled && s.disabled,
       ]}
@@ -4599,9 +4620,9 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     gap: 12,
   },
-  homeReminder:{marginTop:16,minHeight:88,padding:14,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:"#C9D8CF",borderRadius:16,backgroundColor:"#F1F6F3"},
-  homeReminderIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:C.green},
-  homeReminderLabel:{color:C.green,fontSize:10,fontWeight:"700",letterSpacing:1.2},
+  homeReminder:{marginTop:16,minHeight:88,padding:14,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.records.border,borderRadius:16,backgroundColor:SECTION.records.soft},
+  homeReminderIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:SECTION.records.color},
+  homeReminderLabel:{color:SECTION.records.color,fontSize:10,fontWeight:"700",letterSpacing:1.2},
   homeReminderTitle:{marginTop:3,color:C.ink,fontSize:17,lineHeight:21,fontWeight:"700"},
   homeReminderMeta:{marginTop:3,color:C.muted,fontSize:12,fontWeight:"600"},
   saleTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -4776,7 +4797,7 @@ const s = StyleSheet.create({
     gap: 8,
   },
   stockPageHeading:{flexDirection:"row",alignItems:"center",gap:12},
-  stockManageButton:{minHeight:46,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:12,backgroundColor:C.green},
+  stockManageButton:{minHeight:46,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:12,backgroundColor:SECTION.stock.color},
   stockManageButtonText:{color:C.white,fontSize:14,fontWeight:"700"},
   stockEditButton:{width:42,height:42,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
   stockFilters:{marginTop:12,padding:14,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:"#F8F9FA"},
@@ -4993,7 +5014,7 @@ const s = StyleSheet.create({
   },
   saleLine: { marginTop: 3, color: C.red, fontSize: 13, lineHeight: 18, fontWeight: "700" },
   oldPrice: { color: C.muted, textDecorationLine: "line-through" },
-  stock: { marginTop: 4, color: C.green, fontSize: 14, lineHeight: 19, fontWeight: "700" },
+  stock: { marginTop: 4, color: SECTION.stock.color, fontSize: 14, lineHeight: 19, fontWeight: "700" },
   low: { color: C.orange, fontWeight: "700" },
   basket: {
     position: "absolute",
@@ -5242,6 +5263,9 @@ const s = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: C.white,
   },
+  requiredNote:{marginBottom:14,padding:13,flexDirection:"row",alignItems:"flex-start",gap:9,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:12,backgroundColor:SECTION.stock.soft},
+  requiredNoteText:{flex:1,color:C.muted,fontSize:13,lineHeight:19},
+  requiredNoteStrong:{color:C.ink,fontWeight:"700"},
   editHeading: { flexDirection: "row", alignItems: "center", gap: 11 },
   editName: { color: C.ink, fontSize: 22, fontWeight: "700" },
   productMiniIcon: {
@@ -5374,7 +5398,7 @@ const s = StyleSheet.create({
   priceWarning:{marginTop:10,padding:12,flexDirection:"row",alignItems:"center",gap:8,borderRadius:10,backgroundColor:C.orangeSoft},
   priceWarningText:{flex:1,color:C.ink,fontSize:13,fontWeight:"600"},
   priceActions:{marginTop:12,flexDirection:"row",gap:9},
-  pricePrimary:{minHeight:50,flex:1,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:10,backgroundColor:C.dark},
+  pricePrimary:{minHeight:50,flex:1,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:10,backgroundColor:SECTION.stock.color},
   pricePrimaryText:{color:C.white,fontSize:14,fontWeight:"700"},
   priceSecondary:{minHeight:50,flex:1,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},
   priceSecondaryText:{color:C.dark,fontSize:14,fontWeight:"700"},
@@ -5638,17 +5662,17 @@ const s = StyleSheet.create({
   pastWeekDay:{width:"14.2857%",paddingVertical:7,color:C.muted,fontSize:11,fontWeight:"700",textAlign:"center"},
   pastDays:{flexDirection:"row",flexWrap:"wrap"},
   pastDay:{width:"14.2857%",aspectRatio:1,alignItems:"center",justifyContent:"center",borderRadius:12},
-  pastDayOn:{backgroundColor:C.green},
+  pastDayOn:{backgroundColor:SECTION.records.color},
   pastDayText:{color:C.ink,fontSize:14,fontWeight:"600"},
   pastDayOutside:{color:"#B6BDC3"},
   pastDayDisabled:{color:"#D8DCDF"},
   pastDayTextOn:{color:C.white,fontWeight:"700"},
-  pastDateSelected:{minHeight:72,marginTop:12,padding:13,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:"#C9D8CF",borderRadius:14,backgroundColor:"#F1F6F3"},
-  pastDateSelectedLabel:{color:C.green,fontSize:10,fontWeight:"700",letterSpacing:1.1},
+  pastDateSelected:{minHeight:72,marginTop:12,padding:13,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:SECTION.records.border,borderRadius:14,backgroundColor:SECTION.records.soft},
+  pastDateSelectedLabel:{color:SECTION.records.color,fontSize:10,fontWeight:"700",letterSpacing:1.1},
   pastDateSelectedValue:{marginTop:3,color:C.ink,fontSize:17,fontWeight:"700"},
   pastSaleSummary:{marginTop:14,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   changePastDateButton:{minHeight:40,paddingHorizontal:10,alignItems:"center",justifyContent:"center",borderRadius:10,backgroundColor:C.soft},
-  changePastDateText:{color:C.green,fontSize:11,fontWeight:"700"},
+  changePastDateText:{color:SECTION.records.color,fontSize:11,fontWeight:"700"},
   pastSaleIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: C.soft },
   cashIcon: {
     width: 48,

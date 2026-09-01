@@ -77,11 +77,11 @@ function bounds(period: Period, offset: number, exactDate: Date | null) {
 }
 
 const dateText = (date: Date) =>
-  new Intl.DateTimeFormat("en-PH", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  `${String(date.getDate()).padStart(2,"0")}-${String(date.getMonth()+1).padStart(2,"0")}-${date.getFullYear()}`;
+const dateTimeText = (value: string) => {
+  const date = new Date(value);
+  return `${dateText(date)} · ${date.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}`;
+};
 const csvCell = (value: unknown) =>
   `"${String(value ?? "").replace(/"/g, '""')}"`;
 
@@ -121,7 +121,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex - 1, 1))}
         >
-          <Ionicons name="chevron-back" size={22} color="#173B5E" />
+          <Ionicons name="chevron-back" size={22} color="#795C2D" />
         </Pressable>
         <Text style={s.calendarTitle}>
           {new Intl.DateTimeFormat("en-PH", {
@@ -134,7 +134,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex + 1, 1))}
         >
-          <Ionicons name="chevron-forward" size={22} color="#173B5E" />
+          <Ionicons name="chevron-forward" size={22} color="#795C2D" />
         </Pressable>
       </View>
       <View style={s.weekRow}>
@@ -351,7 +351,7 @@ export function ReportsScreen({
         s.sale_items.length
           ? s.sale_items.map((i) => [
               `SALE-${s.receipt_number}`,
-              new Date(s.created_at).toLocaleDateString("en-PH"),
+              dateText(new Date(s.created_at)),
               new Date(s.created_at).toLocaleTimeString("en-PH", {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -372,7 +372,7 @@ export function ReportsScreen({
           : [
               [
                 `SALE-${s.receipt_number}`,
-                new Date(s.created_at).toLocaleDateString("en-PH"),
+                dateText(new Date(s.created_at)),
                 new Date(s.created_at).toLocaleTimeString("en-PH", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -397,7 +397,7 @@ export function ReportsScreen({
         [...summary, ...details]
           .map((row) => row.map(csvCell).join(","))
           .join("\n");
-      const filename = `mik-${period}-sales-${range.start.toLocaleDateString("en-CA")}.csv`;
+      const filename = `mik-${period}-sales-${dateText(range.start)}.csv`;
       if (Platform.OS === "web") {
         const url = URL.createObjectURL(
           new Blob([csv], { type: "text/csv;charset=utf-8" }),
@@ -475,7 +475,7 @@ export function ReportsScreen({
               setCalendarOpen((v) => !v);
             }}
           >
-            <Ionicons name="calendar-outline" size={21} color="#4C644F" />
+            <Ionicons name="calendar-outline" size={21} color="#795C2D" />
             <Text style={s.chooseDateText}>Choose exact date</Text>
           </Pressable>
           <Pressable
@@ -509,10 +509,10 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v - 1)}
         >
-          <Ionicons name="chevron-back" size={25} color="#173B5E" />
+          <Ionicons name="chevron-back" size={25} color="#795C2D" />
         </Pressable>
         <View style={s.periodCenter}>
-          <Ionicons name="calendar-outline" size={19} color="#4C644F" />
+          <Ionicons name="calendar-outline" size={19} color="#795C2D" />
           <Text style={s.periodTitle}>{title}</Text>
         </View>
         <Pressable
@@ -521,11 +521,11 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v + 1)}
         >
-          <Ionicons name="chevron-forward" size={25} color="#173B5E" />
+          <Ionicons name="chevron-forward" size={25} color="#795C2D" />
         </Pressable>
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#354838" />
+        <ActivityIndicator size="large" color="#795C2D" />
       ) : error ? (
         <Text style={s.error}>{error}</Text>
       ) : (
@@ -595,7 +595,7 @@ export function ReportsScreen({
                 <View style={s.saleMain}>
                   <Text style={s.saleName}>SALE-{sale.receipt_number}</Text>
                   <Text style={s.rowSmall}>
-                    {new Date(sale.created_at).toLocaleString("en-PH")} ·{" "}
+                    {dateTimeText(sale.created_at)} ·{" "}
                     {publicShopName(sale.staff?.display_name) || "Staff"}
                   </Text>
                   <Text style={s.rowSmall}>
@@ -666,7 +666,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F4F5F6",
   },
-  tabOn: { backgroundColor: "#102A43" },
+  tabOn: { backgroundColor: "#795C2D" },
   tabText: { fontSize: 13, fontWeight: "700", color: "#626A73" },
   tabTextOn: { color: "#FFF" },
   voidButton: { marginTop: 8, minHeight: 38, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 9, borderWidth: 1, borderColor: "#65243A", backgroundColor: "#FFF" },
@@ -701,10 +701,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#264A3B",
+    borderColor: "#795C2D",
     backgroundColor: "#FFF",
   },
-  todayText: { color: "#354838", fontSize: 14, fontWeight: "700" },
+  todayText: { color: "#795C2D", fontSize: 14, fontWeight: "700" },
   calendar: {
     marginTop: 10,
     padding: 13,
@@ -743,7 +743,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 13,
   },
-  dayOn: { backgroundColor: "#173B5E" },
+  dayOn: { backgroundColor: "#795C2D" },
   dayText: { color: "#16283A", fontSize: 14, fontWeight: "700" },
   dayTextOn: { color: "#FFF" },
   periodNav: {
@@ -776,7 +776,7 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: "#16283A",
   },
-  hero: { padding: 22, borderRadius: 16, backgroundColor: "#0D1722" },
+  hero: { padding: 22, borderRadius: 16, backgroundColor: "#5C4522" },
   heroLabel: { color: "#DDE8F1", fontWeight: "700" },
   heroValue: { color: "#FFF", fontSize: 34, fontWeight: "700", marginTop: 5 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 9, marginTop: 10 },
@@ -814,10 +814,10 @@ const s = StyleSheet.create({
     borderColor: "#E0E3E7",
     borderRadius: 14,
   },
-  rank: { width: 22, fontWeight: "700", color: "#29473A" },
+  rank: { width: 22, fontWeight: "700", color: "#795C2D" },
   rowName: { flex: 1, fontSize: 15, fontWeight: "700", color: "#16283A" },
   rowSmall: { fontSize: 12, color: "#697582" },
-  rowValue: { fontWeight: "700", color: "#102A43" },
+  rowValue: { fontWeight: "700", color: "#795C2D" },
   empty: { padding: 14, color: "#697582", backgroundColor: "#FFF" },
   export: {
     minHeight: 60,
@@ -826,7 +826,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 9,
     borderRadius: 12,
-    backgroundColor: "#142C47",
+    backgroundColor: "#795C2D",
     alignItems: "center",
   },
   exportText: { color: "#FFF", fontSize: 15, fontWeight: "700" },

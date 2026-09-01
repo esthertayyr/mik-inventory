@@ -5,6 +5,7 @@ import { supabase } from "@/src/lib/supabase";
 
 type PrinterStatus = "working" | "needs_attention" | "under_repair" | "retired";
 type Printer = { id:string; name:string; model:string; status:PrinterStatus; notes:string|null; updated_at:string };
+const PRODUCTION="#65243A";
 
 const STATUSES: Array<{id:PrinterStatus;label:string;short:string;color:string;soft:string;icon:keyof typeof Ionicons.glyphMap}> = [
   {id:"working",label:"Working",short:"Working",color:"#087A38",soft:"#EAF6EF",icon:"checkmark-circle"},
@@ -37,17 +38,17 @@ export function PrintersScreen({businessId,locationId,onBack}:{businessId:string
   if(editing)return <ScrollView contentContainerStyle={s.page}>
     <Pressable style={s.back} onPress={()=>setEditing(null)}><Ionicons name="arrow-back" size={22} color="#111820"/><Text style={s.backText}>{editing==="new"?"Add equipment":"Edit equipment"}</Text></Pressable>
     <View style={s.formCard}><Text style={s.formTitle}>{editing==="new"?"Add printer or accessory":"Equipment details"}</Text><Text style={s.help}>Choose an item below or type another model. Change its status whenever needed.</Text>
-      <Text style={s.label}>Equipment name</Text><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Example: A1 Printer 01"/>
-      <Text style={s.label}>Model</Text><TextInput style={s.input} value={model} onChangeText={setModel} placeholder="Choose below or type another model"/><View style={[s.wrap,{marginTop:8}]}>{MODELS.filter(x=>x!=="Other").map(x=><Pressable key={x} style={[s.choice,model===x&&s.choiceOn]} onPress={()=>setModel(x)}><Text style={[s.choiceText,model===x&&s.choiceTextOn]}>{x.replace("Bambu Lab ","")}</Text></Pressable>)}</View>
-      <Text style={s.label}>Current status</Text><View style={s.statusChoices}>{STATUSES.map(x=><Pressable key={x.id} style={[s.statusChoice,{backgroundColor:x.soft,borderColor:status===x.id?x.color:"transparent"}]} onPress={()=>setStatus(x.id)}><Ionicons name={x.icon} size={23} color={x.color}/><Text style={[s.statusChoiceText,{color:x.color}]}>{x.label}</Text>{status===x.id?<Ionicons name="checkmark" size={19} color={x.color}/>:null}</Pressable>)}</View>
-      <Text style={s.label}>Note</Text><TextInput style={[s.input,s.notes]} value={notes} onChangeText={setNotes} placeholder="Example: Nozzle needs replacing" multiline/>
-      <Pressable style={[s.save,saving&&{opacity:.6}]} onPress={()=>void save()} disabled={saving}><Ionicons name="checkmark" size={21} color="#FFF"/><Text style={s.saveText}>{saving?"Saving…":"Save equipment"}</Text></Pressable>
+      <Text style={s.label}>Equipment name · Required</Text><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Example: A1 Printer 01"/>
+      <Text style={s.label}>Model · Required</Text><TextInput style={s.input} value={model} onChangeText={setModel} placeholder="Choose below or type another model"/><View style={[s.wrap,{marginTop:8}]}>{MODELS.filter(x=>x!=="Other").map(x=><Pressable key={x} style={[s.choice,model===x&&s.choiceOn]} onPress={()=>setModel(x)}><Text style={[s.choiceText,model===x&&s.choiceTextOn]}>{x.replace("Bambu Lab ","")}</Text></Pressable>)}</View>
+      <Text style={s.label}>Current status · Required</Text><View style={s.statusChoices}>{STATUSES.map(x=><Pressable key={x.id} style={[s.statusChoice,{backgroundColor:x.soft,borderColor:status===x.id?x.color:"transparent"}]} onPress={()=>setStatus(x.id)}><Ionicons name={x.icon} size={23} color={x.color}/><Text style={[s.statusChoiceText,{color:x.color}]}>{x.label}</Text>{status===x.id?<Ionicons name="checkmark" size={19} color={x.color}/>:null}</Pressable>)}</View>
+      <Text style={s.label}>Note · Optional</Text><TextInput style={[s.input,s.notes]} value={notes} onChangeText={setNotes} placeholder="Example: Nozzle needs replacing" multiline/>
+      <Pressable style={[s.save,{backgroundColor:PRODUCTION},saving&&{opacity:.6}]} onPress={()=>void save()} disabled={saving}><Ionicons name="checkmark" size={21} color="#FFF"/><Text style={s.saveText}>{saving?"Saving…":"Save equipment"}</Text></Pressable>
       {editing!=="new"?<Pressable style={s.remove} onPress={remove}><Text style={s.removeText}>Remove equipment</Text></Pressable>:null}
     </View>
   </ScrollView>;
   const columns=width>=1000?3:width>=680?2:1; const cardWidth=columns===3?"32.3%":columns===2?"49%":"100%";
   return <ScrollView contentContainerStyle={s.page}>
-    <View style={s.heading}><View style={{flex:1}}><Pressable style={s.back} onPress={onBack}><Ionicons name="arrow-back" size={22} color="#111820"/><Text style={s.backText}>Printers</Text></Pressable><Text style={s.help}>See printers and accessories at a glance.</Text></View><Pressable style={s.add} onPress={openNew}><Ionicons name="add" size={22} color="#FFF"/><Text style={s.addText}>Add equipment</Text></Pressable></View>
+    <View style={s.heading}><View style={{flex:1}}><Pressable style={s.back} onPress={onBack}><Ionicons name="arrow-back" size={22} color="#111820"/><Text style={s.backText}>Printers</Text></Pressable><Text style={s.help}>See printers and accessories at a glance.</Text></View><Pressable style={[s.add,{backgroundColor:PRODUCTION}]} onPress={openNew}><Ionicons name="add" size={22} color="#FFF"/><Text style={s.addText}>Add equipment</Text></Pressable></View>
     <View style={s.hero}><View><Text style={s.kicker}>PRINTER FLEET</Text><Text style={s.heroValue}>{workingPrinters} of {active} working</Text><Text style={s.heroHelp}>{printers.filter(p=>p.status==="under_repair"||p.status==="needs_attention").length||0} equipment items need attention</Text></View><View style={s.heroIcon}><Ionicons name="hardware-chip-outline" size={34} color="#00AE42"/></View></View>
     <View style={s.summary}>{STATUSES.slice(0,3).map(x=><View key={x.id} style={[s.summaryCard,{backgroundColor:x.soft}]}><Ionicons name={x.icon} size={20} color={x.color}/><Text style={[s.summaryNumber,{color:x.color}]}>{counts[x.id]}</Text><Text style={s.summaryLabel}>{x.short}</Text></View>)}</View>
     <View style={s.sectionHead}><Text style={s.sectionTitle}>All equipment</Text><Text style={s.count}>{printers.length}</Text></View>
