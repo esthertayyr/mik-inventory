@@ -1117,7 +1117,10 @@ function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)
     <Pressable accessibilityRole="button" accessibilityLabel="Open shop sale" style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop sale</Text><Text style={s.sellModeHelp}>Sell at your shop</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.green}/></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Open event sale" style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event sale</Text><Text style={s.sellModeHelp}>Fast checkout · no letter selection</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.accent}/></Pressable>
     <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={21} color={C.accent}/><Text style={s.eventModeNoteText}><Text style={s.eventModeNoteStrong}>What is Event Sale? </Text>Clickers go directly to payment without choosing letters. After the event, count the remaining A–Z keycaps. Tip: take a photo of sold items to help with counting.</Text></View>
-    <Pressable accessibilityRole="button" accessibilityLabel="Add an earlier sale" style={s.earlierSale} onPress={()=>onOpen("missed")}><Ionicons pointerEvents="none" name="calendar-outline" size={21} color={C.orange}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Add an earlier sale</Text><Text style={s.earlierSaleHelp}>For sales entered on another day</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
+    <Text style={s.salesRecordHeading}>FIX SALES RECORDS</Text>
+    <Text style={s.salesRecordHelp}>Use these only when a sale was missed or entered by mistake.</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel="Add missed sale. Choose the date, then enter a sale you forgot to record." style={s.earlierSale} onPress={()=>onOpen("missed")}><Ionicons pointerEvents="none" name="calendar-outline" size={21} color={SECTION.records.color}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Add missed sale</Text><Text style={s.earlierSaleHelp}>Choose the date, then enter the forgotten sale</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Cancel wrong sale. Find a sale entered by mistake and cancel it." style={s.earlierSale} onPress={()=>onOpen("correct")}><Ionicons pointerEvents="none" name="return-up-back-outline" size={21} color={SECTION.records.color}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Cancel wrong sale</Text><Text style={s.earlierSaleHelp}>Find a mistaken sale and cancel it</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
   </ScrollView>;
 }
 
@@ -1168,7 +1171,7 @@ function PastSaleDatePicker({ value, onChange, onBack, onContinue }: { value: st
   };
   return (
     <ScrollView contentContainerStyle={s.pastDatePage}>
-      <Back title="Add an earlier sale" onPress={onBack} />
+      <Back title="Add missed sale" onPress={onBack} />
       <Text style={s.pageTitle}>When was the sale?</Text>
       <Text style={s.subtitle}>Choose the original sale date before adding products.</Text>
       <View style={s.pastQuickDates}>
@@ -2142,8 +2145,8 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     {
       title: "Records & planning", help: "Review sales records and important dates.", ...SECTION.records, actions: [
         { title: "Sales reports", help: "Daily, weekly or monthly", icon: "bar-chart", screen: "reports" },
-        { title: "Correct sale", help: "Cancel a wrong sale", icon: "return-up-back", screen: "correct" },
-        { title: "Earlier sale", help: "Record a missed sale", icon: "calendar-number", screen: "missed" },
+        { title: "Cancel wrong sale", help: "Find and cancel a mistaken sale", icon: "return-up-back", screen: "correct" },
+        { title: "Add missed sale", help: "Choose its original sale date", icon: "calendar-number", screen: "missed" },
       ],
     },
     {
@@ -3646,8 +3649,8 @@ function More({
       title: "Records & planning", ...SECTION.records, tools: [
         { icon: "calendar-outline", title: "Calendar", help: "Plan events and see reminders", screen: "calendar" },
         { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports" },
-        { icon: "return-up-back-outline", title: "Correct a sale", help: "Cancel a wrong sale", screen: "correct" },
-        { icon: "calendar-number-outline", title: "Earlier sale", help: "Record a missed sale", screen: "missed" },
+        { icon: "return-up-back-outline", title: "Cancel wrong sale", help: "Find and cancel a mistaken sale", screen: "correct" },
+        { icon: "calendar-number-outline", title: "Add missed sale", help: "Choose its original sale date", screen: "missed" },
       ],
     },
     {
@@ -3930,7 +3933,7 @@ const guideSteps: GuideStep[] = [
   },
   {
     title: "Correct or add a missed sale",
-    body: "Tap Sell to add an earlier sale. Choose its date first, add the products, then select Cash or GCash. To cancel a wrong sale, open More, then Correct a sale.",
+    body: "Tap Sell, then Add missed sale. Choose the original date, add the products and select Cash or GCash. To remove a mistaken entry, tap Cancel wrong sale in the same section.",
     icon: "return-up-back",
     flow: [
       { icon: "home-outline", label: "Home" },
@@ -4790,6 +4793,8 @@ const s = StyleSheet.create({
   sellModeTitle:{color:C.ink,fontSize:21,fontWeight:"700"},
   sellModeHelp:{marginTop:4,color:C.muted,fontSize:14},
   earlierSale:{minHeight:72,marginTop:14,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  salesRecordHeading:{marginTop:25,color:SECTION.records.color,fontSize:11,fontWeight:"800",letterSpacing:1.35},
+  salesRecordHelp:{marginTop:5,color:C.muted,fontSize:13,lineHeight:19},
   earlierSaleTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
   earlierSaleHelp:{marginTop:2,color:C.muted,fontSize:12},
   missedBannerTitle: { color: C.white, fontSize: 18, fontWeight: "700" },

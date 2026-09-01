@@ -39,7 +39,7 @@ const benefits: { icon: IconName; title: string; body: string; tone: string }[] 
 const features: { icon: IconName; title: string; body: string }[] = [
   { icon: "storefront-outline", title: "Shop and event sales", body: "Use normal checkout in the shop or faster selling at markets and pop-ups." },
   { icon: "images-outline", title: "Visual product selection", body: "Cashiers match products using clear photographs instead of codes." },
-  { icon: "calendar-outline", title: "Earlier sales", body: "Choose the original date first, then record the products and payment type." },
+  { icon: "calendar-outline", title: "Missed sales", body: "Choose the original date first, then record the products and payment type." },
   { icon: "receipt-outline", title: "Customer orders", body: "Track downpayments, order progress, balance and where the order came from." },
   { icon: "hardware-chip-outline", title: "Production overview", body: "See printer condition and keep a simple record of filament supplies." },
   { icon: "download-outline", title: "Excel-ready reports", body: "Export daily, weekly or monthly sales in a familiar format." },

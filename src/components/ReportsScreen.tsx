@@ -437,7 +437,7 @@ export function ReportsScreen({
     <ScrollView contentContainerStyle={s.page}>
       {correctionMode ? (
         <>
-          <Text style={s.title}>Correct a sale</Text>
+          <Text style={s.title}>Cancel wrong sale</Text>
           <View style={s.correctionGuide}>
             <Ionicons name="return-up-back" size={26} color="#FFF" />
             <View style={s.correctionGuideText}>
@@ -616,7 +616,7 @@ export function ReportsScreen({
                   {sale.status === "completed" ? (
                     <Pressable style={s.voidButton} onPress={() => setVoidTarget(sale)}>
                       <Ionicons name="create-outline" size={17} color="#B84457" />
-                      <Text style={s.voidText}>{correctionMode ? "Remove / correct" : "Correct sale"}</Text>
+                      <Text style={s.voidText}>{correctionMode ? "Cancel this sale" : "Cancel wrong sale"}</Text>
                     </Pressable>
                   ) : null}
                 </View>
