@@ -297,7 +297,7 @@ function Login() {
     <SafeAreaView style={s.login}>
       <StatusBar style="dark" />
       <View style={[s.loginShell, wide && s.loginShellWide]}>
-        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK · SIMPLE SHOPKEEPING</Text><Text style={s.loginEditorialTitle}>Your shop, beautifully organised.</Text><Text style={s.loginEditorialBody}>Sales, stock and customer orders. Clear enough to understand at a glance.</Text><View style={s.loginEditorialRule}/><Text style={s.loginEditorialQuote}>Made for busy hands and calm decisions.</Text></View> : null}
+        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK</Text><Text style={s.loginEditorialTitle}>Everything in its place.</Text><Text style={s.loginEditorialBody}>Sales · Stock · Orders</Text></View> : null}
         <View style={[s.loginCard, wide && s.loginCardWide]}>
         <Image
           source={require("../assets/mik-logo.png")}
@@ -305,7 +305,7 @@ function Login() {
           resizeMode="cover"
         />
         <Text style={s.loginTitle}>Welcome back.</Text>
-        <Text style={s.centerHelp}>Sign in to manage your shop.</Text>
+        <Text style={s.centerHelp}>Your shop is ready.</Text>
         <Label>Username</Label>
         <TextInput
           style={s.input}
@@ -4275,16 +4275,14 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
-    backgroundColor: C.cream,
+    backgroundColor: C.white,
   },
   loginShell:{width:"100%",maxWidth:1040,overflow:"hidden",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white,shadowColor:"#071521",shadowOpacity:.09,shadowRadius:28,shadowOffset:{width:0,height:14},elevation:8},
   loginShellWide:{minHeight:650,flexDirection:"row"},
-  loginEditorial:{width:"52%",padding:56,justifyContent:"center",backgroundColor:C.dark},
-  loginKicker:{color:"#C7D1DA",fontSize:11,fontWeight:"700",letterSpacing:2.1},
-  loginEditorialTitle:{maxWidth:430,marginTop:24,color:C.white,fontSize:48,lineHeight:55,fontWeight:"700",letterSpacing:-1.7},
-  loginEditorialBody:{maxWidth:410,marginTop:20,color:"#D7DEE5",fontSize:18,lineHeight:28},
-  loginEditorialRule:{width:48,height:2,marginTop:38,backgroundColor:C.white},
-  loginEditorialQuote:{marginTop:16,color:C.white,fontSize:14,fontWeight:"700",letterSpacing:.2},
+  loginEditorial:{width:"52%",padding:64,justifyContent:"center",backgroundColor:C.dark},
+  loginKicker:{color:C.white,fontSize:12,fontWeight:"700",letterSpacing:4},
+  loginEditorialTitle:{maxWidth:430,marginTop:30,color:C.white,fontSize:52,lineHeight:58,fontWeight:"600",letterSpacing:-1.8},
+  loginEditorialBody:{maxWidth:410,marginTop:26,color:"#D7DEE5",fontSize:15,lineHeight:24,fontWeight:"500",letterSpacing:1.2},
   loginCard: {
     width: "100%",
     maxWidth: 520,
@@ -4333,6 +4331,7 @@ const s = StyleSheet.create({
     fontSize: 17,
     lineHeight: 25,
     textAlign: "center",
+    marginTop: 5,
     marginBottom: 16,
   },
   help: { color: C.muted, fontSize: 16, lineHeight: 24 },
