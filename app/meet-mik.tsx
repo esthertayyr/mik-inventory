@@ -162,7 +162,7 @@ export default function MeetMik() {
           <Text style={s.closingNote}>MIK is currently available as a web application.</Text>
         </View>
 
-        <View style={s.footer}><View style={[s.footerInner,compact&&s.stack]}><View><View style={s.brand}><Image source={require("../assets/mik-app-icon.png")} style={s.footerLogo as any}/><Text style={s.footerBrand}>MIK</Text></View><Text style={s.footerTag}>Simple shopkeeping for busy people.</Text></View><View style={s.footerLinks}><Pressable accessibilityRole="link" onPress={() => router.push("/")}><Text style={s.footerLink}>Open app</Text></Pressable><Text style={s.footerLinkMuted}>Privacy · Terms · Support coming soon</Text></View></View><Text style={s.easterEgg}>Whatever you do, work at it with all your heart. · Colossians 3:23 · by Esther</Text></View>
+        <View style={s.footer}><View style={[s.footerInner,compact&&s.stack]}><View><View style={s.brand}><Image source={require("../assets/mik-app-icon.png")} style={s.footerLogo as any}/><Text style={s.footerBrand}>MIK</Text></View><Text style={s.footerTag}>Simple shopkeeping for busy people.</Text></View><View style={s.footerLinks}><Pressable accessibilityRole="link" onPress={() => router.push("/")}><Text style={s.footerLink}>Open app</Text></Pressable><Text style={s.footerLinkMuted}>Privacy · Terms · Support coming soon</Text></View></View><Text style={s.easterEgg}>Commit your work to the Lord, and your plans will succeed. · Proverbs 16:3 · Made with faith and love by Esther</Text></View>
       </ScrollView>
     </SafeAreaView>
   );

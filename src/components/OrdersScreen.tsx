@@ -34,6 +34,7 @@ type Order = {
   quantity: number; order_date: string; target_date: string | null;
   total_price: number; amount_paid: number; payment_status: PaymentStatus;
   payment_channel: string | null; payment_reference: string | null; notes: string | null;
+  fulfilment_method: "collection"|"delivery"; fulfilled_at:string|null;
   status: OrderStatus; created_at: string; updated_at: string;
 };
 type Source = { id: string; name: string };
@@ -42,6 +43,7 @@ type Form = {
   social_platform: string; custom_source: string; quantity: string; order_date: string; target_date: string;
   total_price: string; amount_paid: string; payment_channel: string;
   payment_reference: string; notes: string; image_uri: string;
+  fulfilment_method:"collection"|"delivery";
 };
 
 const C = { ink: "#101318", muted: "#626A73", navy: "#142C47", green: "#264A3B", ruby: "#65243A", amber: "#795C2D", border: "#E0E3E7", pale: "#F6F7F8", white: "#FFF" };
@@ -63,7 +65,7 @@ const ORDER_SOURCES = ["Social media", "Walk-in", "Referral", "Marketplace", "We
 const sourceGroup = (source: string) => SOCIAL_PLATFORMS.includes(source)
   ? "Social media"
   : ORDER_SOURCES.includes(source) ? source : source === "Online" ? "Website" : source === "Word of mouth" ? "Referral" : "Other";
-const emptyForm = (): Form => ({ title: "", customer_name: "", customer_contact: "", source: "Social media", social_platform: "Facebook", custom_source: "", quantity: "1", order_date: displayDate(isoDate()), target_date: "", total_price: "", amount_paid: "", payment_channel: "", payment_reference: "", notes: "", image_uri: "" });
+const emptyForm = (): Form => ({ title: "", customer_name: "", customer_contact: "", source: "Social media", social_platform: "Facebook", custom_source: "", quantity: "1", order_date: displayDate(isoDate()), target_date: "", total_price: "", amount_paid: "", payment_channel: "", payment_reference: "", notes: "", image_uri: "", fulfilment_method:"collection" });
 const statusLabel: Record<OrderStatus,string> = { new: "Pending", making: "Active", ready: "Ready", completed: "Completed", cancelled: "Stopped" };
 const statusIcon: Record<OrderStatus,keyof typeof Ionicons.glyphMap> = { new: "sparkles-outline", making: "construct-outline", ready: "checkmark-circle-outline", completed: "bag-check-outline", cancelled: "close-circle-outline" };
 const csvCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
@@ -133,7 +135,7 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
   const startNew = () => { setForm(emptyForm()); setEditing("new"); };
   const startEdit = (o: Order) => {
     const isSocial = SOCIAL_PLATFORMS.includes(o.source);
-    setForm({ title:o.title,customer_name:o.customer_name??"",customer_contact:o.customer_contact??"",source:isSocial?"Social media":ORDER_SOURCES.includes(o.source)?o.source:"Other",social_platform:isSocial?o.source:"Facebook",custom_source:!isSocial&&!ORDER_SOURCES.includes(o.source)?o.source:"",quantity:String(o.quantity),order_date:displayDate(o.order_date),target_date:displayDate(o.target_date),total_price:String(o.total_price),amount_paid:String(o.amount_paid),payment_channel:o.payment_channel??"",payment_reference:o.payment_reference??"",notes:o.notes??"",image_uri:o.image_url??"" });
+    setForm({ title:o.title,customer_name:o.customer_name??"",customer_contact:o.customer_contact??"",source:isSocial?"Social media":ORDER_SOURCES.includes(o.source)?o.source:"Other",social_platform:isSocial?o.source:"Facebook",custom_source:!isSocial&&!ORDER_SOURCES.includes(o.source)?o.source:"",quantity:String(o.quantity),order_date:displayDate(o.order_date),target_date:displayDate(o.target_date),total_price:String(o.total_price),amount_paid:String(o.amount_paid),payment_channel:o.payment_channel??"",payment_reference:o.payment_reference??"",notes:o.notes??"",image_uri:o.image_url??"",fulfilment_method:o.fulfilment_method??"collection" });
     setEditing(o);
   };
   const duplicate = (o: Order) => { startEdit(o); setForm(f=>({...f,title:`${o.title} copy`,order_date:displayDate(isoDate()),target_date:"",amount_paid:"",payment_channel:"",payment_reference:""})); setEditing("new"); };
@@ -157,7 +159,7 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
     if(paid>0&&!form.payment_channel.trim()) return Alert.alert("Payment method needed","Choose where or how the customer paid.");
     setSaving(true);
     const payment_status:PaymentStatus=paid<=0?"unpaid":paid>=total?"paid":"partial";
-    const payload={business_id:businessId,location_id:locationId,title:form.title.trim(),customer_name:form.customer_name.trim()||null,customer_contact:form.customer_contact.trim()||null,source,quantity,order_date:orderDate,target_date:targetDate,total_price:total,amount_paid:paid,payment_status,payment_channel:paid>0?form.payment_channel.trim()||null:null,payment_reference:paid>0?form.payment_reference.trim()||null:null,notes:form.notes.trim()||null};
+    const payload={business_id:businessId,location_id:locationId,title:form.title.trim(),customer_name:form.customer_name.trim()||null,customer_contact:form.customer_contact.trim()||null,source,quantity,order_date:orderDate,target_date:targetDate,total_price:total,amount_paid:paid,payment_status,payment_channel:paid>0?form.payment_channel.trim()||null:null,payment_reference:paid>0?form.payment_reference.trim()||null:null,notes:form.notes.trim()||null,fulfilment_method:form.fulfilment_method};
     let id:string|undefined;
     if(editing==="new") {
       const {data,error}=await supabase.from("external_orders").insert({...payload,created_by:(await supabase.auth.getUser()).data.user?.id}).select("id").single();
@@ -176,6 +178,13 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
         await supabase.from("external_orders").update({image_url}).eq("id",id);
       } catch { Alert.alert("Order saved without photo","The order is safe, but the photo could not be uploaded."); }
     }
+    if(id && paid>=total*.5) {
+      const {data:existing}=await supabase.from("print_jobs").select("id").eq("external_order_id",id).maybeSingle();
+      if(!existing) {
+        const {data:{user}}=await supabase.auth.getUser();
+        await supabase.from("print_jobs").insert({business_id:businessId,location_id:locationId,external_order_id:id,title:form.title.trim(),quantity,needed_date:targetDate,status:"to_print",created_by:user!.id});
+      }
+    }
     if((form.source==="Other"||form.social_platform==="Other")&&!source.startsWith("Other")) await supabase.from("order_sources").upsert({business_id:businessId,name:source},{onConflict:"business_id,name"});
     setSaving(false); setEditing(null); await load();
     Alert.alert("Order saved",paid>=total?"Full payment is recorded.":paid>=total*.5?"The downpayment is recorded. The order is pending for printing.":`Waiting for downpayment. Printing cannot start until at least ${peso(total*.5)} is paid.`);
@@ -185,8 +194,9 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
       return Alert.alert("50% downpayment needed",`Record at least ${peso(Number(o.total_price)*.5)} before printing.`);
     if(status==="completed" && Number(o.amount_paid)<Number(o.total_price))
       return Alert.alert("Final payment needed",`Record the remaining ${peso(Number(o.total_price)-Number(o.amount_paid))} before completing this order.`);
-    const action=async()=>{const {error}=await supabase.from("external_orders").update({status}).eq("id",o.id);if(error)return Alert.alert("Order not updated",error.message);await load();};
+    const action=async(extra:Record<string,unknown>={})=>{const {error}=await supabase.from("external_orders").update({status,...extra}).eq("id",o.id);if(error)return Alert.alert("Order not updated",error.message);const queueStatus=status==="making"?"printing":status==="ready"?"ready":status==="completed"?"done":null;if(queueStatus)await supabase.from("print_jobs").update({status:queueStatus}).eq("external_order_id",o.id);await load();};
     if(status==="cancelled") return Alert.alert("Stop this order?","Printing will stop. The order will remain in history.",[{text:"Keep active",style:"cancel"},{text:"Stop order",style:"destructive",onPress:()=>void action()}]);
+    if(status==="completed") return Alert.alert(o.fulfilment_method==="delivery"?"Confirm delivery":"Confirm collection",`Final payment is fully recorded. Mark this order as ${o.fulfilment_method==="delivery"?"delivered":"collected"}?`,[{text:"Not yet",style:"cancel"},{text:o.fulfilment_method==="delivery"?"Yes, delivered":"Yes, collected",onPress:()=>void action({fulfilled_at:new Date().toISOString()})}]);
     await action();
   };
   const exportOrders = async () => {
@@ -216,7 +226,7 @@ function OrderCard({order,onEdit,onDuplicate,onStatus}:{order:Order;onEdit:()=>v
   const depositNeeded=Number(order.total_price)*.5;
   const depositPaid=Number(order.amount_paid)>=depositNeeded;
   const stage=paymentStage(order);
-  const displayStatus=order.status==="cancelled"?"Stopped":order.status==="completed"?"Completed":order.status==="ready"?"Ready":order.status==="making"?"Active":depositPaid?"Pending printing":"Waiting for downpayment";
+  const displayStatus=order.status==="cancelled"?"Stopped":order.status==="completed"?(order.fulfilment_method==="delivery"?"Delivered":"Collected"):order.status==="ready"?"Ready":order.status==="making"?"Printing":depositPaid?"To print":"Waiting for downpayment";
   const stageColor=stage==="full"?C.green:stage==="pending_deposit"?C.ruby:C.amber;
   const stageSoft=stage==="full"?"#ECF5F0":stage==="pending_deposit"?"#FBEFF1":"#F8F2E8";
   const paymentMessage=stage==="pending_deposit"?`${peso(Math.max(0,depositNeeded-Number(order.amount_paid)))} more needed before printing`:stage==="deposit_paid"?`Downpayment received · ${peso(balance)} balance`:stage==="pending_final"?`Final payment due: ${peso(balance)}`:"Full payment received";
@@ -228,7 +238,7 @@ function OrderCard({order,onEdit,onDuplicate,onStatus}:{order:Order;onEdit:()=>v
     <Text style={[s.depositLine,{color:stageColor}]}>{paymentMessage}</Text>
     {order.amount_paid>0?<Text style={s.paymentDetail}>{peso(Number(order.amount_paid))} paid via {order.payment_channel}{balance>0?` · ${peso(balance)} remaining`:""}</Text>:null}
     {order.notes?<View style={s.remarks}><Text style={s.factLabel}>REMARKS</Text><Text style={s.remarksText}>{order.notes}</Text></View>:null}
-    {next?<Pressable style={[s.next,((!depositPaid&&next==="making")||(next==="completed"&&stage!=="full"))&&s.nextDisabled]} onPress={()=>onStatus(next)}><Text style={s.nextText}>{next==="making"?(depositPaid?"Start printing":"Record 50% downpayment first"):next==="ready"?"Mark as ready":stage==="full"?"Mark completed":"Record final payment first"}</Text><Ionicons name={(next==="making"&&!depositPaid)||(next==="completed"&&stage!=="full")?"lock-closed":"arrow-forward"} size={20} color={C.white}/></Pressable>:null}
+    {next?<Pressable style={[s.next,((!depositPaid&&next==="making")||(next==="completed"&&stage!=="full"))&&s.nextDisabled]} onPress={()=>onStatus(next)}><Text style={s.nextText}>{next==="making"?(depositPaid?"Start printing":"Record 50% downpayment first"):next==="ready"?"Mark as ready":stage==="full"?(order.fulfilment_method==="delivery"?"Confirm delivered":"Confirm collected"):"Record final payment first"}</Text><Ionicons name={(next==="making"&&!depositPaid)||(next==="completed"&&stage!=="full")?"lock-closed":"arrow-forward"} size={20} color={C.white}/></Pressable>:null}
     <View style={s.cardActions}><Pressable style={s.link} onPress={onEdit}><Ionicons name="create-outline" size={18} color={C.navy}/><Text style={s.linkText}>View / edit</Text></Pressable><Pressable style={s.link} onPress={onDuplicate}><Ionicons name="copy-outline" size={18} color={C.navy}/><Text style={s.linkText}>Duplicate</Text></Pressable>{!["completed","cancelled"].includes(order.status)?<Pressable style={s.link} onPress={()=>onStatus("cancelled")}><Text style={s.cancelText}>Stop</Text></Pressable>:order.status==="cancelled"?<Pressable style={s.link} onPress={()=>onStatus("new")}><Text style={s.linkText}>Resume</Text></Pressable>:null}</View>
   </View>;
 }
@@ -252,6 +262,7 @@ function OrderForm({form,setForm,saving,editing,onBack,onSave,onPhoto}:{form:For
     <FormSection number="3" title="How much and when?" help="Enter the full order price. The expected date can stay empty when it is not confirmed."/>
     <View style={[s.two,narrow&&s.twoStack]}><View style={[s.half,narrow&&s.halfStack]}><Field label="Quantity · Required" value={form.quantity} onChangeText={v=>update("quantity",v)} keyboardType="number-pad"/></View><View style={[s.half,narrow&&s.halfStack]}><Field label="Total price · Required" value={form.total_price} onChangeText={v=>update("total_price",v)} keyboardType="decimal-pad" placeholder="₱0"/></View></View>
     <View style={[s.two,narrow&&s.twoStack]}><View style={[s.half,narrow&&s.halfStack]}><Field label="Order date · Required" value={form.order_date} onChangeText={v=>update("order_date",v)} placeholder="DD-MM-YYYY" maxLength={10}/></View><View style={[s.half,narrow&&s.halfStack]}><Field label="Expected date · Optional" value={form.target_date} onChangeText={v=>update("target_date",v)} placeholder="DD-MM-YYYY" maxLength={10}/></View></View>
+    <Text style={s.label}>How will the customer receive it?</Text><View style={s.wrap}>{([['collection','Customer collects'],['delivery','Deliver to customer']] as const).map(([id,label])=><Pressable key={id} style={[s.choice,form.fulfilment_method===id&&s.choiceOn]} onPress={()=>setForm(f=>({...f,fulfilment_method:id}))}><Text style={[s.choiceText,form.fulfilment_method===id&&s.choiceTextOn]}>{label}</Text></Pressable>)}</View>
     <FormSection number="4" title="What has the customer paid?" help="Printing starts after the 50% downpayment. Mik will show the remaining balance."/>
     <View style={s.paymentBox}><View style={s.paymentHead}><Ionicons name="card-outline" size={25} color={C.navy}/><View><Text style={s.paymentTitle}>Customer payment</Text><Text style={s.photoHelp}>No downpayment means no printing.</Text></View></View><Text style={s.label}>Quick payment</Text><View style={s.wrap}><Pressable style={[s.choice,paid===0&&s.choiceOn]} onPress={()=>setForm(f=>({...f,amount_paid:"0",payment_channel:"",payment_reference:""}))}><Text style={[s.choiceText,paid===0&&s.choiceTextOn]}>No downpayment</Text></Pressable><Pressable style={[s.choice,total>0&&paid===total*.5&&s.choiceOn]} onPress={()=>update("amount_paid",String(total*.5))}><Text style={[s.choiceText,total>0&&paid===total*.5&&s.choiceTextOn]}>Paid 50%</Text></Pressable><Pressable style={[s.choice,total>0&&paid===total&&s.choiceOn]} onPress={()=>update("amount_paid",String(total))}><Text style={[s.choiceText,total>0&&paid===total&&s.choiceTextOn]}>Full payment</Text></Pressable></View><Field label="Amount paid" value={form.amount_paid} onChangeText={v=>update("amount_paid",v)} keyboardType="decimal-pad" placeholder="₱0"/><View style={s.paymentNumbers}><Text style={s.balance}>50% needed: {peso(total*.5)}</Text></View><Text style={s.balanceSmall}>Final balance: {peso(Math.max(0,total-paid))}</Text><Text style={s.label}>Payment method</Text><View style={s.wrap}>{["Cash","GCash","Bank transfer","Facebook / online","Other"].map(x=><Pressable key={x} style={[s.choice,form.payment_channel===x&&s.choiceOn]} onPress={()=>update("payment_channel",x)}><Text style={[s.choiceText,form.payment_channel===x&&s.choiceTextOn]}>{x}</Text></Pressable>)}</View><Field label="Payment reference" value={form.payment_reference} onChangeText={v=>update("payment_reference",v)} placeholder="Optional receipt or reference"/></View>
     <FormSection number="5" title="Anything else?" help="Add only information the person making or handing over the order needs to know."/>

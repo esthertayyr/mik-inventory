@@ -33,6 +33,8 @@ import { OrdersScreen } from "@/src/components/OrdersScreen";
 import { PrintersScreen } from "@/src/components/PrintersScreen";
 import { FilamentsScreen } from "@/src/components/FilamentsScreen";
 import { CalendarScreen, type ShopEvent } from "@/src/components/CalendarScreen";
+import { PrintQueueScreen } from "@/src/components/PrintQueueScreen";
+import { PrintPriceCalculator } from "@/src/components/PrintPriceCalculator";
 import type {
   Business,
   CartItem,
@@ -297,7 +299,7 @@ function Login() {
     <SafeAreaView style={s.login}>
       <StatusBar style="dark" />
       <View style={[s.loginShell, wide && s.loginShellWide]}>
-        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK</Text><Text style={s.loginEditorialTitle}>Everything in its place.</Text><Text style={s.loginEditorialBody}>Sales · Stock · Orders</Text></View> : null}
+        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK</Text><Text style={s.loginEditorialTitle}>Your 3D printing shop, made simple.</Text><Text style={s.loginEditorialBody}>Sell products · Track stock · Follow every order</Text></View> : null}
         <View style={[s.loginCard, wide && s.loginCardWide]}>
         <Image
           source={require("../assets/mik-logo.png")}
@@ -305,7 +307,7 @@ function Login() {
           resizeMode="cover"
         />
         <Text style={s.loginTitle}>Welcome back.</Text>
-        <Text style={s.centerHelp}>Your shop is ready.</Text>
+        <Text style={s.centerHelp}>Everything you need to run the day.</Text>
         <Label>Username</Label>
         <TextInput
           style={s.input}
@@ -337,7 +339,7 @@ function Login() {
         </Pressable>
         </View>
       </View>
-      <Text style={s.loginCredit}>Whatever you do, work at it with all your heart. · Colossians 3:23 · by Esther</Text>
+      <Text style={s.loginCredit}>Commit your work to the Lord, and your plans will succeed. · Proverbs 16:3 · Made with faith and love by Esther</Text>
       <GuideModal visible={guideOpen} onClose={() => setGuideOpen(false)} />
     </SafeAreaView>
   );
@@ -893,6 +895,10 @@ function ShopApp({
     body = <SellStart businessId={business!.id} onOpen={setScreen} />;
   else if (screen === "production")
     body = <ProductionStart onOpen={setScreen} />;
+  else if (screen === "print_queue")
+    body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("production")} />;
+  else if (screen === "price_calculator")
+    body = <PrintPriceCalculator onBack={() => setScreen("production")} />;
   else if (screen === "correct")
     body = <ReportsScreen locationId={locationId} correctionMode />;
   else if (screen === "shop")
@@ -943,7 +949,7 @@ function ShopApp({
   const selected =
     screen === "inventory"
       ? "stock_start"
-      : screen === "products" || screen === "reports" || screen === "shop" || screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "price_list"
+      : screen === "products" || screen === "reports" || screen === "shop" || screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "price_list" || screen === "print_queue" || screen === "price_calculator"
       ? "more"
       : screen === "production"
         ? "home"
@@ -1117,6 +1123,9 @@ function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)
 function ProductionStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   return <ScrollView contentContainerStyle={s.sellStartPage}>
     <Text style={s.pageTitle}>Printers & Filament</Text><Text style={s.subtitle}>What do you want to check?</Text>
+    <View style={[s.flowGuide,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]}><View style={[s.flowGuideNumber,{backgroundColor:SECTION.production.color}]}><Text style={s.flowGuideNumberText}>?</Text></View><View style={s.flex}><Text style={s.flowGuideTitle}>Production made simple</Text><Text style={s.flowGuideText}>Use Print Queue for work to make. Use Printers and Filament to check the tools and materials.</Text></View></View>
+    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("print_queue")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="layers" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Print Queue</Text><Text style={s.sellModeHelp}>See what to print, what is printing and what is ready</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:C.white,borderColor:SECTION.production.border}]} onPress={()=>onOpen("price_calculator")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="calculator" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Price calculator</Text><Text style={s.sellModeHelp}>Estimate the cost and suggested selling price</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
     <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("printers")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="hardware-chip" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Printers</Text><Text style={s.sellModeHelp}>Check printer status</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
     <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("filaments")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="color-filter" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Filament</Text><Text style={s.sellModeHelp}>Check filament stock</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
   </ScrollView>;
@@ -2123,6 +2132,8 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     },
     {
       title: "Production", help: "Check the equipment and materials used to make products.", ...SECTION.production, actions: [
+        { title: "Print Queue", help: "To print, printing and ready", icon: "layers", screen: "print_queue" },
+        { title: "Price calculator", help: "Estimate a selling price", icon: "calculator", screen: "price_calculator" },
         { title: "Printers", help: "See which printers are working", icon: "hardware-chip", screen: "printers" },
         { title: "Filaments", help: "Track colours and spools", icon: "color-filter", screen: "filaments" },
       ],

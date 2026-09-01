@@ -12,6 +12,8 @@ export type Screen =
   | "calendar"
   | "price_list"
   | "production"
+  | "print_queue"
+  | "price_calculator"
   | "missed"
   | "correct"
   | "products"
