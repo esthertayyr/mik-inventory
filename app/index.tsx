@@ -224,7 +224,7 @@ const ownerNav: {
     soft: SECTION.sales.soft,
   },
   {
-    id: "inventory",
+    id: "stock_start",
     label: "Stock",
     icon: "cube-outline",
     color: SECTION.stock.color,
@@ -850,6 +850,8 @@ function ShopApp({
         onSell={() => setScreen("sale")}
       />
     );
+  else if (screen === "stock_start")
+    body = <StockStart onOpen={setScreen} />;
   else if (screen === "inventory")
     body = (
       <Inventory
@@ -939,7 +941,9 @@ function ShopApp({
       />
     );
   const selected =
-    screen === "products" || screen === "reports" || screen === "shop" || screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "price_list"
+    screen === "inventory"
+      ? "stock_start"
+      : screen === "products" || screen === "reports" || screen === "shop" || screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "price_list"
       ? "more"
       : screen === "production"
         ? "home"
@@ -1115,6 +1119,20 @@ function ProductionStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
     <Text style={s.pageTitle}>Printers & Filament</Text><Text style={s.subtitle}>What do you want to check?</Text>
     <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("printers")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="hardware-chip" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Printers</Text><Text style={s.sellModeHelp}>Check printer status</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
     <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("filaments")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="color-filter" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Filament</Text><Text style={s.sellModeHelp}>Check filament stock</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
+  </ScrollView>;
+}
+
+function StockStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
+  return <ScrollView contentContainerStyle={s.sellStartPage}>
+    <Text style={s.pageTitle}>Stock</Text>
+    <Text style={s.subtitle}>Choose what you want to do. Mik will guide you one step at a time.</Text>
+    <View style={[s.flowGuide,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]}>
+      <View style={[s.flowGuideNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.flowGuideNumberText}>1</Text></View>
+      <View style={s.flex}><Text style={s.flowGuideTitle}>Start here</Text><Text style={s.flowGuideText}>Choose a card below. Nothing changes until you press the final save button.</Text></View>
+    </View>
+    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("inventory")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="cube" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Check or update stock</Text><Text style={s.sellModeHelp}>See what is low, add stock or correct the number</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:C.white,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("inventory")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="text" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Update A–Z letters</Text><Text style={s.sellModeHelp}>Choose a keycap design, then update each letter</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:C.white,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("products")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="pricetags" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Products and prices</Text><Text style={s.sellModeHelp}>Add a product or change its name, photo or price</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
   </ScrollView>;
 }
 
@@ -2098,7 +2116,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     },
     {
       title: "Stock & products", help: "Keep products ready to sell.", ...SECTION.stock, actions: [
-        { title: "Stock", help: "Count or update stock", icon: "cube", screen: "inventory" },
+        { title: "Stock", help: "Choose how to check or update stock", icon: "cube", screen: "stock_start" },
         { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products" },
         { title: "Price list", help: "View or print prices", icon: "receipt", screen: "price_list" },
       ],
@@ -2905,6 +2923,7 @@ function Products({
             <Ionicons name="information-circle-outline" size={21} color={SECTION.stock.color}/>
             <Text style={s.requiredNoteText}><Text style={s.requiredNoteStrong}>Required:</Text> product name, category and normal price. <Text style={s.requiredNoteStrong}>Optional:</Text> photo, sale price and choices.</Text>
           </View>
+          <View style={s.formStep}><View style={[s.formStepNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.formStepNumberText}>1</Text></View><View style={s.flex}><Text style={s.formStepTitle}>Help the cashier recognise it</Text><Text style={s.formStepHelp}>Use a short product name. Add a photo when one is available.</Text></View></View>
           <View style={s.productPhoto}>
             {image || placeholder ? (
               <Image source={image ? { uri: image } : placeholder} style={s.productPhotoImage} />
@@ -2927,6 +2946,7 @@ function Products({
             onChangeText={setName}
             placeholder="Example: Blue keychain"
           />
+          <View style={s.formStep}><View style={[s.formStepNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.formStepNumberText}>2</Text></View><View style={s.flex}><Text style={s.formStepTitle}>Choose where it appears</Text><Text style={s.formStepHelp}>The category helps the cashier find this product quickly on the Sell screen.</Text></View></View>
           <Label>Category · Required</Label>
           <Pressable style={s.manageCategoryButton} onPress={() => setManagingCategories(true)}>
             <Ionicons name="settings-outline" size={20} color={C.dark} />
@@ -2948,6 +2968,7 @@ function Products({
               />
             ))}
           </ScrollView>
+          <View style={s.formStep}><View style={[s.formStepNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.formStepNumberText}>3</Text></View><View style={s.flex}><Text style={s.formStepTitle}>Set the selling options</Text><Text style={s.formStepHelp}>{extraAlphabetMode ? "Each keycap design can have its own extra-letter price." : "Enter the usual price. Add a sale price only when the item is discounted."}</Text></View></View>
           {extraAlphabetMode ? (
             <View style={s.choiceSetup}>
               <Text style={s.rowTitle}>Design prices</Text>
@@ -3035,6 +3056,7 @@ function Products({
           ) : null}
           {creating ? (
             <>
+              <View style={s.formStep}><View style={[s.formStepNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.formStepNumberText}>4</Text></View><View style={s.flex}><Text style={s.formStepTitle}>Enter what you have now</Text><Text style={s.formStepHelp}>This becomes the starting stock. You can correct it later from Stock.</Text></View></View>
               <Label>
                 {hasChoices
                   ? "Starting stock for each choice · Required"
@@ -4716,6 +4738,16 @@ const s = StyleSheet.create({
   eventModeNoteText:{flex:1,color:C.muted,fontSize:13,lineHeight:19},
   eventModeNoteStrong:{color:C.ink,fontWeight:"700"},
   sellStartPage:{paddingTop:6,paddingBottom:40},
+  flowGuide:{marginTop:18,marginBottom:4,padding:15,flexDirection:"row",alignItems:"flex-start",gap:12,borderWidth:1,borderRadius:15},
+  flowGuideNumber:{width:32,height:32,alignItems:"center",justifyContent:"center",borderRadius:16},
+  flowGuideNumberText:{color:C.white,fontSize:14,fontWeight:"800"},
+  flowGuideTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
+  flowGuideText:{marginTop:3,color:C.muted,fontSize:13,lineHeight:19},
+  formStep:{marginTop:24,paddingTop:18,flexDirection:"row",alignItems:"flex-start",gap:11,borderTopWidth:1,borderTopColor:C.border},
+  formStepNumber:{width:31,height:31,alignItems:"center",justifyContent:"center",borderRadius:16},
+  formStepNumberText:{color:C.white,fontSize:13,fontWeight:"800"},
+  formStepTitle:{color:C.ink,fontSize:17,lineHeight:22,fontWeight:"700"},
+  formStepHelp:{marginTop:3,color:C.muted,fontSize:13,lineHeight:19},
   saleWelcomeOverlay:{flex:1,padding:20,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(13,23,34,.62)"},
   saleWelcomeCard:{width:"100%",maxWidth:430,padding:26,borderRadius:24,backgroundColor:C.white,shadowColor:"#000",shadowOpacity:.18,shadowRadius:24,shadowOffset:{width:0,height:10},elevation:8},
   saleWelcomeIcon:{width:58,height:58,marginBottom:20,alignItems:"center",justifyContent:"center",borderRadius:18,backgroundColor:C.green},

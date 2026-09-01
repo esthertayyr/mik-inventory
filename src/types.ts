@@ -15,6 +15,7 @@ export type Screen =
   | "missed"
   | "correct"
   | "products"
+  | "stock_start"
   | "inventory"
   | "reports"
   | "shop"
