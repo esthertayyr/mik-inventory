@@ -1239,14 +1239,14 @@ function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceU
       </SafeAreaView>
     </Modal>
     <View style={s.sellTodayCard}><Ionicons name="calendar-outline" size={22} color={C.green}/><View style={s.flex}><Text style={s.sellTodayLabel}>RECORDING FOR TODAY</Text><Text style={s.sellTodayDate}>{friendlyLocalDate(today)}</Text></View></View>
+    <Pressable accessibilityRole="button" accessibilityLabel="Forgot to enter a sale? Add it now using the actual earlier date." style={s.missedSaleFeature} onPress={()=>onOpen("missed")}><View pointerEvents="none" style={s.missedSaleFeatureIcon}><Ionicons name="calendar-number-outline" size={27} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.missedSaleFeatureTitle}>Forgot to enter a sale?</Text><Text style={s.missedSaleFeatureHelp}>Tap here, choose the date it happened, then add the products sold.</Text><Text style={s.missedSaleFeatureAction}>ADD AN EARLIER SALE</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.records.color}/></Pressable>
     <Text style={s.pageTitle}>How are you selling?</Text>
     <Text style={s.subtitle}>Choose one to start.</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="Open Shop Sale. Normal Checkout." style={[s.sellModeCard,{backgroundColor:SECTION.sales.soft}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:SECTION.sales.color}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop Sale</Text><Text style={s.sellModeHelp}>Normal Checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.sales.color}/></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Open Event Sale. Fast checkout. Letter selection is skipped." style={[s.sellModeCard,{backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event Sale</Text><Text style={s.sellModeHelp}>Fast Checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
     <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={22} color={C.accent}/><View style={s.flex}><Text style={s.eventModeNoteStrong}>How Event Sale works</Text><Text style={s.eventModeStep}>1. Add the product and take payment.</Text><Text style={s.eventModeStep}>2. Clickers skip the letter screen.</Text><Text style={s.eventModeStep}>3. After the event, count the A–Z keycaps left.</Text><Text style={s.eventModeTip}>Tip: Take a photo of sold items to help you count later.</Text></View></View>
-    <Text style={s.salesRecordHeading}>FIX SALES RECORDS</Text>
-    <Text style={s.salesRecordHelp}>Use these only when a sale was missed or entered by mistake.</Text>
-    <Pressable accessibilityRole="button" accessibilityLabel="Add missed sale. Choose the date, then enter a sale you forgot to record." style={s.earlierSale} onPress={()=>onOpen("missed")}><Ionicons pointerEvents="none" name="calendar-outline" size={21} color={SECTION.records.color}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Add missed sale</Text><Text style={s.earlierSaleHelp}>Choose the date, then enter the forgotten sale</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
+    <Text style={s.salesRecordHeading}>CORRECT A MISTAKE</Text>
+    <Text style={s.salesRecordHelp}>Use this when a sale was entered incorrectly.</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="Cancel wrong sale. Find a sale entered by mistake and cancel it." style={s.earlierSale} onPress={()=>onOpen("correct")}><Ionicons pointerEvents="none" name="return-up-back-outline" size={21} color={SECTION.records.color}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Cancel wrong sale</Text><Text style={s.earlierSaleHelp}>Find a mistaken sale and cancel it</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
   </ScrollView>;
 }
@@ -2263,7 +2263,7 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
     {
       title: "Records & planning", help: "Review sales records and important dates.", ...SECTION.records, actions: [
         { title: "Cancel wrong sale", help: "Find and cancel a mistaken sale", icon: "return-up-back", screen: "correct" },
-        { title: "Add missed sale", help: "Choose its original sale date", icon: "calendar-number", screen: "missed" },
+        { title: "Add an earlier sale", help: "Forgot one? Choose the date it happened", icon: "calendar-number", screen: "missed" },
       ],
     },
     {
@@ -5059,6 +5059,11 @@ const s = StyleSheet.create({
   sellModeTitle:{color:C.ink,fontSize:21,fontWeight:"700"},
   sellModeHelp:{marginTop:4,color:C.muted,fontSize:14},
   earlierSale:{minHeight:72,marginTop:14,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  missedSaleFeature:{minHeight:112,marginTop:14,marginBottom:24,padding:16,flexDirection:"row",alignItems:"center",gap:13,borderWidth:1.5,borderColor:SECTION.records.border,borderRadius:18,backgroundColor:SECTION.records.soft},
+  missedSaleFeatureIcon:{width:52,height:52,alignItems:"center",justifyContent:"center",borderRadius:15,backgroundColor:SECTION.records.color},
+  missedSaleFeatureTitle:{color:C.ink,fontSize:19,lineHeight:24,fontWeight:"700"},
+  missedSaleFeatureHelp:{marginTop:3,color:C.muted,fontSize:14,lineHeight:20},
+  missedSaleFeatureAction:{marginTop:8,color:SECTION.records.color,fontSize:12,fontWeight:"800",letterSpacing:.8},
   salesRecordHeading:{marginTop:28,color:SECTION.records.color,fontSize:18,lineHeight:24,fontWeight:"700"},
   salesRecordHelp:{marginTop:5,color:C.muted,fontSize:13,lineHeight:19},
   earlierSaleTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
