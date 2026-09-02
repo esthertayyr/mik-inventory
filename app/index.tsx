@@ -276,7 +276,7 @@ function DeviceUserGate({session}:{session:Session}) {
     setName(clean);setDraft(clean);setEditing(false);
   };
   if(loading)return <SafeAreaView style={s.loading}><ActivityIndicator size="large" color={C.green}/><Text style={s.help}>Opening MIK…</Text></SafeAreaView>;
-  if(!name||editing)return <SafeAreaView style={s.deviceWelcome}><View style={s.deviceWelcomeCard}><Image source={require("../assets/mik-app-icon.png")} style={s.deviceWelcomeLogo}/><Text style={s.kicker}>{editing?"THIS DEVICE":"FIRST TIME ON THIS DEVICE"}</Text><Text style={s.deviceWelcomeTitle}>{editing?"Change your name":"Who is using MIK?"}</Text><Text style={s.centerHelp}>Use a short name so MIK can guide and greet you personally.</Text><Label>Your name</Label><TextInput style={s.input} value={draft} onChangeText={setDraft} placeholder="Example: Anna or Cashier 1" autoCapitalize="words" maxLength={30} onSubmitEditing={()=>void save()}/><BigButton label={editing?"Save name":"Continue to MIK"} icon="arrow-forward" onPress={()=>void save()}/>{editing?<Pressable style={s.cancel} onPress={()=>{setDraft(name);setEditing(false);}}><Text style={s.help}>Cancel</Text></Pressable>:null}</View></SafeAreaView>;
+  if(!name||editing)return <SafeAreaView style={s.deviceWelcome}><View style={s.deviceWelcomeCard}><Image source={require("../assets/mik-app-icon.png")} style={s.deviceWelcomeLogo}/><Text style={s.deviceWelcomeKicker}>{editing?"THIS DEVICE":"FIRST TIME ON THIS DEVICE"}</Text><Text style={s.deviceWelcomeTitle}>{editing?"Change your name":"Who is using MIK?"}</Text><Text style={s.centerHelp}>Use a short name so MIK can guide and greet you personally.</Text><Text style={s.deviceWelcomeFieldLabel}>Your name</Text><TextInput style={[s.input,s.deviceWelcomeInput]} value={draft} onChangeText={setDraft} placeholder="Example: Anna or Cashier 1" autoCapitalize="words" maxLength={30} onSubmitEditing={()=>void save()}/><View style={s.deviceWelcomeButton}><BigButton label={editing?"Save name":"Continue to MIK"} icon="arrow-forward" onPress={()=>void save()}/></View>{editing?<Pressable style={s.cancel} onPress={()=>{setDraft(name);setEditing(false);}}><Text style={s.help}>Cancel</Text></Pressable>:null}</View></SafeAreaView>;
   return <SignedIn session={session} deviceUserName={name} onChangeDeviceUser={()=>setEditing(true)}/>;
 }
 
@@ -4548,9 +4548,13 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   deviceWelcome:{flex:1,alignItems:"center",justifyContent:"center",padding:20,backgroundColor:C.white},
-  deviceWelcomeCard:{width:"100%",maxWidth:500,padding:28,borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white},
+  deviceWelcomeCard:{width:"100%",maxWidth:500,padding:28,alignItems:"center",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white},
   deviceWelcomeLogo:{width:76,height:76,alignSelf:"center",marginBottom:22,borderRadius:18},
+  deviceWelcomeKicker:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:1.4,textAlign:"center"},
   deviceWelcomeTitle:{marginTop:10,color:C.ink,fontSize:30,lineHeight:36,fontWeight:"700",textAlign:"center"},
+  deviceWelcomeFieldLabel:{width:"100%",marginTop:24,marginBottom:7,color:C.ink,fontSize:14,fontWeight:"700",textAlign:"center"},
+  deviceWelcomeInput:{width:"100%",textAlign:"center"},
+  deviceWelcomeButton:{width:"100%"},
   loginShell:{width:"100%",maxWidth:1040,overflow:"hidden",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white,shadowColor:"#071521",shadowOpacity:.09,shadowRadius:28,shadowOffset:{width:0,height:14},elevation:8},
   loginShellWide:{minHeight:650,flexDirection:"row"},
   loginEditorial:{width:"52%",padding:64,justifyContent:"center",backgroundColor:C.dark},
