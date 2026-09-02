@@ -1445,10 +1445,22 @@ function SaleScreen({
         return [{ ...x, quantity: Math.min(available, x.quantity + n) }];
       }),
     );
+  const changePastPrice = (key: string, value: string) => {
+    const cleaned = value.replace(/[^0-9.]/g, "");
+    if (cleaned.split(".").length > 2) return;
+    const price = Number(cleaned);
+    setCart((old) => old.map((item) =>
+      cartKey(item.product.id, item.variant?.id, item.selectedLetters) === key
+        ? { ...item, unitPrice: cleaned === "" || !Number.isFinite(price) ? 0 : price }
+        : item,
+    ));
+  };
   const complete = async () => {
     if (!cart.length) return;
     if (recordPastSale && !/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate))
       return Alert.alert("Check the sale date", "Choose the original sale date before continuing.");
+    if (recordPastSale && cart.some((item) => !Number.isFinite(item.unitPrice) || item.unitPrice <= 0))
+      return Alert.alert("Price needed", "Enter the price charged for every product in this earlier sale.");
     if (!recordPastSale && payment === "cash" && !cashIsEnough)
       return Alert.alert(
         "Not enough cash",
@@ -1469,6 +1481,7 @@ function SaleScreen({
           selected_letters: x.selectedLetters,
           defer_letters: eventMode && x.product.letters_required > 0,
           quantity: x.quantity,
+          ...(recordPastSale ? { unit_price: x.unitPrice } : {}),
         })),
         p_payment_method: payment,
         p_payment_received: recordPastSale || payment === "cash" || gcashReceived,
@@ -1567,7 +1580,23 @@ function SaleScreen({
                         {x.product.alphabet_style?.name ?? "Letters"}: {x.selectedLetters.join(" · ")}
                       </Text>
                     ) : null}
-                    <Text style={s.rowHelp}>{peso(x.unitPrice)} each</Text>
+                    {recordPastSale ? (
+                      <View style={s.pastPriceField}>
+                        <Text style={s.pastPriceLabel}>Price charged each</Text>
+                        <View style={s.pastPriceInputWrap}>
+                          <Text style={s.pastPricePeso}>₱</Text>
+                          <TextInput
+                            accessibilityLabel={`Price charged for ${x.product.name}`}
+                            style={s.pastPriceInput}
+                            value={x.unitPrice > 0 ? String(x.unitPrice) : ""}
+                            onChangeText={(value) => changePastPrice(key, value)}
+                            placeholder="0"
+                            keyboardType="decimal-pad"
+                          />
+                        </View>
+                        <Text style={s.pastPriceHint}>Change this if the old price was different.</Text>
+                      </View>
+                    ) : <Text style={s.rowHelp}>{peso(x.unitPrice)} each</Text>}
                   </View>
                   <Text style={s.lineTotal}>
                     {peso(x.quantity * x.unitPrice)}
@@ -1703,7 +1732,7 @@ function SaleScreen({
               <View style={s.pastSaleIcon}><Ionicons name="calendar-outline" size={22} color={C.dark} /></View>
               <View style={s.flex}>
                 <Text style={s.rowTitle}>Save to {friendlyLocalDate(pastSaleDate)}</Text>
-                <Text style={s.rowHelp}>Only the payment type will be recorded for this earlier sale.</Text>
+                <Text style={s.rowHelp}>The selected date, price charged and payment type will be recorded.</Text>
               </View>
               <Pressable style={s.changePastDateButton} onPress={() => { setReview(false); setPastDateReady(false); }}><Text style={s.changePastDateText}>Change date</Text></Pressable>
             </View>
@@ -1725,7 +1754,7 @@ function SaleScreen({
               !cart.length ||
               (!recordPastSale && payment === "gcash" && !gcashReceived) ||
               (!recordPastSale && payment === "cash" && !cashIsEnough) ||
-              (recordPastSale && !/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate))
+              (recordPastSale && (!/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate) || cart.some((item) => item.unitPrice <= 0)))
             }
           />
           <Text style={s.safe}>
@@ -5390,6 +5419,12 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   cartProductTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  pastPriceField:{marginTop:8,alignItems:"flex-start"},
+  pastPriceLabel:{color:C.ink,fontSize:13,fontWeight:"700"},
+  pastPriceInputWrap:{marginTop:5,width:150,height:46,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:5,borderWidth:1.5,borderColor:SECTION.records.color,borderRadius:10,backgroundColor:C.white},
+  pastPricePeso:{color:C.ink,fontSize:18,fontWeight:"700"},
+  pastPriceInput:{flex:1,paddingVertical:0,color:C.ink,fontSize:19,fontWeight:"700",outlineStyle:"none"} as any,
+  pastPriceHint:{marginTop:4,color:C.muted,fontSize:12,lineHeight:17},
   cartProductBottom: {
     marginTop: 10,
     paddingTop: 9,
