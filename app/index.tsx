@@ -406,6 +406,7 @@ type AdminShop = {
   last_login?: string | null;
 };
 function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
+  const {width}=useWindowDimensions();
   const [shops, setShops] = useState<AdminShop[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -616,11 +617,11 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
                 </View>
                 <View style={[s.statusPill, shop.status !== "active" && s.statusPillPaused]}><Text style={[s.statusText, shop.status !== "active" && s.statusTextPaused]}>{shop.status === "active" ? "ACTIVE" : "PAUSED"}</Text></View>
               </View>
-              <View style={s.adminShopActions}>
+              <View style={[s.adminShopActions,width<620&&s.adminShopActionsMobile]}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Manage staff for ${shop.name}`}
-                style={s.adminShopAction}
+                style={[s.adminShopAction,width<620&&s.adminShopActionMobile]}
                 onPress={() => setStaffShop(shop)}
               >
                 <Ionicons name="people-outline" size={20} color={C.green} /><Text style={s.adminShopActionText}>Staff</Text>
@@ -628,7 +629,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Edit ${shop.name}`}
-                style={s.adminShopAction}
+                style={[s.adminShopAction,width<620&&s.adminShopActionMobile]}
                 onPress={() => setManageShop({ shop, mode: "edit" })}
               >
                 <Ionicons name="create-outline" size={20} color={C.dark} /><Text style={s.adminShopActionText}>Edit</Text>
@@ -636,7 +637,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Duplicate ${shop.name}`}
-                style={s.adminShopAction}
+                style={[s.adminShopAction,width<620&&s.adminShopActionMobile]}
                 onPress={() => setManageShop({ shop, mode: "duplicate" })}
               >
                 <Ionicons name="copy-outline" size={20} color={C.accent} /><Text style={s.adminShopActionText}>Copy</Text>
@@ -644,7 +645,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={shop.status === "active" ? `Pause ${shop.name}` : `Reactivate ${shop.name}`}
-                style={s.adminShopAction}
+                style={[s.adminShopAction,width<620&&s.adminShopActionMobile]}
                 onPress={() => setShopStatus(shop)}
               >
                 <Ionicons name={shop.status === "active" ? "pause-circle-outline" : "play-circle-outline"} size={21} color={shop.status === "active" ? C.red : C.accent} /><Text style={s.adminShopActionText}>{shop.status === "active" ? "Pause" : "Activate"}</Text>
@@ -652,7 +653,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${shop.name}`}
-                style={[s.adminShopAction, s.adminShopActionPrimary]}
+                style={[s.adminShopAction, s.adminShopActionPrimary,width<620&&s.adminShopActionMobile]}
                 onPress={() => setOpenShop(shop)}
               >
                 <Ionicons name="enter-outline" size={21} color={C.white} /><Text style={[s.adminShopActionText, { color: C.white }]}>Open</Text>
@@ -686,6 +687,7 @@ const STAFF_PRESETS={
 };
 
 function AdminStaffManager({shop,onBack}:{shop:AdminShop;onBack:()=>void}){
+  const {width}=useWindowDimensions();
   const [staff,setStaff]=useState<AdminStaff[]>([]);
   const [loading,setLoading]=useState(true);
   const [creating,setCreating]=useState(false);
@@ -713,7 +715,7 @@ function AdminStaffManager({shop,onBack}:{shop:AdminShop;onBack:()=>void}){
   const permissionGrid=(current:StaffPermission[],setter:(value:StaffPermission[])=>void)=><View style={s.staffPermissionGrid}>{STAFF_PERMISSIONS.map(item=><Pressable key={item.id} style={[s.staffPermissionCard,current.includes(item.id)&&s.staffPermissionCardOn]} onPress={()=>toggle(item.id,setter,current)}><Ionicons name={item.icon} size={21} color={current.includes(item.id)?C.white:C.green}/><View style={s.flex}><Text style={[s.staffPermissionTitle,current.includes(item.id)&&{color:C.white}]}>{item.label}</Text><Text style={[s.staffPermissionHelp,current.includes(item.id)&&{color:"#E6EFEA"}]}>{item.help}</Text></View><Ionicons name={current.includes(item.id)?"checkmark-circle":"ellipse-outline"} size={21} color={current.includes(item.id)?C.white:C.muted}/></Pressable>)}</View>;
   return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}><Back title="Manage staff" onPress={onBack}/><Text style={s.pageTitle}>{shop.name} staff</Text><Text style={s.subtitle}>Each person sees only the functions you select.</Text>
     <View style={s.editCard}><Text style={s.editName}>Create staff account</Text><Label>Staff name</Label><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Example: Anna"/><Label>Short username</Label><TextInput style={s.input} value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="Example: anna"/><Text style={s.rowHelp}>Their login will be {shop.login_username??"shop"}.{username.trim().toLowerCase()||"anna"}</Text><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 6 characters"/><Label>Quick role</Label><View style={s.stockSortRow}>{Object.entries(STAFF_PRESETS).map(([label,value])=><Chip key={label} label={label} selected={permissions.length===value.length&&value.every(x=>permissions.includes(x))} onPress={()=>setPermissions([...value])}/>)}</View><Label>Functions this person can use</Label>{permissionGrid(permissions,setPermissions)}<BigButton label={creating?"Creating account…":"Create staff account"} icon="person-add-outline" onPress={()=>void create()} disabled={creating}/></View>
-    <Text style={s.section}>Staff accounts</Text>{loading?<ActivityIndicator color={C.green}/>:staff.length?staff.map(person=><View key={person.user_id} style={s.adminShop}><View style={s.adminShopTop}><View style={s.shopAvatar}><Ionicons name="person-outline" size={23} color={C.green}/></View><View style={s.flex}><Text style={s.rowTitle}>{person.display_name}</Text><Text style={s.rowHelp}>{person.login_username}</Text><Text style={s.adminLastLogin}>{person.last_login?`Last login: ${friendlyDateTime(person.last_login)}`:"No login yet"}</Text></View><View style={[s.statusPill,!person.active&&s.statusPillPaused]}><Text style={[s.statusText,!person.active&&s.statusTextPaused]}>{person.active?"ACTIVE":"DISABLED"}</Text></View></View><Text style={s.staffAccessSummary}>{person.permissions.map(id=>STAFF_PERMISSIONS.find(x=>x.id===id)?.label).filter(Boolean).join(" · ")}</Text><View style={s.adminShopActions}><Pressable style={s.adminShopAction} onPress={()=>setEditing({...person,permissions:[...person.permissions]})}><Ionicons name="options-outline" size={20} color={C.green}/><Text style={s.adminShopActionText}>Access</Text></Pressable><Pressable style={s.adminShopAction} onPress={()=>{setPasswordPerson(person);setNewPassword("");}}><Ionicons name="key-outline" size={20} color={C.accent}/><Text style={s.adminShopActionText}>Password</Text></Pressable><Pressable style={s.adminShopAction} onPress={()=>setStatus(person)}><Ionicons name={person.active?"pause-circle-outline":"play-circle-outline"} size={20} color={person.active?C.red:C.green}/><Text style={s.adminShopActionText}>{person.active?"Disable":"Enable"}</Text></Pressable></View></View>):<Empty title="No staff accounts yet"/>}
+    <Text style={s.section}>Staff accounts</Text>{loading?<ActivityIndicator color={C.green}/>:staff.length?staff.map(person=><View key={person.user_id} style={s.adminShop}><View style={s.adminShopTop}><View style={s.shopAvatar}><Ionicons name="person-outline" size={23} color={C.green}/></View><View style={s.flex}><Text style={s.rowTitle}>{person.display_name}</Text><Text style={s.rowHelp}>{person.login_username}</Text><Text style={s.adminLastLogin}>{person.last_login?`Last login: ${friendlyDateTime(person.last_login)}`:"No login yet"}</Text></View><View style={[s.statusPill,!person.active&&s.statusPillPaused]}><Text style={[s.statusText,!person.active&&s.statusTextPaused]}>{person.active?"ACTIVE":"DISABLED"}</Text></View></View><Text style={s.staffAccessSummary}>{person.permissions.map(id=>STAFF_PERMISSIONS.find(x=>x.id===id)?.label).filter(Boolean).join(" · ")}</Text><View style={[s.adminShopActions,width<620&&s.adminShopActionsMobile]}><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setEditing({...person,permissions:[...person.permissions]})}><Ionicons name="options-outline" size={20} color={C.green}/><Text style={s.adminShopActionText}>Access</Text></Pressable><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>{setPasswordPerson(person);setNewPassword("");}}><Ionicons name="key-outline" size={20} color={C.accent}/><Text style={s.adminShopActionText}>Password</Text></Pressable><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setStatus(person)}><Ionicons name={person.active?"pause-circle-outline":"play-circle-outline"} size={20} color={person.active?C.red:C.green}/><Text style={s.adminShopActionText}>{person.active?"Disable":"Enable"}</Text></Pressable></View></View>):<Empty title="No staff accounts yet"/>}
     {editing?<View style={s.editCard}><Text style={s.editName}>Access for {editing.display_name}</Text>{permissionGrid(editing.permissions,value=>setEditing({...editing,permissions:value}))}<BigButton label="Save access" icon="checkmark-circle-outline" onPress={()=>void savePermissions()}/><Pressable style={s.cancel} onPress={()=>setEditing(null)}><Text style={s.help}>Cancel</Text></Pressable></View>:null}
     {passwordPerson?<View style={s.editCard}><Text style={s.editName}>New password for {passwordPerson.display_name}</Text><TextInput style={s.input} secureTextEntry value={newPassword} onChangeText={setNewPassword} placeholder="At least 6 characters"/><BigButton label="Change password" icon="key-outline" onPress={()=>void resetPassword()}/><Pressable style={s.cancel} onPress={()=>setPasswordPerson(null)}><Text style={s.help}>Cancel</Text></Pressable></View>:null}
   </ScrollView></SafeAreaView>;
@@ -4941,6 +4943,8 @@ const s = StyleSheet.create({
   adminShopTop:{flexDirection:"row",alignItems:"center",gap:11},
   adminShopActions:{paddingTop:10,flexDirection:"row",gap:7,borderTopWidth:1,borderTopColor:C.border},
   adminShopAction:{flex:1,minHeight:42,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:5,borderRadius:10,backgroundColor:C.soft},
+  adminShopActionsMobile:{flexWrap:"wrap",gap:9},
+  adminShopActionMobile:{flexGrow:1,flexBasis:"46%",minWidth:"46%",minHeight:50,paddingHorizontal:10},
   adminShopActionPrimary:{backgroundColor:C.green},
   adminShopActionText:{color:C.dark,fontSize:12,fontWeight:"700"},
   adminLastLogin:{marginTop:3,color:C.muted,fontSize:12},
