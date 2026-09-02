@@ -333,7 +333,7 @@ function Login() {
         />
         {!wide?<Text style={s.loginMobileName}>MIK. · MIKAEL</Text>:null}
         <Text style={s.loginTitle}>Welcome back.</Text>
-        <Text style={s.centerHelp}>Everything you need to run the day.</Text>
+        <Text style={s.centerHelp}>Your shop is ready for the day.</Text>
         <Label>Username</Label>
         <TextInput
           style={s.input}
@@ -4014,18 +4014,28 @@ type GuideStep = { title: string; body: string; icon: Icon; flow: GuideFlow[] };
 const guideSteps: GuideStep[] = [
   {
     title: "Welcome to Mik",
-    body: "Home has six simple choices. Tap Home at any time to come back.",
+    body: "Home groups every tool by task. Tap Home at any time to find sales, stock, production, records, settings and support.",
     icon: "home",
     flow: [
       { icon: "home-outline", label: "Home" },
       { icon: "cart-outline", label: "Sell" },
-      { icon: "today-outline", label: "Today" },
+      { icon: "clipboard-outline", label: "Orders" },
       { icon: "cube-outline", label: "Stock" },
     ],
   },
   {
-    title: "Make a sale",
-    body: "Tap the product photo. If it has choices, tap the letter, colour, or size. Check the quantity, then confirm payment.",
+    title: "Choose how you are selling",
+    body: "Shop Sale is the normal checkout and asks for keycap letters. Event Sale is faster and skips letters, so you count the A–Z keycaps after the event.",
+    icon: "storefront",
+    flow: [
+      { icon: "cart-outline", label: "Sell" },
+      { icon: "storefront-outline", label: "Shop Sale" },
+      { icon: "flash-outline", label: "Event Sale" },
+    ],
+  },
+  {
+    title: "Make and finish a sale",
+    body: "Choose a category, tap the product photo and select any required choices. Review quantities, choose Cash or GCash, then confirm payment.",
     icon: "cart",
     flow: [
       { icon: "cart-outline", label: "Sell" },
@@ -4035,70 +4045,59 @@ const guideSteps: GuideStep[] = [
     ],
   },
   {
-    title: "See what sold today",
-    body: "Today shows the sales total, number of items, sold products, and each receipt.",
-    icon: "today",
-    flow: [
-      { icon: "today-outline", label: "Today" },
-      { icon: "bag-check-outline", label: "Sold items" },
-      { icon: "receipt-outline", label: "Receipts" },
-    ],
-  },
-  {
-    title: "Check and change stock",
-    body: "Tap Stock, choose a product, then add stock or record damaged stock. Mik asks for a letter, colour, or size when needed.",
+    title: "Keep stock and products ready",
+    body: "Stock shows what is low or empty. Update finished products and A–Z keycaps separately. Products & prices lets you add, edit or remove products and categories.",
     icon: "cube",
     flow: [
       { icon: "cube-outline", label: "Stock" },
-      { icon: "image-outline", label: "Product" },
-      { icon: "add-circle-outline", label: "Add stock" },
+      { icon: "text-outline", label: "A–Z keycaps" },
+      { icon: "pricetags-outline", label: "Products" },
     ],
   },
   {
     title: "Track outside orders",
-    body: "Tap Orders for Facebook, online, referral, or walk-in work. Record where the customer paid, then update the order as work progresses.",
+    body: "Record Facebook, online, referral or walk-in work. Printing starts after 50% payment. Mark the order ready, collect final payment, then confirm collection or delivery.",
     icon: "clipboard",
     flow: [
       { icon: "clipboard-outline", label: "Orders" },
       { icon: "card-outline", label: "Payment" },
-      { icon: "construct-outline", label: "Making" },
-      { icon: "checkmark-circle-outline", label: "Ready" },
+      { icon: "construct-outline", label: "Print" },
+      { icon: "checkmark-circle-outline", label: "Collect" },
     ],
   },
   {
-    title: "Correct or add a missed sale",
-    body: "Tap Sell, then Add missed sale. Choose the original date, add the products and select Cash or GCash. To remove a mistaken entry, tap Cancel wrong sale in the same section.",
-    icon: "return-up-back",
+    title: "Manage 3D printing work",
+    body: "Use Print Queue for jobs, Printers for equipment condition, Filaments for materials, and Price calculator for a simple selling-price estimate.",
+    icon: "layers",
     flow: [
-      { icon: "home-outline", label: "Home" },
-      { icon: "return-up-back-outline", label: "Correct" },
-      { icon: "calendar-outline", label: "Missed sale" },
+      { icon: "layers-outline", label: "Print Queue" },
+      { icon: "hardware-chip-outline", label: "Printers" },
+      { icon: "color-filter-outline", label: "Filaments" },
     ],
   },
   {
-    title: "Create or edit a product",
-    body: "Open More, then Products & prices. Add a photo, price, and stock. Turn on choices only when a product needs letters, colours, or sizes.",
-    icon: "pricetags",
-    flow: [
-      { icon: "home-outline", label: "Home" },
-      { icon: "pricetags-outline", label: "Products" },
-      { icon: "camera-outline", label: "Photo" },
-      { icon: "save-outline", label: "Save" },
-    ],
-  },
-  {
-    title: "View sales reports",
-    body: "Open More, then Sales reports. Choose a day, week, month, or exact date.",
+    title: "See results and plan ahead",
+    body: "Sales Today shows receipts. View all sales gives daily, weekly, monthly or exact-date reports. Calendar keeps events and reminders in one place.",
     icon: "bar-chart",
     flow: [
-      { icon: "home-outline", label: "Home" },
-      { icon: "bar-chart-outline", label: "Reports" },
-      { icon: "calendar-outline", label: "Choose date" },
+      { icon: "today-outline", label: "Today" },
+      { icon: "bar-chart-outline", label: "All sales" },
+      { icon: "calendar-outline", label: "Calendar" },
+    ],
+  },
+  {
+    title: "Fix records and get help",
+    body: "Add a missed sale using its original date. Cancel a mistaken sale to restore its stock. If something is not working, send a problem report with an optional photo.",
+    icon: "help-circle",
+    flow: [
+      { icon: "calendar-outline", label: "Missed sale" },
+      { icon: "return-up-back-outline", label: "Cancel sale" },
+      { icon: "chatbox-ellipses-outline", label: "Report" },
     ],
   },
   {
     title: "Export for Excel",
-    body: "Choose the period first, then tap Export for Excel. Save or share the sales list.",
+    body: "Sales reports and Orders can be exported for Excel. Choose the period or list first, then save or share the file.",
     icon: "download",
     flow: [
       { icon: "calendar-outline", label: "Period" },
