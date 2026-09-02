@@ -3731,9 +3731,10 @@ function ReportIssue({businessId,onBack}:{businessId:string;onBack:()=>void}) {
     const clean = message.trim();
     if (clean.length < 5) return Alert.alert("Tell us what happened", "Write a short description so we know what to check.");
     setSending(true);
-    const { error } = await supabase.from("issue_reports").insert({ business_id: businessId, category, message: clean });
+    const { data, error } = await supabase.from("issue_reports").insert({ business_id: businessId, category, message: clean }).select("id").single();
     setSending(false);
     if (error) return Alert.alert("Report not sent", error.message);
+    if (data?.id) await supabase.functions.invoke("notify-issue-report", { body: { issueId: data.id } });
     setMessage("");
     Alert.alert("Report sent", "The MIK owner can now see your report.", [{text:"Done",onPress:onBack}]);
   };
