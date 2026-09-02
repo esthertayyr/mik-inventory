@@ -1404,7 +1404,7 @@ function SaleScreen({
             );
       return [
         ...old,
-        { product: p, variant, selectedLetters, quantity: 1, unitPrice: price },
+        { product: p, variant, selectedLetters, quantity: 1, unitPrice: price, listedPrice: price },
       ];
     });
     setChoosing(null);
@@ -1582,7 +1582,15 @@ function SaleScreen({
                     ) : null}
                     {recordPastSale ? (
                       <View style={s.pastPriceField}>
-                        <Text style={s.pastPriceLabel}>Price charged each</Text>
+                        <Text style={s.pastPriceLabel}>Which price was charged?</Text>
+                        <Pressable
+                          style={[s.currentPriceButton, x.unitPrice === x.listedPrice && s.currentPriceButtonOn]}
+                          onPress={() => changePastPrice(key, String(x.listedPrice))}
+                        >
+                          <Ionicons name={x.unitPrice === x.listedPrice ? "checkmark-circle" : "refresh-circle-outline"} size={20} color={x.unitPrice === x.listedPrice ? C.white : SECTION.records.color}/>
+                          <Text style={[s.currentPriceButtonText, x.unitPrice === x.listedPrice && s.currentPriceButtonTextOn]}>Use current price · {peso(x.listedPrice)}</Text>
+                        </Pressable>
+                        <Text style={s.pastPriceOr}>OR ENTER THE PRICE CHARGED THEN</Text>
                         <View style={s.pastPriceInputWrap}>
                           <Text style={s.pastPricePeso}>₱</Text>
                           <TextInput
@@ -1594,7 +1602,7 @@ function SaleScreen({
                             keyboardType="decimal-pad"
                           />
                         </View>
-                        <Text style={s.pastPriceHint}>Change this if the old price was different.</Text>
+                        <Text style={s.pastPriceHint}>Only change this when the earlier selling price was different.</Text>
                       </View>
                     ) : <Text style={s.rowHelp}>{peso(x.unitPrice)} each</Text>}
                   </View>
@@ -5421,6 +5429,11 @@ const s = StyleSheet.create({
   cartProductTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   pastPriceField:{marginTop:8,alignItems:"flex-start"},
   pastPriceLabel:{color:C.ink,fontSize:13,fontWeight:"700"},
+  currentPriceButton:{marginTop:6,minHeight:42,paddingHorizontal:11,flexDirection:"row",alignItems:"center",gap:7,borderWidth:1,borderColor:SECTION.records.border,borderRadius:10,backgroundColor:SECTION.records.soft},
+  currentPriceButtonOn:{borderColor:SECTION.records.color,backgroundColor:SECTION.records.color},
+  currentPriceButtonText:{color:SECTION.records.color,fontSize:13,fontWeight:"700"},
+  currentPriceButtonTextOn:{color:C.white},
+  pastPriceOr:{marginTop:9,color:C.muted,fontSize:10,fontWeight:"700",letterSpacing:.65},
   pastPriceInputWrap:{marginTop:5,width:150,height:46,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:5,borderWidth:1.5,borderColor:SECTION.records.color,borderRadius:10,backgroundColor:C.white},
   pastPricePeso:{color:C.ink,fontSize:18,fontWeight:"700"},
   pastPriceInput:{flex:1,paddingVertical:0,color:C.ink,fontSize:19,fontWeight:"700",outlineStyle:"none"} as any,

@@ -68,6 +68,7 @@ export interface CartItem {
   variant: ProductVariant | null;
   quantity: number;
   unitPrice: number;
+  listedPrice: number;
   selectedLetters: string[];
 }
 export interface Profile {
