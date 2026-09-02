@@ -324,13 +324,14 @@ function Login() {
     <SafeAreaView style={s.login}>
       <StatusBar style="dark" />
       <View style={[s.loginShell, wide && s.loginShellWide]}>
-        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK</Text><Text style={s.loginEditorialTitle}>Your 3D printing shop, made simple.</Text><Text style={s.loginEditorialBody}>Sell products · Track stock · Follow every order</Text></View> : null}
+        {wide ? <View style={s.loginEditorial}><View style={s.loginBrandLine}><Text style={s.loginKicker}>MIK.</Text><Text style={s.loginBrandName}>Mikael</Text></View><Text style={s.loginEditorialTitle}>Your 3D printing shop, made simple.</Text><Text style={s.loginEditorialBody}>Sell products · Track stock · Follow every order</Text></View> : null}
         <View style={[s.loginCard, wide && s.loginCardWide]}>
         <Image
           source={require("../assets/mik-logo.png")}
           style={s.brandLogo}
           resizeMode="cover"
         />
+        {!wide?<Text style={s.loginMobileName}>MIK. · MIKAEL</Text>:null}
         <Text style={s.loginTitle}>Welcome back.</Text>
         <Text style={s.centerHelp}>Everything you need to run the day.</Text>
         <Label>Username</Label>
@@ -4462,6 +4463,9 @@ const s = StyleSheet.create({
   loginShellWide:{minHeight:650,flexDirection:"row"},
   loginEditorial:{width:"52%",padding:64,justifyContent:"center",backgroundColor:C.dark},
   loginKicker:{color:C.white,fontSize:12,fontWeight:"700",letterSpacing:4},
+  loginBrandLine:{flexDirection:"row",alignItems:"baseline",gap:12},
+  loginBrandName:{color:"#BFC9D2",fontSize:12,fontWeight:"500",letterSpacing:2},
+  loginMobileName:{marginTop:-5,marginBottom:8,color:C.muted,fontSize:12,fontWeight:"600",letterSpacing:2,textAlign:"center"},
   loginEditorialTitle:{maxWidth:430,marginTop:30,color:C.white,fontSize:52,lineHeight:58,fontWeight:"600",letterSpacing:-1.8},
   loginEditorialBody:{maxWidth:410,marginTop:26,color:"#D7DEE5",fontSize:15,lineHeight:24,fontWeight:"500",letterSpacing:1.2},
   loginCard: {
