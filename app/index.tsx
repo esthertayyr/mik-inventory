@@ -416,6 +416,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const [openShop, setOpenShop] = useState<AdminShop | null>(null);
   const [showActivity, setShowActivity] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
+  const [staffShop, setStaffShop] = useState<AdminShop | null>(null);
   const [manageShop, setManageShop] = useState<{ shop: AdminShop; mode: "edit" | "duplicate" } | null>(null);
   const [ownerStats, setOwnerStats] = useState({ salesToday: 0, activeOrders: 0, lowStock: 0 });
   const [exporting, setExporting] = useState(false);
@@ -515,6 +516,8 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     return <OwnerActivityLog shops={shops} onBack={() => setShowActivity(false)} />;
   if (showIssues)
     return <OwnerIssueReports onBack={() => setShowIssues(false)} />;
+  if (staffShop)
+    return <AdminStaffManager shop={staffShop} onBack={() => setStaffShop(null)} />;
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -616,6 +619,14 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
               <View style={s.adminShopActions}>
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel={`Manage staff for ${shop.name}`}
+                style={s.adminShopAction}
+                onPress={() => setStaffShop(shop)}
+              >
+                <Ionicons name="people-outline" size={20} color={C.green} /><Text style={s.adminShopActionText}>Staff</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
                 accessibilityLabel={`Edit ${shop.name}`}
                 style={s.adminShopAction}
                 onPress={() => setManageShop({ shop, mode: "edit" })}
@@ -655,6 +666,59 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   );
 }
 
+type StaffPermission = "sell"|"sales"|"orders"|"stock"|"products"|"reports"|"production"|"calendar"|"settings";
+type AdminStaff = { user_id:string;display_name:string;login_username:string;permissions:StaffPermission[];active:boolean;created_at:string;last_login:string|null };
+const STAFF_PERMISSIONS:Array<{id:StaffPermission;label:string;help:string;icon:Icon}>=[
+  {id:"sell",label:"Make sales",help:"Shop and Event checkout",icon:"cart-outline"},
+  {id:"sales",label:"View sales",help:"Today, history and corrections",icon:"receipt-outline"},
+  {id:"orders",label:"Customer orders",help:"Create and update orders",icon:"clipboard-outline"},
+  {id:"stock",label:"Update stock",help:"Counts and A–Z keycaps",icon:"layers-outline"},
+  {id:"products",label:"Manage products",help:"Create, edit and delete products",icon:"cube-outline"},
+  {id:"reports",label:"Reports and exports",help:"Sales reports and Excel files",icon:"bar-chart-outline"},
+  {id:"production",label:"Production",help:"Print Queue, printers and filament",icon:"construct-outline"},
+  {id:"calendar",label:"Calendar",help:"Events and reminders",icon:"calendar-outline"},
+  {id:"settings",label:"Shop settings",help:"Shop details and advanced tools",icon:"settings-outline"},
+];
+const STAFF_PRESETS={
+  Cashier:["sell","sales"] as StaffPermission[],
+  "Sales team":["sell","sales","orders","calendar"] as StaffPermission[],
+  Manager:STAFF_PERMISSIONS.map(x=>x.id).filter(x=>x!=="settings"),
+};
+
+function AdminStaffManager({shop,onBack}:{shop:AdminShop;onBack:()=>void}){
+  const [staff,setStaff]=useState<AdminStaff[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [creating,setCreating]=useState(false);
+  const [name,setName]=useState("");
+  const [username,setUsername]=useState("");
+  const [password,setPassword]=useState("");
+  const [permissions,setPermissions]=useState<StaffPermission[]>(STAFF_PRESETS.Cashier);
+  const [editing,setEditing]=useState<AdminStaff|null>(null);
+  const [passwordPerson,setPasswordPerson]=useState<AdminStaff|null>(null);
+  const [newPassword,setNewPassword]=useState("");
+  const invoke=async(body:Record<string,unknown>)=>{
+    const {data,error}=await supabase.functions.invoke("admin-manage-staff",{body:{shopId:shop.id,...body}});
+    if(error){let message=error.message;try{message=(await error.context?.json())?.error??message;}catch{}throw new Error(message);}
+    return data;
+  };
+  const load=useCallback(async()=>{setLoading(true);try{const data=await invoke({action:"list"});setStaff(data.staff??[]);}catch(e){Alert.alert("Staff not loaded",e instanceof Error?e.message:"Please try again.");}finally{setLoading(false);}},[shop.id]);
+  useEffect(()=>{void load();},[load]);
+  const toggle=(id:StaffPermission,setter:(value:StaffPermission[])=>void,current:StaffPermission[])=>setter(current.includes(id)?current.filter(x=>x!==id):[...current,id]);
+  const create=async()=>{
+    setCreating(true);try{const data=await invoke({action:"create",displayName:name,username,password,permissions});setName("");setUsername("");setPassword("");setPermissions(STAFF_PRESETS.Cashier);await load();Alert.alert("Staff account created",`Login username: ${data.loginUsername}`);}catch(e){Alert.alert("Staff not created",e instanceof Error?e.message:"Please check the details.");}finally{setCreating(false);}
+  };
+  const savePermissions=async()=>{if(!editing)return;try{await invoke({action:"permissions",userId:editing.user_id,permissions:editing.permissions});setEditing(null);await load();Alert.alert("Access updated",`${editing.display_name} will see only the selected functions.`);}catch(e){Alert.alert("Access not updated",e instanceof Error?e.message:"Please try again.");}};
+  const resetPassword=async()=>{if(!passwordPerson)return;try{await invoke({action:"password",userId:passwordPerson.user_id,password:newPassword});setPasswordPerson(null);setNewPassword("");Alert.alert("Password changed");}catch(e){Alert.alert("Password not changed",e instanceof Error?e.message:"Please try again.");}};
+  const setStatus=(person:AdminStaff)=>Alert.alert(person.active?"Disable this staff account?":"Enable this staff account?",person.active?"They will not be able to sign in. Their history stays saved.":"They will be able to sign in again.",[{text:"Cancel",style:"cancel"},{text:person.active?"Disable":"Enable",style:person.active?"destructive":"default",onPress:async()=>{try{await invoke({action:"status",userId:person.user_id,active:!person.active});await load();}catch(e){Alert.alert("Account not changed",e instanceof Error?e.message:"Please try again.");}}}]);
+  const permissionGrid=(current:StaffPermission[],setter:(value:StaffPermission[])=>void)=><View style={s.staffPermissionGrid}>{STAFF_PERMISSIONS.map(item=><Pressable key={item.id} style={[s.staffPermissionCard,current.includes(item.id)&&s.staffPermissionCardOn]} onPress={()=>toggle(item.id,setter,current)}><Ionicons name={item.icon} size={21} color={current.includes(item.id)?C.white:C.green}/><View style={s.flex}><Text style={[s.staffPermissionTitle,current.includes(item.id)&&{color:C.white}]}>{item.label}</Text><Text style={[s.staffPermissionHelp,current.includes(item.id)&&{color:"#E6EFEA"}]}>{item.help}</Text></View><Ionicons name={current.includes(item.id)?"checkmark-circle":"ellipse-outline"} size={21} color={current.includes(item.id)?C.white:C.muted}/></Pressable>)}</View>;
+  return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}><Back title="Manage staff" onPress={onBack}/><Text style={s.pageTitle}>{shop.name} staff</Text><Text style={s.subtitle}>Each person sees only the functions you select.</Text>
+    <View style={s.editCard}><Text style={s.editName}>Create staff account</Text><Label>Staff name</Label><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Example: Anna"/><Label>Short username</Label><TextInput style={s.input} value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="Example: anna"/><Text style={s.rowHelp}>Their login will be {shop.login_username??"shop"}.{username.trim().toLowerCase()||"anna"}</Text><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 6 characters"/><Label>Quick role</Label><View style={s.stockSortRow}>{Object.entries(STAFF_PRESETS).map(([label,value])=><Chip key={label} label={label} selected={permissions.length===value.length&&value.every(x=>permissions.includes(x))} onPress={()=>setPermissions([...value])}/>)}</View><Label>Functions this person can use</Label>{permissionGrid(permissions,setPermissions)}<BigButton label={creating?"Creating account…":"Create staff account"} icon="person-add-outline" onPress={()=>void create()} disabled={creating}/></View>
+    <Text style={s.section}>Staff accounts</Text>{loading?<ActivityIndicator color={C.green}/>:staff.length?staff.map(person=><View key={person.user_id} style={s.adminShop}><View style={s.adminShopTop}><View style={s.shopAvatar}><Ionicons name="person-outline" size={23} color={C.green}/></View><View style={s.flex}><Text style={s.rowTitle}>{person.display_name}</Text><Text style={s.rowHelp}>{person.login_username}</Text><Text style={s.adminLastLogin}>{person.last_login?`Last login: ${friendlyDateTime(person.last_login)}`:"No login yet"}</Text></View><View style={[s.statusPill,!person.active&&s.statusPillPaused]}><Text style={[s.statusText,!person.active&&s.statusTextPaused]}>{person.active?"ACTIVE":"DISABLED"}</Text></View></View><Text style={s.staffAccessSummary}>{person.permissions.map(id=>STAFF_PERMISSIONS.find(x=>x.id===id)?.label).filter(Boolean).join(" · ")}</Text><View style={s.adminShopActions}><Pressable style={s.adminShopAction} onPress={()=>setEditing({...person,permissions:[...person.permissions]})}><Ionicons name="options-outline" size={20} color={C.green}/><Text style={s.adminShopActionText}>Access</Text></Pressable><Pressable style={s.adminShopAction} onPress={()=>{setPasswordPerson(person);setNewPassword("");}}><Ionicons name="key-outline" size={20} color={C.accent}/><Text style={s.adminShopActionText}>Password</Text></Pressable><Pressable style={s.adminShopAction} onPress={()=>setStatus(person)}><Ionicons name={person.active?"pause-circle-outline":"play-circle-outline"} size={20} color={person.active?C.red:C.green}/><Text style={s.adminShopActionText}>{person.active?"Disable":"Enable"}</Text></Pressable></View></View>):<Empty title="No staff accounts yet"/>}
+    {editing?<View style={s.editCard}><Text style={s.editName}>Access for {editing.display_name}</Text>{permissionGrid(editing.permissions,value=>setEditing({...editing,permissions:value}))}<BigButton label="Save access" icon="checkmark-circle-outline" onPress={()=>void savePermissions()}/><Pressable style={s.cancel} onPress={()=>setEditing(null)}><Text style={s.help}>Cancel</Text></Pressable></View>:null}
+    {passwordPerson?<View style={s.editCard}><Text style={s.editName}>New password for {passwordPerson.display_name}</Text><TextInput style={s.input} secureTextEntry value={newPassword} onChangeText={setNewPassword} placeholder="At least 6 characters"/><BigButton label="Change password" icon="key-outline" onPress={()=>void resetPassword()}/><Pressable style={s.cancel} onPress={()=>setPasswordPerson(null)}><Text style={s.help}>Cancel</Text></Pressable></View>:null}
+  </ScrollView></SafeAreaView>;
+}
+
 function ShopApp({
   session,
   adminBusiness,
@@ -679,6 +743,7 @@ function ShopApp({
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [staffPermissions,setStaffPermissions]=useState<StaffPermission[]|null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
   const [saleInProgress, setSaleInProgress] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
@@ -776,7 +841,7 @@ function ShopApp({
       return;
     }
     if (!session) return;
-    const [{ data: p }, { data: m }] = await Promise.all([
+    const [{ data: p }, { data: m }, { data: staffAccess }] = await Promise.all([
       supabase
         .from("profiles")
         .select("id,display_name")
@@ -784,9 +849,11 @@ function ShopApp({
         .maybeSingle(),
       supabase
         .from("business_memberships")
-        .select("business_id,role,businesses(id,name,logo_url)")
+        .select("business_id,role,businesses(id,name,logo_url,login_username)")
         .eq("user_id", session.user.id),
+      supabase.from("shop_staff_accounts").select("permissions,active").eq("user_id",session.user.id).maybeSingle(),
     ]);
+    setStaffPermissions(staffAccess?.active ? (staffAccess.permissions as StaffPermission[]) : null);
     setProfile(p as Profile | null);
     const member: any = m?.[0];
     if (!member) {
@@ -798,6 +865,7 @@ function ShopApp({
       id: member.business_id,
       name: member.businesses.name,
       logo_url: member.businesses.logo_url ?? null,
+      login_username: member.businesses.login_username ?? null,
       role: member.role,
     } as Business;
     setBusiness(b);
@@ -842,8 +910,12 @@ function ShopApp({
     );
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
-  const nav =
-    role === "owner" ? ownerNav : ownerNav.filter((x) => x.id !== "more");
+  const nav = role === "owner" ? ownerNav : ownerNav.filter((x) =>
+    x.id === "home" ||
+    (x.id === "sell_start" && staffPermissions?.includes("sell")) ||
+    (x.id === "orders" && staffPermissions?.includes("orders")) ||
+    (x.id === "stock_start" && staffPermissions?.includes("stock"))
+  );
   const current = locations.find((x) => x.id === locationId);
   const reload = () =>
     business && locationId
@@ -859,6 +931,7 @@ function ShopApp({
     body = (
       <QuickStart
         locationId={locationId}
+        permissions={staffPermissions}
         onOpen={(next) => {
           if (next === "products") {
             setEditProductId(null);
@@ -980,6 +1053,8 @@ function ShopApp({
         }}
       />
     );
+  else if(screen === "staff")
+    body=<AdminStaffManager shop={{id:business!.id,name:business!.name,logo_url:business!.logo_url,slug:null,login_username:business!.login_username??null,status:"active",created_at:""}} onBack={()=>setScreen("more")}/>;
   else
     body = (
       <More
@@ -996,12 +1071,13 @@ function ShopApp({
         onGuide={() => setGuideOpen(true)}
         deviceUserName={deviceUserName}
         onChangeDeviceUser={onChangeDeviceUser}
+        canManageStaff={role === "owner"}
       />
     );
   const selected =
     screen === "inventory" || screen === "alphabet_inventory" || screen === "products" || screen === "price_list"
       ? "stock_start"
-      : screen === "reports" || screen === "shop" || screen === "report_issue"
+      : screen === "reports" || screen === "shop" || screen === "report_issue" || screen === "staff"
       ? "more"
       : screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "print_queue" || screen === "price_calculator"
         ? "home"
@@ -2107,7 +2183,7 @@ function SaleScreen({
   );
 }
 
-function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (screen: Screen) => void }) {
+function QuickStart({ locationId, onOpen, permissions }: { locationId: string; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null }) {
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
@@ -2202,6 +2278,16 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
       ],
     },
   ];
+  const permissionFor=(screen:Screen):StaffPermission=>
+    (["sell_start","sale","event_sale","missed"] as Screen[]).includes(screen)?"sell":
+    (["dashboard","correct"] as Screen[]).includes(screen)?"sales":
+    screen==="orders"?"orders":
+    (["stock_start","inventory","alphabet_inventory"] as Screen[]).includes(screen)?"stock":
+    (["products","price_list"] as Screen[]).includes(screen)?"products":
+    screen==="reports"?"reports":
+    (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
+    screen==="calendar"?"calendar":"settings";
+  const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>!permissions||permissions.includes(permissionFor(action.screen)))})).filter(group=>group.actions.length);
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
       <Text style={s.pageTitle}>Your shop</Text>
@@ -2217,7 +2303,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
           <Ionicons name="chevron-forward" size={22} color={SECTION.records.color} />
         </Pressable>
       ) : null}
-      {groups.map((group) => (
+      {visibleGroups.map((group) => (
         <View key={group.title} style={s.quickSection}>
           <View style={s.quickSectionHeading}>
             <View style={[s.quickSectionMark,{backgroundColor:group.color}]} />
@@ -3681,6 +3767,7 @@ function More({
   onGuide,
   deviceUserName,
   onChangeDeviceUser,
+  canManageStaff,
 }: {
   profile: Profile | null;
   business: Business;
@@ -3688,6 +3775,7 @@ function More({
   onGuide: () => void;
   deviceUserName: string;
   onChangeDeviceUser?: () => void;
+  canManageStaff:boolean;
 }) {
   const { width } = useWindowDimensions();
   type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean };
@@ -3699,6 +3787,7 @@ function More({
     },
     {
       title: "Shop & help", ...SECTION.settings, tools: [
+        ...(canManageStaff?[{ icon: "people-outline" as Icon, title: "Manage staff", help: "Create accounts and choose their access", screen: "staff" as Screen }]:[]),
         { icon: "storefront-outline", title: "Shop profile & logo", help: business.logo_url ? "Replace this shop's logo" : "Add this shop's logo", screen: "shop" },
         { icon: "help-circle-outline", title: "How to use Mik", help: "Replay the step-by-step guide", guide: true },
         { icon: "chatbox-ellipses-outline", title: "Report a problem", help: "Tell the MIK owner what went wrong", screen: "report_issue" },
@@ -4859,6 +4948,12 @@ const s = StyleSheet.create({
   adminShopActionPrimary:{backgroundColor:C.green},
   adminShopActionText:{color:C.dark,fontSize:12,fontWeight:"700"},
   adminLastLogin:{marginTop:3,color:C.muted,fontSize:12},
+  staffPermissionGrid:{marginTop:8,gap:8},
+  staffPermissionCard:{minHeight:64,padding:12,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.white},
+  staffPermissionCardOn:{backgroundColor:C.green,borderColor:C.green},
+  staffPermissionTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
+  staffPermissionHelp:{marginTop:2,color:C.muted,fontSize:13,lineHeight:18},
+  staffAccessSummary:{marginTop:11,marginBottom:10,color:C.muted,fontSize:13,lineHeight:19},
   statusPillPaused:{backgroundColor:C.redSoft},
   statusTextPaused:{color:C.red},
   clearSaleText: { color: C.red, fontSize: 13, fontWeight: "700" },

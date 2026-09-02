@@ -21,6 +21,7 @@ export type Screen =
   | "alphabet_inventory"
   | "reports"
   | "report_issue"
+  | "staff"
   | "shop"
   | "more";
 
@@ -77,6 +78,7 @@ export interface Business {
   id: string;
   name: string;
   logo_url: string | null;
+  login_username?: string | null;
   role: Role;
 }
 export interface Location {
