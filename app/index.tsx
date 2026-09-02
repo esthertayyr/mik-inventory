@@ -418,6 +418,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const [showActivity, setShowActivity] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [staffShop, setStaffShop] = useState<AdminShop | null>(null);
+  const [actionShop,setActionShop]=useState<AdminShop|null>(null);
   const [manageShop, setManageShop] = useState<{ shop: AdminShop; mode: "edit" | "duplicate" } | null>(null);
   const [ownerStats, setOwnerStats] = useState({ salesToday: 0, activeOrders: 0, lowStock: 0 });
   const [exporting, setExporting] = useState(false);
@@ -519,6 +520,13 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     return <OwnerIssueReports onBack={() => setShowIssues(false)} />;
   if (staffShop)
     return <AdminStaffManager shop={staffShop} onBack={() => setStaffShop(null)} />;
+  if(actionShop)
+    return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}><Back title="Shop profiles" onPress={()=>setActionShop(null)}/><View style={s.manageShopHero}><View style={s.shopAvatar}><Ionicons name="storefront" size={25} color={C.green}/></View><View style={s.flex}><Text style={s.pageTitle}>{actionShop.name}</Text><Text style={s.subtitle}>Choose what you want to manage.</Text></View></View><View style={s.manageShopGrid}>
+      <Pressable style={s.manageShopCard} onPress={()=>{setStaffShop(actionShop);setActionShop(null);}}><View style={[s.quickIcon,{backgroundColor:SECTION.sales.color}]}><Ionicons name="people-outline" size={24} color={C.white}/></View><Text style={s.quickTitle}>Staff accounts</Text><Text style={s.quickHelp}>Create staff and choose their access</Text><Ionicons name="arrow-forward" size={20} color={SECTION.sales.color}/></Pressable>
+      <Pressable style={s.manageShopCard} onPress={()=>{setManageShop({shop:actionShop,mode:"edit"});setActionShop(null);}}><View style={[s.quickIcon,{backgroundColor:SECTION.settings.color}]}><Ionicons name="create-outline" size={24} color={C.white}/></View><Text style={s.quickTitle}>Edit shop</Text><Text style={s.quickHelp}>Change its name, username or password</Text><Ionicons name="arrow-forward" size={20} color={SECTION.settings.color}/></Pressable>
+      <Pressable style={s.manageShopCard} onPress={()=>{setManageShop({shop:actionShop,mode:"duplicate"});setActionShop(null);}}><View style={[s.quickIcon,{backgroundColor:SECTION.records.color}]}><Ionicons name="copy-outline" size={24} color={C.white}/></View><Text style={s.quickTitle}>Copy shop</Text><Text style={s.quickHelp}>Create another shop from this profile</Text><Ionicons name="arrow-forward" size={20} color={SECTION.records.color}/></Pressable>
+      <Pressable style={s.manageShopCard} onPress={()=>setShopStatus(actionShop)}><View style={[s.quickIcon,{backgroundColor:actionShop.status==="active"?C.red:C.green}]}><Ionicons name={actionShop.status==="active"?"pause-circle-outline":"play-circle-outline"} size={24} color={C.white}/></View><Text style={s.quickTitle}>{actionShop.status==="active"?"Pause shop":"Activate shop"}</Text><Text style={s.quickHelp}>{actionShop.status==="active"?"Stop new logins without deleting data":"Allow this shop to sign in again"}</Text><Ionicons name="arrow-forward" size={20} color={actionShop.status==="active"?C.red:C.green}/></Pressable>
+    </View></ScrollView></SafeAreaView>;
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -620,43 +628,19 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
               <View style={[s.adminShopActions,width<620&&s.adminShopActionsMobile]}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Manage staff for ${shop.name}`}
-                style={[s.adminShopAction,width<620&&s.adminShopActionMobile]}
-                onPress={() => setStaffShop(shop)}
+                accessibilityLabel={`Manage ${shop.name}`}
+                style={[s.adminShopAction,s.adminShopActionHalf]}
+                onPress={() => setActionShop(shop)}
               >
-                <Ionicons name="people-outline" size={20} color={C.green} /><Text style={s.adminShopActionText}>Staff</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Edit ${shop.name}`}
-                style={[s.adminShopAction,width<620&&s.adminShopActionMobile]}
-                onPress={() => setManageShop({ shop, mode: "edit" })}
-              >
-                <Ionicons name="create-outline" size={20} color={C.dark} /><Text style={s.adminShopActionText}>Edit</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Duplicate ${shop.name}`}
-                style={[s.adminShopAction,width<620&&s.adminShopActionMobile]}
-                onPress={() => setManageShop({ shop, mode: "duplicate" })}
-              >
-                <Ionicons name="copy-outline" size={20} color={C.accent} /><Text style={s.adminShopActionText}>Copy</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={shop.status === "active" ? `Pause ${shop.name}` : `Reactivate ${shop.name}`}
-                style={[s.adminShopAction,width<620&&s.adminShopActionMobile]}
-                onPress={() => setShopStatus(shop)}
-              >
-                <Ionicons name={shop.status === "active" ? "pause-circle-outline" : "play-circle-outline"} size={21} color={shop.status === "active" ? C.red : C.accent} /><Text style={s.adminShopActionText}>{shop.status === "active" ? "Pause" : "Activate"}</Text>
+                <Ionicons name="options-outline" size={21} color={C.green} /><Text style={s.adminShopActionText}>Manage shop</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${shop.name}`}
-                style={[s.adminShopAction, s.adminShopActionPrimary,width<620&&s.adminShopActionMobile]}
+                style={[s.adminShopAction,s.adminShopActionHalf,s.adminShopActionPrimary]}
                 onPress={() => setOpenShop(shop)}
               >
-                <Ionicons name="enter-outline" size={21} color={C.white} /><Text style={[s.adminShopActionText, { color: C.white }]}>Open</Text>
+                <Ionicons name="enter-outline" size={21} color={C.white} /><Text style={[s.adminShopActionText, { color: C.white }]}>Open shop</Text>
               </Pressable>
               </View>
             </View>
@@ -4946,10 +4930,11 @@ const s = StyleSheet.create({
   },
   adminShopTop:{flexDirection:"row",alignItems:"center",gap:11},
   adminShopActions:{paddingTop:10,flexDirection:"row",flexWrap:"wrap",gap:9,borderTopWidth:1,borderTopColor:C.border},
-  adminShopAction:{flexGrow:1,flexBasis:"30%",minWidth:140,minHeight:46,paddingHorizontal:10,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:6,borderRadius:10,backgroundColor:C.soft},
+  adminShopAction:{flexGrow:0,flexShrink:1,flexBasis:"31%",minWidth:0,minHeight:46,paddingHorizontal:10,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:6,borderRadius:10,backgroundColor:C.soft},
   adminShopActionsMobile:{flexWrap:"wrap",gap:9},
-  adminShopActionMobile:{flexGrow:1,flexBasis:"46%",minWidth:"46%",minHeight:50,paddingHorizontal:10},
+  adminShopActionMobile:{flexGrow:0,flexShrink:1,flexBasis:"47%",minWidth:0,minHeight:50,paddingHorizontal:8},
   adminShopActionPrimary:{backgroundColor:C.green},
+  adminShopActionHalf:{flexBasis:"48%"},
   adminShopActionText:{color:C.dark,fontSize:12,fontWeight:"700"},
   adminLastLogin:{marginTop:3,color:C.muted,fontSize:12},
   staffPermissionGrid:{marginTop:8,gap:8},
@@ -4958,6 +4943,9 @@ const s = StyleSheet.create({
   staffPermissionTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
   staffPermissionHelp:{marginTop:2,color:C.muted,fontSize:13,lineHeight:18},
   staffAccessSummary:{marginTop:11,marginBottom:10,color:C.muted,fontSize:13,lineHeight:19},
+  manageShopHero:{marginTop:8,marginBottom:18,padding:18,flexDirection:"row",alignItems:"center",gap:13,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:C.white},
+  manageShopGrid:{flexDirection:"row",flexWrap:"wrap",gap:12},
+  manageShopCard:{width:"48%",minHeight:168,padding:17,justifyContent:"space-between",borderWidth:1,borderColor:C.border,borderRadius:17,backgroundColor:C.white},
   statusPillPaused:{backgroundColor:C.redSoft},
   statusTextPaused:{color:C.red},
   clearSaleText: { color: C.red, fontSize: 13, fontWeight: "700" },
