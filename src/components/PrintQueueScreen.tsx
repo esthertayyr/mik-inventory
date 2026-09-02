@@ -107,6 +107,15 @@ export function PrintQueueScreen({
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => {
+    const waiting = jobs.filter((j) => j.status === "to_print");
+    if (waiting.length) {
+      Alert.alert(
+        "Orders ready to print",
+        `${waiting.length} paid order${waiting.length === 1 ? " is" : "s are"} waiting in Print Queue.`,
+      );
+    }
+  }, [jobs.length]);
   const counts = useMemo(
     () =>
       Object.fromEntries(
