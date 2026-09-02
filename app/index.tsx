@@ -389,6 +389,7 @@ function PlatformAdmin() {
   const [password, setPassword] = useState("");
   const [openShop, setOpenShop] = useState<AdminShop | null>(null);
   const [showActivity, setShowActivity] = useState(false);
+  const [showIssues, setShowIssues] = useState(false);
   const [manageShop, setManageShop] = useState<{ shop: AdminShop; mode: "edit" | "duplicate" } | null>(null);
   const [ownerStats, setOwnerStats] = useState({ salesToday: 0, activeOrders: 0, lowStock: 0 });
   const [exporting, setExporting] = useState(false);
@@ -486,6 +487,8 @@ function PlatformAdmin() {
     return <AdminShopForm shop={manageShop.shop} mode={manageShop.mode} onBack={() => setManageShop(null)} onDone={async () => { setManageShop(null); await load(); }} />;
   if (showActivity)
     return <OwnerActivityLog shops={shops} onBack={() => setShowActivity(false)} />;
+  if (showIssues)
+    return <OwnerIssueReports onBack={() => setShowIssues(false)} />;
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -515,6 +518,11 @@ function PlatformAdmin() {
           <View style={s.activityButtonIcon}><Ionicons name="time-outline" size={23} color={C.white} /></View>
           <View style={s.flex}><Text style={s.activityButtonTitle}>Shop activity</Text><Text style={s.activityButtonHelp}>Sales, products, stock, orders and logins</Text></View>
           <Ionicons name="chevron-forward" size={21} color={C.green} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Open problem reports" style={s.activityButton} onPress={() => setShowIssues(true)}>
+          <View style={[s.activityButtonIcon,{backgroundColor:C.accent}]}><Ionicons name="chatbox-ellipses-outline" size={23} color={C.white} /></View>
+          <View style={s.flex}><Text style={s.activityButtonTitle}>Problem reports</Text><Text style={s.activityButtonHelp}>Messages sent by shop users</Text></View>
+          <Ionicons name="chevron-forward" size={21} color={C.accent} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Export all shop sales" style={s.ownerExportButton} onPress={() => void exportOwnerSales()} disabled={exporting}>
           <Ionicons name="download-outline" size={22} color={C.accent} />
@@ -902,6 +910,8 @@ function ShopApp({
         <ReportsScreen locationId={locationId} hideTitle />
       </View>
     );
+  else if (screen === "report_issue")
+    body = <ReportIssue businessId={business!.id} onBack={() => setScreen("more")} />;
   else if (screen === "sell_start")
     body = <SellStart businessId={business!.id} onOpen={setScreen} />;
   else if (screen === "print_queue")
@@ -959,7 +969,7 @@ function ShopApp({
   const selected =
     screen === "inventory" || screen === "alphabet_inventory" || screen === "products" || screen === "price_list"
       ? "stock_start"
-      : screen === "reports" || screen === "shop"
+      : screen === "reports" || screen === "shop" || screen === "report_issue"
       ? "more"
       : screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "print_queue" || screen === "price_calculator"
         ? "home"
@@ -1115,7 +1125,7 @@ function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)
           <Text style={s.saleWelcomeDate}>{friendlyLocalDate(today)}</Text>
           <Text style={s.saleWelcomeHelp}>Sales entered now will be recorded under today.</Text>
           <Pressable accessibilityRole="button" style={s.saleWelcomePrimary} onPress={() => void start("sale")}><Ionicons name="storefront" size={22} color={C.white}/><Text style={s.saleWelcomePrimaryText}>Start shop sale</Text></Pressable>
-          <Pressable accessibilityRole="button" style={s.saleWelcomeSecondary} onPress={() => void start("event_sale")}><Ionicons name="flash" size={22} color={C.accent}/><Text style={s.saleWelcomeSecondaryText}>Start event sale</Text></Pressable>
+          <Pressable accessibilityRole="button" style={s.saleWelcomeSecondary} onPress={() => void start("event_sale")}><Ionicons name="flash" size={22} color={C.accent}/><View style={s.flex}><Text style={s.saleWelcomeSecondaryText}>Start Event Sale · Fast checkout</Text><Text style={s.saleWelcomeSecondaryHelp}>Skip letter choices now. Count A–Z keycaps after the event.</Text></View></Pressable>
           <Pressable accessibilityRole="button" style={s.saleWelcomeLater} onPress={() => void closeWelcome()}><Text style={s.saleWelcomeLaterText}>Choose later</Text></Pressable>
         </View>
       </SafeAreaView>
@@ -1123,9 +1133,9 @@ function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)
     <View style={s.sellTodayCard}><Ionicons name="calendar-outline" size={22} color={C.green}/><View style={s.flex}><Text style={s.sellTodayLabel}>RECORDING FOR TODAY</Text><Text style={s.sellTodayDate}>{friendlyLocalDate(today)}</Text></View></View>
     <Text style={s.pageTitle}>How are you selling?</Text>
     <Text style={s.subtitle}>Choose one to start.</Text>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open shop sale" style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop sale</Text><Text style={s.sellModeHelp}>Sell at your shop</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.green}/></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open event sale" style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event sale</Text><Text style={s.sellModeHelp}>Fast checkout · no letter selection</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.accent}/></Pressable>
-    <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={21} color={C.accent}/><Text style={s.eventModeNoteText}><Text style={s.eventModeNoteStrong}>What is Event Sale? </Text>Clickers go directly to payment without choosing letters. After the event, count the remaining A–Z keycaps. Tip: take a photo of sold items to help with counting.</Text></View>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open shop sale. Normal checkout. Choose every keycap now." style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop Sale</Text><Text style={s.sellModeHelp}>Normal checkout · choose every keycap now</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.green}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open Event Sale. Fast checkout. Letter selection is skipped." style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event Sale · Fast checkout</Text><Text style={s.sellModeHelp}>Sell quickly · choose no letters during checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.accent}/></Pressable>
+    <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={22} color={C.accent}/><View style={s.flex}><Text style={s.eventModeNoteStrong}>How Event Sale works</Text><Text style={s.eventModeStep}>1. Add the product and take payment.</Text><Text style={s.eventModeStep}>2. Clickers skip the letter screen.</Text><Text style={s.eventModeStep}>3. After the event, count the A–Z keycaps left.</Text><Text style={s.eventModeTip}>Tip: Take a photo of sold items to help you count later.</Text></View></View>
     <Text style={s.salesRecordHeading}>FIX SALES RECORDS</Text>
     <Text style={s.salesRecordHelp}>Use these only when a sale was missed or entered by mistake.</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="Add missed sale. Choose the date, then enter a sale you forgot to record." style={s.earlierSale} onPress={()=>onOpen("missed")}><Ionicons pointerEvents="none" name="calendar-outline" size={21} color={SECTION.records.color}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Add missed sale</Text><Text style={s.earlierSaleHelp}>Choose the date, then enter the forgotten sale</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
@@ -3646,6 +3656,7 @@ function More({
       title: "Shop & help", ...SECTION.settings, tools: [
         { icon: "storefront-outline", title: "Shop profile & logo", help: business.logo_url ? "Replace this shop's logo" : "Add this shop's logo", screen: "shop" },
         { icon: "help-circle-outline", title: "How to use Mik", help: "Replay the step-by-step guide", guide: true },
+        { icon: "chatbox-ellipses-outline", title: "Report a problem", help: "Tell the MIK owner what went wrong", screen: "report_issue" },
       ],
     },
   ];
@@ -3699,6 +3710,73 @@ function More({
       </Pressable>
     </ScrollView>
   );
+}
+
+type IssueReport = {
+  id: string;
+  business_id: string;
+  category: string;
+  message: string;
+  status: "open" | "resolved";
+  created_at: string;
+  business: { name: string } | null;
+};
+
+function ReportIssue({businessId,onBack}:{businessId:string;onBack:()=>void}) {
+  const choices = ["Sales", "Stock", "Orders", "Account", "Something else"];
+  const [category,setCategory] = useState(choices[0]);
+  const [message,setMessage] = useState("");
+  const [sending,setSending] = useState(false);
+  const send = async () => {
+    const clean = message.trim();
+    if (clean.length < 5) return Alert.alert("Tell us what happened", "Write a short description so we know what to check.");
+    setSending(true);
+    const { error } = await supabase.from("issue_reports").insert({ business_id: businessId, category, message: clean });
+    setSending(false);
+    if (error) return Alert.alert("Report not sent", error.message);
+    setMessage("");
+    Alert.alert("Report sent", "The MIK owner can now see your report.", [{text:"Done",onPress:onBack}]);
+  };
+  return <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+    <Back title="Report a problem" onPress={onBack}/>
+    <View style={s.issueIntro}><View style={s.issueIntroIcon}><Ionicons name="chatbox-ellipses-outline" size={27} color={C.white}/></View><View style={s.flex}><Text style={s.issueIntroTitle}>Something not working?</Text><Text style={s.issueIntroHelp}>Send a short message. The MIK owner will see it in the Owner dashboard.</Text></View></View>
+    <Text style={s.issueStep}>1 · Where is the problem?</Text>
+    <View style={s.issueChoices}>{choices.map(choice=><Pressable key={choice} style={[s.issueChoice,category===choice&&s.issueChoiceOn]} onPress={()=>setCategory(choice)}><Text style={[s.issueChoiceText,category===choice&&s.issueChoiceTextOn]}>{choice}</Text></Pressable>)}</View>
+    <Text style={s.issueStep}>2 · What happened?</Text>
+    <TextInput style={[s.input,s.issueMessage]} multiline textAlignVertical="top" value={message} onChangeText={setMessage} placeholder="Example: I tapped Clear Sale but the products stayed." maxLength={1000}/>
+    <Text style={s.issuePrivacy}>Do not include passwords or payment account numbers.</Text>
+    <BigButton label={sending?"Sending…":"Send report"} icon="send-outline" color={C.accent} onPress={()=>void send()} disabled={sending}/>
+  </ScrollView>;
+}
+
+function OwnerIssueReports({onBack}:{onBack:()=>void}) {
+  const [items,setItems] = useState<IssueReport[]>([]);
+  const [loading,setLoading] = useState(true);
+  const [showResolved,setShowResolved] = useState(false);
+  const load = useCallback(async()=>{
+    setLoading(true);
+    let query = supabase.from("issue_reports").select("id,business_id,category,message,status,created_at,business:businesses(name)").order("created_at",{ascending:false});
+    if(!showResolved) query=query.eq("status","open");
+    const {data,error}=await query;
+    if(error) Alert.alert("Reports not loaded",error.message);
+    setItems((data??[]) as unknown as IssueReport[]);setLoading(false);
+  },[showResolved]);
+  useEffect(()=>{void load();},[load]);
+  const resolve = async(item:IssueReport)=>{
+    const {error}=await supabase.from("issue_reports").update({status:item.status==="open"?"resolved":"open",resolved_at:item.status==="open"?new Date().toISOString():null}).eq("id",item.id);
+    if(error)return Alert.alert("Report not updated",error.message);
+    await load();
+  };
+  return <SafeAreaView style={s.app}><View style={s.adminTop}><Pressable accessibilityRole="button" accessibilityLabel="Back to owner account" style={s.backButton} onPress={onBack}><Ionicons name="arrow-back" size={23} color={C.ink}/></Pressable><View style={s.flex}><Text style={s.kicker}>OWNER ONLY</Text><Text style={s.shopName}>Problem reports</Text></View></View><ScrollView contentContainerStyle={s.adminPage}>
+    <Pressable style={s.issueToggle} onPress={()=>setShowResolved(v=>!v)}><Ionicons name={showResolved?"eye-off-outline":"eye-outline"} size={20} color={C.accent}/><Text style={s.issueToggleText}>{showResolved?"Hide completed reports":"Show completed reports"}</Text></Pressable>
+    {loading ? (
+      <ActivityIndicator color={C.green}/>
+    ) : items.length ? (
+      items.map(item=><View key={item.id} style={s.issueOwnerCard}><View style={s.issueOwnerTop}><View style={s.flex}><Text style={s.issueOwnerShop}>{item.business?.name??"Unknown shop"}</Text><Text style={s.issueOwnerMeta}>{item.category} · {friendlyDateTime(item.created_at)}</Text></View><View style={[s.statusPill,item.status==="resolved"&&s.statusPillPaused]}><Text style={[s.statusText,item.status==="resolved"&&s.statusTextPaused]}>{item.status==="open"?"OPEN":"DONE"}</Text></View></View><Text style={s.issueOwnerMessage}>{item.message}</Text><Pressable style={s.issueResolve} onPress={()=>void resolve(item)}><Ionicons name={item.status==="open"?"checkmark-circle-outline":"refresh-outline"} size={20} color={C.accent}/><Text style={s.issueResolveText}>{item.status==="open"?"Mark as completed":"Reopen report"}</Text></Pressable></View>)
+    ) : (
+      <Empty title={showResolved?"No problem reports yet":"No open problems"}/>
+    )}
+  </ScrollView></SafeAreaView>;
 }
 
 function ShopProfile({
@@ -4589,6 +4667,27 @@ const s = StyleSheet.create({
   activityTime:{marginTop:3,color:C.muted,fontSize:11},
   activityEmptyTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
   activityEmptyText:{color:C.muted,fontSize:13,textAlign:"center"},
+  issueIntro:{marginBottom:22,padding:16,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:C.white},
+  issueIntroIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:C.accent},
+  issueIntroTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
+  issueIntroHelp:{marginTop:4,color:C.muted,fontSize:13,lineHeight:19},
+  issueStep:{marginTop:16,marginBottom:10,color:C.ink,fontSize:16,fontWeight:"700"},
+  issueChoices:{flexDirection:"row",flexWrap:"wrap",gap:8},
+  issueChoice:{minHeight:42,paddingHorizontal:14,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:21,backgroundColor:C.white},
+  issueChoiceOn:{borderColor:C.accent,backgroundColor:C.accent},
+  issueChoiceText:{color:C.ink,fontSize:14,fontWeight:"600"},
+  issueChoiceTextOn:{color:C.white},
+  issueMessage:{minHeight:150,paddingTop:15},
+  issuePrivacy:{marginTop:8,marginBottom:12,color:C.muted,fontSize:12,lineHeight:18},
+  issueToggle:{minHeight:48,marginBottom:8,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:8,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.white},
+  issueToggleText:{color:C.accent,fontSize:14,fontWeight:"700"},
+  issueOwnerCard:{marginTop:10,padding:15,borderWidth:1,borderColor:C.border,borderRadius:15,backgroundColor:C.white},
+  issueOwnerTop:{flexDirection:"row",alignItems:"flex-start",gap:10},
+  issueOwnerShop:{color:C.ink,fontSize:16,fontWeight:"700"},
+  issueOwnerMeta:{marginTop:3,color:C.muted,fontSize:12},
+  issueOwnerMessage:{marginTop:13,color:C.ink,fontSize:15,lineHeight:22},
+  issueResolve:{minHeight:44,marginTop:14,paddingHorizontal:12,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderTopWidth:1,borderTopColor:C.border},
+  issueResolveText:{color:C.accent,fontSize:14,fontWeight:"700"},
   copyStockChoice:{minHeight:74,marginTop:18,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.green,borderRadius:12,backgroundColor:C.white},
   ownerSecurityCard:{marginTop:18,padding:18,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:C.white},
   ownerSecurityHeading:{flexDirection:"row",alignItems:"center",gap:12,marginBottom:8},
@@ -4748,6 +4847,8 @@ const s = StyleSheet.create({
   eventModeNote:{marginTop:8,padding:12,flexDirection:"row",alignItems:"flex-start",gap:9,borderWidth:1,borderColor:"#DCE7E2",borderRadius:12,backgroundColor:C.white},
   eventModeNoteText:{flex:1,color:C.muted,fontSize:13,lineHeight:19},
   eventModeNoteStrong:{color:C.ink,fontWeight:"700"},
+  eventModeStep:{marginTop:5,color:C.ink,fontSize:13,lineHeight:19},
+  eventModeTip:{marginTop:8,color:C.accentDark,fontSize:12,lineHeight:18,fontWeight:"700"},
   sellStartPage:{paddingTop:6,paddingBottom:40},
   flowGuide:{marginTop:18,marginBottom:4,padding:15,flexDirection:"row",alignItems:"flex-start",gap:12,borderWidth:1,borderRadius:15},
   flowGuideNumber:{width:32,height:32,alignItems:"center",justifyContent:"center",borderRadius:16},
@@ -4769,6 +4870,7 @@ const s = StyleSheet.create({
   saleWelcomePrimaryText:{color:C.white,fontSize:16,fontWeight:"700"},
   saleWelcomeSecondary:{minHeight:56,marginTop:10,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderWidth:1,borderColor:C.accent,borderRadius:15,backgroundColor:C.white},
   saleWelcomeSecondaryText:{color:C.accent,fontSize:16,fontWeight:"700"},
+  saleWelcomeSecondaryHelp:{marginTop:2,color:C.ink,fontSize:12,lineHeight:17},
   saleWelcomeLater:{minHeight:44,marginTop:7,alignItems:"center",justifyContent:"center"},
   saleWelcomeLaterText:{color:C.muted,fontSize:14,fontWeight:"600"},
   sellTodayCard:{marginBottom:18,padding:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
