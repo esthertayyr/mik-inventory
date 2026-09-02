@@ -324,7 +324,7 @@ function Login() {
     <SafeAreaView style={s.login}>
       <StatusBar style="dark" />
       <View style={[s.loginShell, wide && s.loginShellWide]}>
-        {wide ? <View style={s.loginEditorial}><View style={s.loginBrandLine}><Text style={s.loginKicker}>MIK.</Text><Text style={s.loginBrandName}>Mikael</Text></View><Text style={s.loginEditorialTitle}>Your 3D printing shop, made simple.</Text><Text style={s.loginEditorialBody}>Sell products · Track stock · Follow every order</Text></View> : null}
+        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK · MIKAEL</Text><Text style={s.loginEditorialTitle}>Your 3D printing shop, made simple.</Text><Text style={s.loginEditorialBody}>Sell products · Track stock · Follow every order</Text></View> : null}
         <View style={[s.loginCard, wide && s.loginCardWide]}>
         <Image
           source={require("../assets/mik-logo.png")}
@@ -3036,7 +3036,7 @@ function Products({
               />
             ))}
           </ScrollView>
-          <View style={s.formStep}><View style={[s.formStepNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.formStepNumberText}>3</Text></View><View style={s.flex}><Text style={s.formStepTitle}>Set the selling options</Text><Text style={s.formStepHelp}>{extraAlphabetMode ? "Each keycap design can have its own extra-letter price." : "Enter the usual price. Add a sale price only when the item is discounted."}</Text></View></View>
+          <View style={s.formStep}><View style={[s.formStepNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.formStepNumberText}>3</Text></View><View style={s.flex}><Text style={s.formStepTitle}>Set the selling options</Text><Text style={s.formStepHelp}>{extraAlphabetMode ? "Create the design here. Later, use Stock → A–Z letters to count each A–Z keycap." : "Enter the usual price. Add a sale price only when the item is discounted."}</Text></View></View>
           {extraAlphabetMode ? (
             <View style={s.choiceSetup}>
               <Text style={s.rowTitle}>Design prices</Text>
@@ -3314,10 +3314,12 @@ function Inventory({
       ? p.variants.reduce((total, item) => total + item.quantity_on_hand, 0)
       : p.quantity_on_hand;
   const needsCount = (p: Product) => p.needs_stock_count || Boolean(p.alphabet_style?.letters.some((item) => item.needs_stock_count));
-  const filtered = products
+  const stockProducts = alphabetOnly
+    ? products.filter((p) => Boolean(p.alphabet_style) && /alphabet|keycap/i.test(p.name))
+    : products;
+  const filtered = stockProducts
     .filter(
       (p) =>
-        (!alphabetOnly || Boolean(p.alphabet_style)) &&
         (!category || p.category_id === category) &&
         p.name.toLowerCase().includes(search.toLowerCase()) &&
         (stockView !== "out" || shownStock(p) <= 0) &&
@@ -3569,7 +3571,7 @@ function Inventory({
             </View>
             <Search value={search} onChange={setSearch} />
             <View style={[s.stockFilters, width >= 900 && s.stockFiltersDesktop]}>
-              <View style={s.stockFilterGroup}>
+              {!alphabetOnly ? <View style={s.stockFilterGroup}>
                 <Text style={s.stockFilterLabel}>Category</Text>
                 <Pressable style={s.stockCategoryPicker} onPress={() => setCategoryOpen((open) => !open)}>
                   <View style={s.stockCategoryPickerIcon}><Ionicons name={category ? categoryIcon(categoryName(category)) : "apps"} size={21} color={C.accent} /></View>
@@ -3583,7 +3585,7 @@ function Inventory({
                     {categories.map((c) => <Pressable key={c.id} style={[s.categoryMenuRow,category===c.id&&s.categoryMenuRowOn]} onPress={() => { setCategory(c.id); setCategoryOpen(false); }}><Ionicons name={categoryIcon(c.name)} size={20} color={categoryTone(c.name).color}/><Text style={s.categoryMenuText}>{c.name}</Text>{category===c.id?<Ionicons name="checkmark" size={20} color={C.accent}/>:null}</Pressable>)}
                   </View>
                 ) : null}
-              </View>
+              </View> : null}
               <View style={s.stockFilterGroup}>
                 <Text style={s.stockFilterLabel}>Show stock by</Text>
                 <View style={s.stockSortRow}>
@@ -3594,7 +3596,7 @@ function Inventory({
                 </View>
               </View>
             </View>
-            <Text style={s.stockResultCount}>{filtered.length} {filtered.length === 1 ? "product" : "products"}</Text>
+            <Text style={s.stockResultCount}>{filtered.length} {alphabetOnly ? (filtered.length === 1 ? "keycap design" : "keycap designs") : (filtered.length === 1 ? "product" : "products")}</Text>
           </View>
         )}
         ListEmptyComponent={<Empty title="No products match this view" />}
@@ -3925,6 +3927,10 @@ type ActivityLog = {
 };
 
 function activityDetail(item: ActivityLog) {
+  if (item.action === "login") {
+    const name = item.details?.device_user_name;
+    return name ? `Signed in as ${name}` : "Signed in";
+  }
   if (item.action !== "product_updated") return "";
   const before = item.details?.before ?? {};
   const after = item.details?.after ?? {};
