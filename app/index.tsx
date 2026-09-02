@@ -131,6 +131,7 @@ const SECTION = {
   production: { color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE" },
   records: { color: "#795C2D", soft: "#F8F6F1", border: "#E7DFD0" },
   settings: { color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3" },
+  support: { color: "#5A405F", soft: "#F7F3F8", border: "#E5DCE7" },
 } as const;
 type Icon = keyof typeof Ionicons.glyphMap;
 function categoryIcon(name: string): Icon {
@@ -251,7 +252,32 @@ export default function Home() {
   }, []);
   if (!iconsReady)
     return <SafeAreaView style={s.loading}><ActivityIndicator size="large" color={C.green} /></SafeAreaView>;
-  return session ? <SignedIn session={session} /> : <Login />;
+  return session ? <DeviceUserGate session={session} /> : <Login />;
+}
+
+function DeviceUserGate({session}:{session:Session}) {
+  const storageKey=`mik-device-user-${session.user.id}`;
+  const [loading,setLoading]=useState(true);
+  const [name,setName]=useState("");
+  const [draft,setDraft]=useState("");
+  const [editing,setEditing]=useState(false);
+  const [recorded,setRecorded]=useState(false);
+  useEffect(()=>{AsyncStorage.getItem(storageKey).then(value=>{setName(value??"");setDraft(value??"");setLoading(false);});},[storageKey]);
+  useEffect(()=>{
+    if(loading||!name||recorded)return;
+    setRecorded(true);
+    void supabase.rpc("record_login_activity",{p_device_name:name});
+  },[loading,name,recorded]);
+  const save=async()=>{
+    const clean=draft.trim().replace(/\s+/g," ");
+    if(clean.length<2)return Alert.alert("Enter a name","Use a name such as Anna, Cashier 1 or Front Counter.");
+    if(clean.length>30)return Alert.alert("Name is too long","Use 30 characters or fewer.");
+    await AsyncStorage.setItem(storageKey,clean);
+    setName(clean);setDraft(clean);setEditing(false);
+  };
+  if(loading)return <SafeAreaView style={s.loading}><ActivityIndicator size="large" color={C.green}/><Text style={s.help}>Opening MIK…</Text></SafeAreaView>;
+  if(!name||editing)return <SafeAreaView style={s.deviceWelcome}><View style={s.deviceWelcomeCard}><Image source={require("../assets/mik-app-icon.png")} style={s.deviceWelcomeLogo}/><Text style={s.kicker}>{editing?"THIS DEVICE":"FIRST TIME ON THIS DEVICE"}</Text><Text style={s.deviceWelcomeTitle}>{editing?"Change your name":"Who is using MIK?"}</Text><Text style={s.centerHelp}>Use a short name so MIK can guide and greet you personally.</Text><Label>Your name</Label><TextInput style={s.input} value={draft} onChangeText={setDraft} placeholder="Example: Anna or Cashier 1" autoCapitalize="words" maxLength={30} onSubmitEditing={()=>void save()}/><BigButton label={editing?"Save name":"Continue to MIK"} icon="arrow-forward" onPress={()=>void save()}/>{editing?<Pressable style={s.cancel} onPress={()=>{setDraft(name);setEditing(false);}}><Text style={s.help}>Cancel</Text></Pressable>:null}</View></SafeAreaView>;
+  return <SignedIn session={session} deviceUserName={name} onChangeDeviceUser={()=>setEditing(true)}/>;
 }
 
 function Login() {
@@ -290,7 +316,6 @@ function Login() {
         password,
       }));
     }
-    if (!e) await supabase.rpc("record_login_activity");
     setBusy(false);
     if (e)
       setError("The username or password is not correct. Please try again.");
@@ -345,7 +370,7 @@ function Login() {
   );
 }
 
-function SignedIn({ session }: { session: Session }) {
+function SignedIn({ session,deviceUserName,onChangeDeviceUser }: { session: Session;deviceUserName:string;onChangeDeviceUser:()=>void }) {
   const [checking, setChecking] = useState(true);
   const [platformAdmin, setPlatformAdmin] = useState(false);
   useEffect(() => {
@@ -366,7 +391,7 @@ function SignedIn({ session }: { session: Session }) {
         <Text style={s.help}>Opening your account…</Text>
       </SafeAreaView>
     );
-  return platformAdmin ? <PlatformAdmin /> : <ShopApp session={session} />;
+  return platformAdmin ? <PlatformAdmin deviceUserName={deviceUserName} /> : <ShopApp session={session} deviceUserName={deviceUserName} onChangeDeviceUser={onChangeDeviceUser} />;
 }
 
 type AdminShop = {
@@ -379,7 +404,7 @@ type AdminShop = {
   created_at: string;
   last_login?: string | null;
 };
-function PlatformAdmin() {
+function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const [shops, setShops] = useState<AdminShop[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -494,7 +519,7 @@ function PlatformAdmin() {
       <StatusBar style="dark" />
       <View style={s.adminTop}>
         <View>
-          <Text style={s.kicker}>OWNER</Text>
+          <Text style={s.kicker}>OWNER · {deviceUserName}</Text>
           <Text style={s.shopName}>Shop profiles</Text>
         </View>
         <Pressable
@@ -633,10 +658,14 @@ function ShopApp({
   session,
   adminBusiness,
   onAdminExit,
+  deviceUserName="Owner",
+  onChangeDeviceUser,
 }: {
   session?: Session;
   adminBusiness?: AdminShop;
   onAdminExit?: () => void;
+  deviceUserName?: string;
+  onChangeDeviceUser?: () => void;
 }) {
   const { width } = useWindowDimensions();
   const [screen, setScreen] = useState<Screen>("home");
@@ -913,7 +942,7 @@ function ShopApp({
   else if (screen === "report_issue")
     body = <ReportIssue businessId={business!.id} onBack={() => setScreen("more")} />;
   else if (screen === "sell_start")
-    body = <SellStart businessId={business!.id} onOpen={setScreen} />;
+    body = <SellStart businessId={business!.id} deviceUserName={deviceUserName} onOpen={setScreen} />;
   else if (screen === "print_queue")
     body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
   else if (screen === "price_calculator")
@@ -964,6 +993,8 @@ function ShopApp({
           setScreen(next);
         }}
         onGuide={() => setGuideOpen(true)}
+        deviceUserName={deviceUserName}
+        onChangeDeviceUser={onChangeDeviceUser}
       />
     );
   const selected =
@@ -1099,7 +1130,7 @@ function NoShopProfile() {
   );
 }
 
-function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)=>void}) {
+function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceUserName:string;onOpen:(screen:Screen)=>void}) {
   const today = localDateKey();
   const [welcomeVisible,setWelcomeVisible] = useState(false);
   const welcomeKey = `mik-sale-welcome-${businessId}-${today}`;
@@ -1121,10 +1152,10 @@ function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)
       <SafeAreaView style={s.saleWelcomeOverlay}>
         <View style={s.saleWelcomeCard}>
           <View style={s.saleWelcomeIcon}><Ionicons name="sunny-outline" size={34} color={C.white}/></View>
-          <Text style={s.saleWelcomeTitle}>{greetingForNow()} 👋</Text>
+          <Text style={s.saleWelcomeTitle}>{greetingForNow()}, {deviceUserName} 👋</Text>
           <Text style={s.saleWelcomeDate}>{friendlyLocalDate(today)}</Text>
           <Text style={s.saleWelcomeHelp}>Sales entered now will be recorded under today.</Text>
-          <Pressable accessibilityRole="button" style={s.saleWelcomePrimary} onPress={() => void start("sale")}><Ionicons name="storefront" size={22} color={C.white}/><Text style={s.saleWelcomePrimaryText}>Start shop sale</Text></Pressable>
+          <Pressable accessibilityRole="button" style={s.saleWelcomePrimary} onPress={() => void start("sale")}><Ionicons name="storefront" size={22} color={C.white}/><View style={s.flex}><Text style={s.saleWelcomePrimaryText}>Shop Sale</Text><Text style={s.saleWelcomePrimaryHelp}>Normal Checkout</Text></View></Pressable>
           <Pressable accessibilityRole="button" style={s.saleWelcomeSecondary} onPress={() => void start("event_sale")}><Ionicons name="flash" size={22} color={C.accent}/><View style={s.flex}><Text style={s.saleWelcomeSecondaryText}>Start Event Sale · Fast checkout</Text><Text style={s.saleWelcomeSecondaryHelp}>Skip letter choices now. Count A–Z keycaps after the event.</Text></View></Pressable>
           <Pressable accessibilityRole="button" style={s.saleWelcomeLater} onPress={() => void closeWelcome()}><Text style={s.saleWelcomeLaterText}>Choose later</Text></Pressable>
         </View>
@@ -1133,8 +1164,8 @@ function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)
     <View style={s.sellTodayCard}><Ionicons name="calendar-outline" size={22} color={C.green}/><View style={s.flex}><Text style={s.sellTodayLabel}>RECORDING FOR TODAY</Text><Text style={s.sellTodayDate}>{friendlyLocalDate(today)}</Text></View></View>
     <Text style={s.pageTitle}>How are you selling?</Text>
     <Text style={s.subtitle}>Choose one to start.</Text>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open shop sale. Normal checkout. Choose every keycap now." style={[s.sellModeCard,{backgroundColor:"#F2F5F7"}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.green}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop Sale</Text><Text style={s.sellModeHelp}>Normal checkout · choose every keycap now</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.green}/></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open Event Sale. Fast checkout. Letter selection is skipped." style={[s.sellModeCard,{backgroundColor:C.accentSoft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:C.accent}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event Sale · Fast checkout</Text><Text style={s.sellModeHelp}>Sell quickly · choose no letters during checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={C.accent}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open Shop Sale. Normal Checkout." style={[s.sellModeCard,{backgroundColor:SECTION.sales.soft}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:SECTION.sales.color}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop Sale</Text><Text style={s.sellModeHelp}>Normal Checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.sales.color}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open Event Sale. Fast checkout. Letter selection is skipped." style={[s.sellModeCard,{backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event Sale</Text><Text style={s.sellModeHelp}>Fast Checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
     <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={22} color={C.accent}/><View style={s.flex}><Text style={s.eventModeNoteStrong}>How Event Sale works</Text><Text style={s.eventModeStep}>1. Add the product and take payment.</Text><Text style={s.eventModeStep}>2. Clickers skip the letter screen.</Text><Text style={s.eventModeStep}>3. After the event, count the A–Z keycaps left.</Text><Text style={s.eventModeTip}>Tip: Take a photo of sold items to help you count later.</Text></View></View>
     <Text style={s.salesRecordHeading}>FIX SALES RECORDS</Text>
     <Text style={s.salesRecordHelp}>Use these only when a sale was missed or entered by mistake.</Text>
@@ -2132,6 +2163,7 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
       title: "Sales & customers", help: "Sell and follow customer work.", ...SECTION.sales, actions: [
         { title: "Sell", help: "Start a shop or event sale", icon: "cart", screen: "sell_start" },
         { title: "Sales today", help: "See today's total and receipts", icon: "today", screen: "dashboard" },
+        { title: "View all sales", help: "Daily, weekly or monthly reports", icon: "bar-chart", screen: "reports" },
         { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active · ${orderSummary.urgent} due now` : "Track customer orders", icon: "clipboard", screen: "orders" },
         { title: "Calendar", help: "Events and reminders", icon: "calendar", screen: "calendar" },
       ],
@@ -2153,7 +2185,6 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
     },
     {
       title: "Records & planning", help: "Review sales records and important dates.", ...SECTION.records, actions: [
-        { title: "Sales reports", help: "Daily, weekly or monthly", icon: "bar-chart", screen: "reports" },
         { title: "Cancel wrong sale", help: "Find and cancel a mistaken sale", icon: "return-up-back", screen: "correct" },
         { title: "Add missed sale", help: "Choose its original sale date", icon: "calendar-number", screen: "missed" },
       ],
@@ -2162,6 +2193,11 @@ function QuickStart({ locationId, onOpen }: { locationId: string; onOpen: (scree
       title: "Shop & help", help: "Change shop details or get help.", ...SECTION.settings, actions: [
         { title: "Shop profile", help: "Change the shop logo", icon: "storefront", screen: "shop" },
         { title: "More & help", help: "Settings and simple guides", icon: "grid", screen: "more" },
+      ],
+    },
+    {
+      title: "Support", help: "Tell us when something is not working.", ...SECTION.support, actions: [
+        { title: "Report a problem", help: "Send a message and optional photo", icon: "chatbox-ellipses", screen: "report_issue" },
       ],
     },
   ];
@@ -3628,7 +3664,9 @@ function PriceList({products,categories,business,onBack,onEdit}:{products:Produc
     const popup=window.open("","_blank","width=900,height=900");
     if(!popup)return Alert.alert("Allow pop-ups","Allow pop-ups for Mik, then try Print price list again.");
     popup.document.write(`<!doctype html><html><head><title>${escape(business.name)} Price List</title><style>body{font-family:Arial,sans-serif;color:#101318;max-width:820px;margin:0 auto;padding:40px}header{border-bottom:3px solid #142C47;padding-bottom:20px;margin-bottom:25px}h1{font-size:34px;margin:0}p{color:#626A73}h2{font-size:18px;margin:25px 0 8px;color:#264A3B}.row{display:flex;justify-content:space-between;gap:25px;padding:10px 0;border-bottom:1px solid #E0E3E7}.row strong{white-space:nowrap}@media print{body{padding:0}}</style></head><body><header><h1>${escape(business.name)}</h1><p>Price List</p></header>${sections}</body></html>`);
-    popup.document.close();popup.focus();popup.print();
+    popup.document.close();
+    popup.focus();
+    window.setTimeout(()=>popup.print(),350);
   };
   return <ScrollView contentContainerStyle={s.scroll}><Back title="Price list" onPress={onBack}/><View style={s.priceListHero}><View style={s.flex}><Text style={s.priceListKicker}>CUSTOMER PRICE LIST</Text><Text style={s.priceListTitle}>Current selling prices</Text><Text style={s.priceListHelp}>Use this at a pop-up or print it for customers.</Text></View><Ionicons name="receipt-outline" size={38} color={C.accent}/></View>{missing?<View style={s.priceWarning}><Ionicons name="alert-circle-outline" size={21} color={C.orange}/><Text style={s.priceWarningText}>{missing} {missing===1?"product needs":"products need"} a price before printing.</Text></View>:null}<View style={[s.priceActions,width<520&&s.priceActionsMobile]}><Pressable style={s.pricePrimary} onPress={printList}><Ionicons name="print-outline" size={21} color={C.white}/><Text style={s.pricePrimaryText}>Print price list</Text></Pressable><Pressable style={s.priceSecondary} onPress={onEdit}><Ionicons name="create-outline" size={21} color={C.dark}/><Text style={s.priceSecondaryText}>Edit product prices</Text></Pressable></View>{grouped.map(group=><View key={group.category.id} style={s.priceSection}><View style={[s.priceSectionMark,{backgroundColor:categoryTone(group.category.name).color}]}/><Text style={s.priceSectionTitle}>{group.category.name}</Text>{group.items.map(product=><View key={product.id} style={s.priceRow}><Text style={s.priceName}>{product.name}</Text><View style={s.priceRight}>{product.sale_price!==null?<Text style={s.priceSaleTag}>SALE</Text>:null}<Text style={[s.priceValue,product.sale_price===null&&product.regular_price===null&&s.priceMissing]}>{product.sale_price!==null||product.regular_price!==null?peso(Number(product.sale_price??product.regular_price)):"Price needed"}</Text></View></View>)}</View>)}</ScrollView>;
 }
@@ -3638,11 +3676,15 @@ function More({
   business,
   onOpen,
   onGuide,
+  deviceUserName,
+  onChangeDeviceUser,
 }: {
   profile: Profile | null;
   business: Business;
   onOpen: (x: Screen) => void;
   onGuide: () => void;
+  deviceUserName: string;
+  onChangeDeviceUser?: () => void;
 }) {
   const { width } = useWindowDimensions();
   type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean };
@@ -3704,6 +3746,7 @@ function More({
           <Text style={s.rowHelp}>This login belongs to this shop only</Text>
         </View>
       </View>
+      {onChangeDeviceUser?<Pressable style={s.deviceNameButton} onPress={onChangeDeviceUser}><Ionicons name="person-outline" size={21} color={C.accent}/><View style={s.flex}><Text style={s.rowTitle}>Using MIK as {deviceUserName}</Text><Text style={s.rowHelp}>Change the name saved on this device</Text></View><Ionicons name="chevron-forward" size={20} color={C.muted}/></Pressable>:null}
       <Pressable style={s.signout} onPress={() => supabase.auth.signOut()}>
         <Ionicons name="log-out-outline" size={22} color={C.red} />
         <Text style={s.signoutText}>Sign out</Text>
@@ -3719,6 +3762,7 @@ type IssueReport = {
   message: string;
   status: "open" | "resolved";
   created_at: string;
+  image_url: string | null;
   business: { name: string } | null;
 };
 
@@ -3727,15 +3771,34 @@ function ReportIssue({businessId,onBack}:{businessId:string;onBack:()=>void}) {
   const [category,setCategory] = useState(choices[0]);
   const [message,setMessage] = useState("");
   const [sending,setSending] = useState(false);
+  const [photo,setPhoto] = useState<{uri:string;width:number;height:number}|null>(null);
+  const choosePhoto=async()=>{
+    const permission=await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if(!permission.granted)return Alert.alert("Photo access needed","Allow MIK to choose a screenshot or photo.");
+    const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],quality:1});
+    if(!result.canceled){const asset=result.assets[0];setPhoto({uri:asset.uri,width:asset.width,height:asset.height});}
+  };
   const send = async () => {
     const clean = message.trim();
     if (clean.length < 5) return Alert.alert("Tell us what happened", "Write a short description so we know what to check.");
     setSending(true);
-    const { data, error } = await supabase.from("issue_reports").insert({ business_id: businessId, category, message: clean }).select("id").single();
+    let image_url:string|null=null;
+    if(photo){
+      try{
+        const resized=await ImageManipulator.manipulateAsync(photo.uri,[photo.width>=photo.height?{resize:{width:1200}}:{resize:{height:1200}}],{compress:.72,format:ImageManipulator.SaveFormat.JPEG});
+        const response=await fetch(resized.uri);if(!response.ok)throw new Error("Photo could not be read");
+        const path=`${businessId}/issues/${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
+        const {error:uploadError}=await supabase.storage.from("product-images").upload(path,await response.arrayBuffer(),{contentType:"image/jpeg"});
+        if(uploadError)throw uploadError;
+        image_url=supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
+      }catch(error:any){setSending(false);return Alert.alert("Photo not uploaded",error?.message??"Please try another image.");}
+    }
+    const { data, error } = await supabase.from("issue_reports").insert({ business_id: businessId, category, message: clean, image_url }).select("id").single();
     setSending(false);
     if (error) return Alert.alert("Report not sent", error.message);
     if (data?.id) await supabase.functions.invoke("notify-issue-report", { body: { issueId: data.id } });
     setMessage("");
+    setPhoto(null);
     Alert.alert("Report sent", "The MIK owner can now see your report.", [{text:"Done",onPress:onBack}]);
   };
   return <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
@@ -3745,6 +3808,8 @@ function ReportIssue({businessId,onBack}:{businessId:string;onBack:()=>void}) {
     <View style={s.issueChoices}>{choices.map(choice=><Pressable key={choice} style={[s.issueChoice,category===choice&&s.issueChoiceOn]} onPress={()=>setCategory(choice)}><Text style={[s.issueChoiceText,category===choice&&s.issueChoiceTextOn]}>{choice}</Text></Pressable>)}</View>
     <Text style={s.issueStep}>2 · What happened?</Text>
     <TextInput style={[s.input,s.issueMessage]} multiline textAlignVertical="top" value={message} onChangeText={setMessage} placeholder="Example: I tapped Clear Sale but the products stayed." maxLength={1000}/>
+    <Text style={s.issueStep}>3 · Add a photo (optional)</Text>
+    <Pressable style={s.issuePhotoButton} onPress={()=>void choosePhoto()}><Ionicons name="camera-outline" size={22} color={C.accent}/><View style={s.flex}><Text style={s.rowTitle}>{photo?"Change photo":"Add screenshot or photo"}</Text><Text style={s.rowHelp}>{photo?"Photo ready to send":"This can help us understand the problem"}</Text></View>{photo?<Image source={{uri:photo.uri}} style={s.issuePhotoThumb}/>:<Ionicons name="add" size={22} color={C.muted}/>}</Pressable>
     <Text style={s.issuePrivacy}>Do not include passwords or payment account numbers.</Text>
     <BigButton label={sending?"Sending…":"Send report"} icon="send-outline" color={C.accent} onPress={()=>void send()} disabled={sending}/>
   </ScrollView>;
@@ -3756,7 +3821,7 @@ function OwnerIssueReports({onBack}:{onBack:()=>void}) {
   const [showResolved,setShowResolved] = useState(false);
   const load = useCallback(async()=>{
     setLoading(true);
-    let query = supabase.from("issue_reports").select("id,business_id,category,message,status,created_at,business:businesses(name)").order("created_at",{ascending:false});
+    let query = supabase.from("issue_reports").select("id,business_id,category,message,status,created_at,image_url,business:businesses(name)").order("created_at",{ascending:false});
     if(!showResolved) query=query.eq("status","open");
     const {data,error}=await query;
     if(error) Alert.alert("Reports not loaded",error.message);
@@ -3773,7 +3838,7 @@ function OwnerIssueReports({onBack}:{onBack:()=>void}) {
     {loading ? (
       <ActivityIndicator color={C.green}/>
     ) : items.length ? (
-      items.map(item=><View key={item.id} style={s.issueOwnerCard}><View style={s.issueOwnerTop}><View style={s.flex}><Text style={s.issueOwnerShop}>{item.business?.name??"Unknown shop"}</Text><Text style={s.issueOwnerMeta}>{item.category} · {friendlyDateTime(item.created_at)}</Text></View><View style={[s.statusPill,item.status==="resolved"&&s.statusPillPaused]}><Text style={[s.statusText,item.status==="resolved"&&s.statusTextPaused]}>{item.status==="open"?"OPEN":"DONE"}</Text></View></View><Text style={s.issueOwnerMessage}>{item.message}</Text><Pressable style={s.issueResolve} onPress={()=>void resolve(item)}><Ionicons name={item.status==="open"?"checkmark-circle-outline":"refresh-outline"} size={20} color={C.accent}/><Text style={s.issueResolveText}>{item.status==="open"?"Mark as completed":"Reopen report"}</Text></Pressable></View>)
+      items.map(item=><View key={item.id} style={s.issueOwnerCard}><View style={s.issueOwnerTop}><View style={s.flex}><Text style={s.issueOwnerShop}>{item.business?.name??"Unknown shop"}</Text><Text style={s.issueOwnerMeta}>{item.category} · {friendlyDateTime(item.created_at)}</Text></View><View style={[s.statusPill,item.status==="resolved"&&s.statusPillPaused]}><Text style={[s.statusText,item.status==="resolved"&&s.statusTextPaused]}>{item.status==="open"?"OPEN":"DONE"}</Text></View></View><Text style={s.issueOwnerMessage}>{item.message}</Text>{item.image_url?<Image source={{uri:item.image_url}} style={s.issueOwnerImage} resizeMode="contain"/>:null}<Pressable style={s.issueResolve} onPress={()=>void resolve(item)}><Ionicons name={item.status==="open"?"checkmark-circle-outline":"refresh-outline"} size={20} color={C.accent}/><Text style={s.issueResolveText}>{item.status==="open"?"Mark as completed":"Reopen report"}</Text></Pressable></View>)
     ) : (
       <Empty title={showResolved?"No problem reports yet":"No open problems"}/>
     )}
@@ -4389,6 +4454,10 @@ const s = StyleSheet.create({
     padding: 20,
     backgroundColor: C.white,
   },
+  deviceWelcome:{flex:1,alignItems:"center",justifyContent:"center",padding:20,backgroundColor:C.white},
+  deviceWelcomeCard:{width:"100%",maxWidth:500,padding:28,borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white},
+  deviceWelcomeLogo:{width:76,height:76,alignSelf:"center",marginBottom:22,borderRadius:18},
+  deviceWelcomeTitle:{marginTop:10,color:C.ink,fontSize:30,lineHeight:36,fontWeight:"700",textAlign:"center"},
   loginShell:{width:"100%",maxWidth:1040,overflow:"hidden",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white,shadowColor:"#071521",shadowOpacity:.09,shadowRadius:28,shadowOffset:{width:0,height:14},elevation:8},
   loginShellWide:{minHeight:650,flexDirection:"row"},
   loginEditorial:{width:"52%",padding:64,justifyContent:"center",backgroundColor:C.dark},
@@ -4605,7 +4674,7 @@ const s = StyleSheet.create({
   },
   desktopNavIcon:{width:36,height:32},
   navIconOn: { backgroundColor: C.green },
-  navText: { marginTop: 2, color: C.muted, fontSize: 11, fontWeight: "700" },
+  navText: { marginTop: 2, color: C.muted, fontSize: 12, fontWeight: "700" },
   navTextOn: { color: C.dark, fontWeight: "700" },
   headerHome: {
     minHeight: 42,
@@ -4647,7 +4716,7 @@ const s = StyleSheet.create({
   adminHero: { padding: 20, borderRadius: 20, backgroundColor: C.dark },
   ownerStatsRow:{marginVertical:12,flexDirection:"row",gap:8},
   ownerStatCard:{flex:1,minWidth:0,padding:12,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.white},
-  ownerStatLabel:{color:C.muted,fontSize:9,fontWeight:"700",letterSpacing:.6},
+  ownerStatLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.4},
   ownerStatValue:{marginTop:6,color:C.ink,fontSize:18,fontWeight:"700"},
   ownerExportButton:{minHeight:68,marginBottom:14,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   ownerExportTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
@@ -4665,9 +4734,10 @@ const s = StyleSheet.create({
   activitySummary:{color:C.ink,fontSize:15,lineHeight:20,fontWeight:"700"},
   activityDetail:{marginTop:4,color:C.ink,fontSize:12,lineHeight:18},
   activityMeta:{marginTop:5,color:C.muted,fontSize:12,fontWeight:"600"},
-  activityTime:{marginTop:3,color:C.muted,fontSize:11},
+  activityTime:{marginTop:3,color:C.muted,fontSize:12},
   activityEmptyTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
   activityEmptyText:{color:C.muted,fontSize:13,textAlign:"center"},
+  deviceNameButton:{minHeight:70,marginTop:12,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   issueIntro:{marginBottom:22,padding:16,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:C.white},
   issueIntroIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:C.accent},
   issueIntroTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
@@ -4679,6 +4749,8 @@ const s = StyleSheet.create({
   issueChoiceText:{color:C.ink,fontSize:14,fontWeight:"600"},
   issueChoiceTextOn:{color:C.white},
   issueMessage:{minHeight:150,paddingTop:15},
+  issuePhotoButton:{minHeight:74,padding:12,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  issuePhotoThumb:{width:52,height:52,borderRadius:10,resizeMode:"contain",backgroundColor:C.soft},
   issuePrivacy:{marginTop:8,marginBottom:12,color:C.muted,fontSize:12,lineHeight:18},
   issueToggle:{minHeight:48,marginBottom:8,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:8,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.white},
   issueToggleText:{color:C.accent,fontSize:14,fontWeight:"700"},
@@ -4687,6 +4759,7 @@ const s = StyleSheet.create({
   issueOwnerShop:{color:C.ink,fontSize:16,fontWeight:"700"},
   issueOwnerMeta:{marginTop:3,color:C.muted,fontSize:12},
   issueOwnerMessage:{marginTop:13,color:C.ink,fontSize:15,lineHeight:22},
+  issueOwnerImage:{width:"100%",height:220,marginTop:12,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.soft},
   issueResolve:{minHeight:44,marginTop:14,paddingHorizontal:12,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderTopWidth:1,borderTopColor:C.border},
   issueResolveText:{color:C.accent,fontSize:14,fontWeight:"700"},
   copyStockChoice:{minHeight:74,marginTop:18,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.green,borderRadius:12,backgroundColor:C.white},
@@ -4754,7 +4827,7 @@ const s = StyleSheet.create({
   },
   homeReminder:{marginTop:16,minHeight:88,padding:14,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.records.border,borderRadius:16,backgroundColor:SECTION.records.soft},
   homeReminderIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:SECTION.records.color},
-  homeReminderLabel:{color:SECTION.records.color,fontSize:10,fontWeight:"700",letterSpacing:1.2},
+  homeReminderLabel:{color:SECTION.records.color,fontSize:12,fontWeight:"700",letterSpacing:.8},
   homeReminderTitle:{marginTop:3,color:C.ink,fontSize:17,lineHeight:21,fontWeight:"700"},
   homeReminderMeta:{marginTop:3,color:C.muted,fontSize:12,fontWeight:"600"},
   saleTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -4775,8 +4848,8 @@ const s = StyleSheet.create({
   adminShopActions:{paddingTop:10,flexDirection:"row",gap:7,borderTopWidth:1,borderTopColor:C.border},
   adminShopAction:{flex:1,minHeight:42,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:5,borderRadius:10,backgroundColor:C.soft},
   adminShopActionPrimary:{backgroundColor:C.green},
-  adminShopActionText:{color:C.dark,fontSize:11,fontWeight:"700"},
-  adminLastLogin:{marginTop:3,color:C.muted,fontSize:11},
+  adminShopActionText:{color:C.dark,fontSize:12,fontWeight:"700"},
+  adminLastLogin:{marginTop:3,color:C.muted,fontSize:12},
   statusPillPaused:{backgroundColor:C.redSoft},
   statusTextPaused:{color:C.red},
   clearSaleText: { color: C.red, fontSize: 13, fontWeight: "700" },
@@ -4869,23 +4942,24 @@ const s = StyleSheet.create({
   saleWelcomeHelp:{marginTop:8,marginBottom:20,color:C.muted,fontSize:15,lineHeight:22},
   saleWelcomePrimary:{minHeight:58,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderRadius:15,backgroundColor:C.green},
   saleWelcomePrimaryText:{color:C.white,fontSize:16,fontWeight:"700"},
+  saleWelcomePrimaryHelp:{marginTop:2,color:"#DDE7F0",fontSize:13,fontWeight:"600"},
   saleWelcomeSecondary:{minHeight:56,marginTop:10,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderWidth:1,borderColor:C.accent,borderRadius:15,backgroundColor:C.white},
   saleWelcomeSecondaryText:{color:C.accent,fontSize:16,fontWeight:"700"},
   saleWelcomeSecondaryHelp:{marginTop:2,color:C.ink,fontSize:12,lineHeight:17},
   saleWelcomeLater:{minHeight:44,marginTop:7,alignItems:"center",justifyContent:"center"},
   saleWelcomeLaterText:{color:C.muted,fontSize:14,fontWeight:"600"},
   sellTodayCard:{marginBottom:18,padding:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
-  sellTodayLabel:{color:C.muted,fontSize:11,fontWeight:"700",letterSpacing:.7},
+  sellTodayLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.6},
   sellTodayDate:{marginTop:3,color:C.ink,fontSize:15,fontWeight:"700"},
   saleDateBar:{marginBottom:14,paddingVertical:11,paddingHorizontal:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
-  saleDateBarLabel:{color:C.muted,fontSize:10,fontWeight:"700",letterSpacing:.55},
+  saleDateBarLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.45},
   saleDateBarValue:{marginTop:2,color:C.ink,fontSize:14,fontWeight:"700"},
   sellModeCard:{minHeight:108,marginTop:12,padding:17,flexDirection:"row",alignItems:"center",gap:14,borderWidth:1,borderColor:C.border,borderRadius:16},
   sellModeIcon:{width:56,height:56,alignItems:"center",justifyContent:"center",borderRadius:15},
   sellModeTitle:{color:C.ink,fontSize:21,fontWeight:"700"},
   sellModeHelp:{marginTop:4,color:C.muted,fontSize:14},
   earlierSale:{minHeight:72,marginTop:14,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
-  salesRecordHeading:{marginTop:25,color:SECTION.records.color,fontSize:11,fontWeight:"800",letterSpacing:1.35},
+  salesRecordHeading:{marginTop:28,color:SECTION.records.color,fontSize:18,lineHeight:24,fontWeight:"700"},
   salesRecordHelp:{marginTop:5,color:C.muted,fontSize:13,lineHeight:19},
   earlierSaleTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
   earlierSaleHelp:{marginTop:2,color:C.muted,fontSize:12},
@@ -5541,9 +5615,9 @@ const s = StyleSheet.create({
   },
   stockNumLow: { backgroundColor: C.orangeSoft },
   stockNumText: { color: C.dark, fontSize: 19, fontWeight: "700" },
-  stockNumLabel:{marginTop:-2,color:C.muted,fontSize:11,fontWeight:"600",textTransform:"uppercase",letterSpacing:.35},
+  stockNumLabel:{marginTop:-2,color:C.muted,fontSize:12,fontWeight:"600",textTransform:"uppercase",letterSpacing:.3},
   priceListHero:{marginTop:14,padding:20,flexDirection:"row",alignItems:"center",gap:16,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:"#F5F7F8"},
-  priceListKicker:{color:C.accent,fontSize:11,fontWeight:"700",letterSpacing:1.5},
+  priceListKicker:{color:C.accent,fontSize:12,fontWeight:"700",letterSpacing:1.1},
   priceListTitle:{marginTop:5,color:C.ink,fontSize:26,fontWeight:"700",letterSpacing:-.5},
   priceListHelp:{marginTop:4,color:C.muted,fontSize:14,lineHeight:20},
   priceWarning:{marginTop:10,padding:12,flexDirection:"row",alignItems:"center",gap:8,borderRadius:10,backgroundColor:C.orangeSoft},
@@ -5561,7 +5635,7 @@ const s = StyleSheet.create({
   priceName:{flex:1,color:C.ink,fontSize:14,lineHeight:19,fontWeight:"600"},
   priceRight:{alignItems:"flex-end"},
   priceValue:{color:C.dark,fontSize:17,fontWeight:"700"},
-  priceSaleTag:{marginBottom:1,color:C.red,fontSize:9,fontWeight:"700",letterSpacing:.8},
+  priceSaleTag:{marginBottom:1,color:C.red,fontSize:12,fontWeight:"700",letterSpacing:.5},
   priceMissing:{color:C.orange,fontSize:12},
   menu: {
     minHeight: 84,
@@ -5811,7 +5885,7 @@ const s = StyleSheet.create({
   pastMonthButton:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.soft},
   pastMonthTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
   pastWeekRow:{marginTop:7,flexDirection:"row"},
-  pastWeekDay:{width:"14.2857%",paddingVertical:7,color:C.muted,fontSize:11,fontWeight:"700",textAlign:"center"},
+  pastWeekDay:{width:"14.2857%",paddingVertical:7,color:C.muted,fontSize:12,fontWeight:"700",textAlign:"center"},
   pastDays:{flexDirection:"row",flexWrap:"wrap"},
   pastDay:{width:"14.2857%",aspectRatio:1,alignItems:"center",justifyContent:"center",borderRadius:12},
   pastDayOn:{backgroundColor:SECTION.records.color},
@@ -5820,11 +5894,11 @@ const s = StyleSheet.create({
   pastDayDisabled:{color:"#D8DCDF"},
   pastDayTextOn:{color:C.white,fontWeight:"700"},
   pastDateSelected:{minHeight:72,marginTop:12,padding:13,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:SECTION.records.border,borderRadius:14,backgroundColor:SECTION.records.soft},
-  pastDateSelectedLabel:{color:SECTION.records.color,fontSize:10,fontWeight:"700",letterSpacing:1.1},
+  pastDateSelectedLabel:{color:SECTION.records.color,fontSize:12,fontWeight:"700",letterSpacing:.7},
   pastDateSelectedValue:{marginTop:3,color:C.ink,fontSize:17,fontWeight:"700"},
   pastSaleSummary:{marginTop:14,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   changePastDateButton:{minHeight:40,paddingHorizontal:10,alignItems:"center",justifyContent:"center",borderRadius:10,backgroundColor:C.soft},
-  changePastDateText:{color:SECTION.records.color,fontSize:11,fontWeight:"700"},
+  changePastDateText:{color:SECTION.records.color,fontSize:12,fontWeight:"700"},
   pastSaleIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: C.soft },
   cashIcon: {
     width: 48,

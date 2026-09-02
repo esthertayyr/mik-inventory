@@ -23,7 +23,7 @@ Deno.serve(async (request) => {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const { data: issue, error } = await admin
       .from("issue_reports")
-      .select("id,reported_by,category,message,created_at,business:businesses(name)")
+      .select("id,reported_by,category,message,created_at,image_url,business:businesses(name)")
       .eq("id", issueId)
       .single();
     if (error || !issue || issue.reported_by !== user.id)
@@ -39,7 +39,7 @@ Deno.serve(async (request) => {
         from: "MIK Reports <onboarding@resend.dev>",
         to: ["esther.tayyr@gmail.com"],
         subject: `[MIK] New ${issue.category} problem from ${shopName ?? "a shop"}`,
-        text: `A new problem was reported in MIK.\n\nShop: ${shopName ?? "Unknown shop"}\nArea: ${issue.category}\nTime: ${issue.created_at}\n\n${issue.message}\n\nOpen the MIK Owner dashboard to review and close this report.`,
+        text: `A new problem was reported in MIK.\n\nShop: ${shopName ?? "Unknown shop"}\nArea: ${issue.category}\nTime: ${issue.created_at}\n\n${issue.message}${issue.image_url ? `\n\nAttached photo: ${issue.image_url}` : ""}\n\nOpen the MIK Owner dashboard to review and close this report.`,
       }),
     });
     if (!response.ok) throw new Error(`Email service returned ${response.status}`);
