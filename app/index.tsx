@@ -2786,15 +2786,12 @@ function Products({
     ]);
   const deleteProduct = () => {
     if (!selected) return;
-    Alert.alert(
+    confirmDestructive(
       "Delete this product?",
       `${selected.name} will disappear from Sell and Stock. Past sales will stay safe.`,
-      [
-        { text: "Keep product", style: "cancel" },
-        {
-          text: "Delete product",
-          style: "destructive",
-          onPress: async () => {
+      "Delete product",
+      () => {
+        void (async () => {
             setSaving(true);
             const { error } = await supabase
               .from("products")
@@ -2837,9 +2834,8 @@ function Products({
                 ? "Its stored photo was removed. Past sales were not changed."
                 : "Past sales were not changed. The photo was kept because another product may still use it.",
             );
-          },
-        },
-      ],
+        })();
+      },
     );
   };
   const duplicateProduct = () => {
