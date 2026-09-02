@@ -645,6 +645,7 @@ function ShopApp({
   const [saleInProgress, setSaleInProgress] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [productsBackScreen, setProductsBackScreen] = useState<Screen>("more");
+  const [priceListBackScreen, setPriceListBackScreen] = useState<Screen>("home");
   const loadData = useCallback(
     async (businessId: string, selectedLocationId: string) => {
       const start = new Date();
@@ -825,6 +826,7 @@ function ShopApp({
             setEditProductId(null);
             setProductsBackScreen("home");
           }
+          if (next === "price_list") setPriceListBackScreen("home");
           setScreen(next);
           if (next === "dashboard") void reload();
         }}
@@ -854,15 +856,23 @@ function ShopApp({
       />
     );
   else if (screen === "stock_start")
-    body = <StockStart onOpen={setScreen} />;
-  else if (screen === "inventory")
+    body = <StockStart onOpen={(next) => {
+      if (next === "products") {
+        setEditProductId(null);
+        setProductsBackScreen("stock_start");
+      }
+      if (next === "price_list") setPriceListBackScreen("stock_start");
+      setScreen(next);
+    }} />;
+  else if (screen === "inventory" || screen === "alphabet_inventory")
     body = (
       <Inventory
         products={products}
         categories={categories}
         locationId={locationId}
         onSaved={reload}
-        onHome={() => setScreen("home")}
+        alphabetOnly={screen === "alphabet_inventory"}
+        onBack={() => setScreen("stock_start")}
         onManageProducts={(productId) => {
           setEditProductId(productId ?? null);
           setProductsBackScreen("inventory");
@@ -894,14 +904,12 @@ function ShopApp({
     );
   else if (screen === "sell_start")
     body = <SellStart businessId={business!.id} onOpen={setScreen} />;
-  else if (screen === "production")
-    body = <ProductionStart onOpen={setScreen} />;
   else if (screen === "print_queue")
-    body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("production")} />;
+    body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
   else if (screen === "price_calculator")
-    body = <PrintPriceCalculator onBack={() => setScreen("production")} />;
+    body = <PrintPriceCalculator onBack={() => setScreen("home")} />;
   else if (screen === "correct")
-    body = <ReportsScreen locationId={locationId} correctionMode />;
+    body = <ReportsScreen locationId={locationId} correctionMode onBack={() => setScreen("sell_start")} />;
   else if (screen === "shop")
     body = (
       <ShopProfile
@@ -924,7 +932,7 @@ function ShopApp({
         products={products}
         categories={categories}
         business={business!}
-        onBack={() => setScreen("home")}
+        onBack={() => setScreen(priceListBackScreen)}
         onEdit={() => {
           setEditProductId(null);
           setProductsBackScreen("price_list");
@@ -942,22 +950,23 @@ function ShopApp({
             setEditProductId(null);
             setProductsBackScreen("more");
           }
+          if (next === "price_list") setPriceListBackScreen("more");
           setScreen(next);
         }}
         onGuide={() => setGuideOpen(true)}
       />
     );
   const selected =
-    screen === "inventory"
+    screen === "inventory" || screen === "alphabet_inventory" || screen === "products" || screen === "price_list"
       ? "stock_start"
-      : screen === "products" || screen === "reports" || screen === "shop" || screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "price_list" || screen === "print_queue" || screen === "price_calculator"
+      : screen === "reports" || screen === "shop"
       ? "more"
-      : screen === "production"
+      : screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "print_queue" || screen === "price_calculator"
         ? "home"
       : screen === "missed" || screen === "sale" || screen === "event_sale"
         ? "sell_start"
-        : screen === "correct"
-          ? "home"
+      : screen === "correct"
+          ? "sell_start"
           : screen;
   return (
     <SafeAreaView style={s.app}>
@@ -1124,17 +1133,6 @@ function SellStart({businessId,onOpen}:{businessId:string;onOpen:(screen:Screen)
   </ScrollView>;
 }
 
-function ProductionStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
-  return <ScrollView contentContainerStyle={s.sellStartPage}>
-    <Text style={s.pageTitle}>Printers & Filament</Text><Text style={s.subtitle}>What do you want to check?</Text>
-    <View style={[s.flowGuide,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]}><View style={[s.flowGuideNumber,{backgroundColor:SECTION.production.color}]}><Text style={s.flowGuideNumberText}>?</Text></View><View style={s.flex}><Text style={s.flowGuideTitle}>Production made simple</Text><Text style={s.flowGuideText}>Use Print Queue for work to make. Use Printers and Filament to check the tools and materials.</Text></View></View>
-    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("print_queue")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="layers" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Print Queue</Text><Text style={s.sellModeHelp}>See what to print, what is printing and what is ready</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:C.white,borderColor:SECTION.production.border}]} onPress={()=>onOpen("price_calculator")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="calculator" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Price calculator</Text><Text style={s.sellModeHelp}>Estimate the cost and suggested selling price</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("printers")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="hardware-chip" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Printers</Text><Text style={s.sellModeHelp}>Check printer status</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]} onPress={()=>onOpen("filaments")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="color-filter" size={30} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Filament</Text><Text style={s.sellModeHelp}>Check filament stock</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
-  </ScrollView>;
-}
-
 function StockStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   return <ScrollView contentContainerStyle={s.sellStartPage}>
     <Text style={s.pageTitle}>Stock</Text>
@@ -1144,8 +1142,9 @@ function StockStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
       <View style={s.flex}><Text style={s.flowGuideTitle}>Start here</Text><Text style={s.flowGuideText}>Choose a card below. Nothing changes until you press the final save button.</Text></View>
     </View>
     <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("inventory")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="cube" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Check or update stock</Text><Text style={s.sellModeHelp}>See what is low, add stock or correct the number</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:C.white,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("inventory")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="text" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Update A–Z letters</Text><Text style={s.sellModeHelp}>Choose a keycap design, then update each letter</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:C.white,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("products")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="pricetags" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Products and prices</Text><Text style={s.sellModeHelp}>Add a product or change its name, photo or price</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("alphabet_inventory")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="text" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Update A–Z letters</Text><Text style={s.sellModeHelp}>Only keycap designs and their A–Z stock appear here</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("products")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="cube-outline" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Manage products</Text><Text style={s.sellModeHelp}>Add, edit or delete products and categories</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
+    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("price_list")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="receipt-outline" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Price list</Text><Text style={s.sellModeHelp}>See or print the prices shown to customers</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
   </ScrollView>;
 }
 
@@ -3235,14 +3234,16 @@ function Inventory({
   categories,
   locationId,
   onSaved,
-  onHome,
+  alphabetOnly = false,
+  onBack,
   onManageProducts,
 }: {
   products: Product[];
   categories: Category[];
   locationId: string;
   onSaved: () => void;
-  onHome: () => void;
+  alphabetOnly?: boolean;
+  onBack: () => void;
   onManageProducts: (productId?: string) => void;
 }) {
   const { width } = useWindowDimensions();
@@ -3269,6 +3270,7 @@ function Inventory({
   const filtered = products
     .filter(
       (p) =>
+        (!alphabetOnly || Boolean(p.alphabet_style)) &&
         (!category || p.category_id === category) &&
         p.name.toLowerCase().includes(search.toLowerCase()) &&
         (stockView !== "out" || shownStock(p) <= 0) &&
@@ -3348,7 +3350,7 @@ function Inventory({
           ? `${amount} damaged or lost recorded.`
           : `${amount} received into stock.`,
       [
-        { text: "Home", onPress: onHome },
+        { text: "Back to stock", onPress: onBack },
         { text: "Update another" },
       ],
     );
@@ -3507,15 +3509,16 @@ function Inventory({
         showsVerticalScrollIndicator
         ListHeaderComponent={(
           <View style={s.stockListHeader}>
-            <View style={s.stockPageHeading}>
+            <Back title={alphabetOnly ? "A–Z letter stock" : "Stock"} onPress={onBack} />
+            <View style={[s.stockPageHeading, s.stockPageHero, width < 560 && s.stockPageHeadingMobile]}>
               <View style={s.flex}>
-                <Text style={s.pageTitle}>Stock</Text>
-                <Text style={s.subtitle}>Tap a product to change its stock.</Text>
+                <Text style={s.pageTitle}>{alphabetOnly ? "Update A–Z letters" : "Check and update stock"}</Text>
+                <Text style={s.subtitle}>{alphabetOnly ? "Choose a keycap design, then tap a letter to change its count." : "Tap a product to add stock or correct its count."}</Text>
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Edit products and prices" style={s.stockManageButton} onPress={() => onManageProducts()}>
+              {!alphabetOnly ? <Pressable accessibilityRole="button" accessibilityLabel="Manage products" style={s.stockManageButton} onPress={() => onManageProducts()}>
                 <Ionicons name="create-outline" size={20} color={C.white} />
-                <Text style={s.stockManageButtonText}>Edit products</Text>
-              </Pressable>
+                <Text style={s.stockManageButtonText}>Manage products</Text>
+              </Pressable> : null}
             </View>
             <Search value={search} onChange={setSearch} />
             <View style={[s.stockFilters, width >= 900 && s.stockFiltersDesktop]}>
@@ -3605,6 +3608,7 @@ function Inventory({
 }
 
 function PriceList({products,categories,business,onBack,onEdit}:{products:Product[];categories:Category[];business:Business;onBack:()=>void;onEdit:()=>void}) {
+  const { width } = useWindowDimensions();
   const grouped=categories.map(category=>({category,items:products.filter(product=>product.category_id===category.id)})).filter(group=>group.items.length);
   const missing=products.filter(product=>product.sale_price===null&&product.regular_price===null).length;
   const printList=()=>{
@@ -3616,7 +3620,7 @@ function PriceList({products,categories,business,onBack,onEdit}:{products:Produc
     popup.document.write(`<!doctype html><html><head><title>${escape(business.name)} Price List</title><style>body{font-family:Arial,sans-serif;color:#101318;max-width:820px;margin:0 auto;padding:40px}header{border-bottom:3px solid #142C47;padding-bottom:20px;margin-bottom:25px}h1{font-size:34px;margin:0}p{color:#626A73}h2{font-size:18px;margin:25px 0 8px;color:#264A3B}.row{display:flex;justify-content:space-between;gap:25px;padding:10px 0;border-bottom:1px solid #E0E3E7}.row strong{white-space:nowrap}@media print{body{padding:0}}</style></head><body><header><h1>${escape(business.name)}</h1><p>Price List</p></header>${sections}</body></html>`);
     popup.document.close();popup.focus();popup.print();
   };
-  return <ScrollView contentContainerStyle={s.scroll}><Back title="Price list" onPress={onBack}/><View style={s.priceListHero}><View style={s.flex}><Text style={s.priceListKicker}>POP-UP DISPLAY</Text><Text style={s.priceListTitle}>Current selling prices</Text><Text style={s.priceListHelp}>Sale prices are shown automatically when available.</Text></View><Ionicons name="receipt-outline" size={38} color={C.accent}/></View>{missing?<View style={s.priceWarning}><Ionicons name="alert-circle-outline" size={21} color={C.orange}/><Text style={s.priceWarningText}>{missing} {missing===1?"product needs":"products need"} a price before printing.</Text></View>:null}<View style={s.priceActions}><Pressable style={s.pricePrimary} onPress={printList}><Ionicons name="print-outline" size={21} color={C.white}/><Text style={s.pricePrimaryText}>Print price list</Text></Pressable><Pressable style={s.priceSecondary} onPress={onEdit}><Ionicons name="create-outline" size={21} color={C.dark}/><Text style={s.priceSecondaryText}>Edit prices</Text></Pressable></View>{grouped.map(group=><View key={group.category.id} style={s.priceSection}><View style={[s.priceSectionMark,{backgroundColor:categoryTone(group.category.name).color}]}/><Text style={s.priceSectionTitle}>{group.category.name}</Text>{group.items.map(product=><View key={product.id} style={s.priceRow}><Text style={s.priceName}>{product.name}</Text><View style={s.priceRight}>{product.sale_price!==null?<Text style={s.priceSaleTag}>SALE</Text>:null}<Text style={[s.priceValue,product.sale_price===null&&product.regular_price===null&&s.priceMissing]}>{product.sale_price!==null||product.regular_price!==null?peso(Number(product.sale_price??product.regular_price)):"Price needed"}</Text></View></View>)}</View>)}</ScrollView>;
+  return <ScrollView contentContainerStyle={s.scroll}><Back title="Price list" onPress={onBack}/><View style={s.priceListHero}><View style={s.flex}><Text style={s.priceListKicker}>CUSTOMER PRICE LIST</Text><Text style={s.priceListTitle}>Current selling prices</Text><Text style={s.priceListHelp}>Use this at a pop-up or print it for customers.</Text></View><Ionicons name="receipt-outline" size={38} color={C.accent}/></View>{missing?<View style={s.priceWarning}><Ionicons name="alert-circle-outline" size={21} color={C.orange}/><Text style={s.priceWarningText}>{missing} {missing===1?"product needs":"products need"} a price before printing.</Text></View>:null}<View style={[s.priceActions,width<520&&s.priceActionsMobile]}><Pressable style={s.pricePrimary} onPress={printList}><Ionicons name="print-outline" size={21} color={C.white}/><Text style={s.pricePrimaryText}>Print price list</Text></Pressable><Pressable style={s.priceSecondary} onPress={onEdit}><Ionicons name="create-outline" size={21} color={C.dark}/><Text style={s.priceSecondaryText}>Edit product prices</Text></Pressable></View>{grouped.map(group=><View key={group.category.id} style={s.priceSection}><View style={[s.priceSectionMark,{backgroundColor:categoryTone(group.category.name).color}]}/><Text style={s.priceSectionTitle}>{group.category.name}</Text>{group.items.map(product=><View key={product.id} style={s.priceRow}><Text style={s.priceName}>{product.name}</Text><View style={s.priceRight}>{product.sale_price!==null?<Text style={s.priceSaleTag}>SALE</Text>:null}<Text style={[s.priceValue,product.sale_price===null&&product.regular_price===null&&s.priceMissing]}>{product.sale_price!==null||product.regular_price!==null?peso(Number(product.sale_price??product.regular_price)):"Price needed"}</Text></View></View>)}</View>)}</ScrollView>;
 }
 
 function More({
@@ -3634,23 +3638,8 @@ function More({
   type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean };
   const groups: Array<{ title: string; color: string; soft: string; border: string; tools: MoreTool[] }> = [
     {
-      title: "Stock & products", ...SECTION.stock, tools: [
-        { icon: "pricetags-outline", title: "Products & prices", help: "Add products or change prices", screen: "products" },
-        { icon: "receipt-outline", title: "Price list", help: "View or print selling prices", screen: "price_list" },
-      ],
-    },
-    {
-      title: "Production", ...SECTION.production, tools: [
-        { icon: "hardware-chip-outline", title: "Printers", help: "See which printers are working", screen: "printers" },
-        { icon: "color-filter-outline", title: "Filaments", help: "Track colours and spools", screen: "filaments" },
-      ],
-    },
-    {
-      title: "Records & planning", ...SECTION.records, tools: [
-        { icon: "calendar-outline", title: "Calendar", help: "Plan events and see reminders", screen: "calendar" },
+      title: "Reports", ...SECTION.records, tools: [
         { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports" },
-        { icon: "return-up-back-outline", title: "Cancel wrong sale", help: "Find and cancel a mistaken sale", screen: "correct" },
-        { icon: "calendar-number-outline", title: "Add missed sale", help: "Choose its original sale date", screen: "missed" },
       ],
     },
     {
@@ -3663,7 +3652,7 @@ function More({
   return (
     <ScrollView contentContainerStyle={s.scroll}>
       <Text style={s.pageTitle}>More</Text>
-      <Text style={s.subtitle}>Shop tools, grouped by topic.</Text>
+      <Text style={s.subtitle}>Reports, shop settings and help.</Text>
       {groups.map((group) => (
         <View key={group.title} style={s.quickSection}>
           <View style={s.quickSectionHeading}>
@@ -4852,6 +4841,8 @@ const s = StyleSheet.create({
     gap: 8,
   },
   stockPageHeading:{flexDirection:"row",alignItems:"center",gap:12},
+  stockPageHeadingMobile:{flexDirection:"column",alignItems:"stretch"},
+  stockPageHero:{marginTop:10,marginBottom:12,padding:16,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:16,backgroundColor:SECTION.stock.soft},
   stockManageButton:{minHeight:46,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:12,backgroundColor:SECTION.stock.color},
   stockManageButtonText:{color:C.white,fontSize:14,fontWeight:"700"},
   stockEditButton:{width:42,height:42,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
@@ -5455,6 +5446,7 @@ const s = StyleSheet.create({
   priceWarning:{marginTop:10,padding:12,flexDirection:"row",alignItems:"center",gap:8,borderRadius:10,backgroundColor:C.orangeSoft},
   priceWarningText:{flex:1,color:C.ink,fontSize:13,fontWeight:"600"},
   priceActions:{marginTop:12,flexDirection:"row",gap:9},
+  priceActionsMobile:{flexDirection:"column"},
   pricePrimary:{minHeight:50,flex:1,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:10,backgroundColor:SECTION.stock.color},
   pricePrimaryText:{color:C.white,fontSize:14,fontWeight:"700"},
   priceSecondary:{minHeight:50,flex:1,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},

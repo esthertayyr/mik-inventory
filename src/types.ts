@@ -11,7 +11,6 @@ export type Screen =
   | "filaments"
   | "calendar"
   | "price_list"
-  | "production"
   | "print_queue"
   | "price_calculator"
   | "missed"
@@ -19,6 +18,7 @@ export type Screen =
   | "products"
   | "stock_start"
   | "inventory"
+  | "alphabet_inventory"
   | "reports"
   | "shop"
   | "more";

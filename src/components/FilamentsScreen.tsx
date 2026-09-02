@@ -1,47 +1,716 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/src/lib/supabase";
 
-type Filament={id:string;brand:string;material:string;color:string;finish:string;spool_count:number;notes:string|null};
-const PRODUCTION="#65243A";
-const BRANDS=["Bambu Lab","eSUN","Polymaker","SUNLU","Creality","Overture","JAYO","Anycubic","ELEGOO","Generic"];
-const MATERIALS=["PLA","PLA+","PETG","ABS","ASA","TPU","PC","Nylon / PA","PVA Support","PETG-CF","PLA-CF","PA-CF"];
-const COLORS=["Black","White","Grey","Silver","Red","Orange","Yellow","Green","Lime","Blue","Navy","Purple","Pink","Brown","Beige","Gold","Bronze","Natural / Clear","Multi-colour"];
-const FINISHES=["Standard","Matte","Silk","Dual-colour","Tri-colour","Rainbow","Translucent","Glow in the dark","Marble","Wood","Carbon fibre","Sparkle","Colour-changing"];
-const swatch=(color:string)=>{const c=color.toLowerCase();if(c.includes("black"))return"#17191B";if(c.includes("white"))return"#F7F7F5";if(c.includes("grey")||c.includes("silver"))return"#8A9198";if(c.includes("red"))return"#A82D3F";if(c.includes("orange"))return"#D66A22";if(c.includes("yellow")||c.includes("gold"))return"#D5A71B";if(c.includes("green")||c.includes("lime"))return"#388353";if(c.includes("blue")||c.includes("navy"))return"#315E91";if(c.includes("purple"))return"#76528C";if(c.includes("pink"))return"#D4879B";if(c.includes("brown")||c.includes("bronze"))return"#795B43";if(c.includes("clear")||c.includes("natural"))return"#E8E5DC";if(c.includes("multi")||c.includes("rainbow"))return"#8D5E91";return"#A9AFB4";};
+type Filament = {
+  id: string;
+  brand: string;
+  material: string;
+  color: string;
+  finish: string;
+  spool_count: number;
+  notes: string | null;
+};
+const PRODUCTION = "#65243A";
+const BRANDS = [
+  "Bambu Lab",
+  "eSUN",
+  "Polymaker",
+  "SUNLU",
+  "Creality",
+  "Overture",
+  "JAYO",
+  "Anycubic",
+  "ELEGOO",
+  "Generic",
+];
+const MATERIALS = [
+  "PLA",
+  "PLA+",
+  "PETG",
+  "ABS",
+  "ASA",
+  "TPU",
+  "PC",
+  "Nylon / PA",
+  "PVA Support",
+  "PETG-CF",
+  "PLA-CF",
+  "PA-CF",
+];
+const COLORS = [
+  "Black",
+  "White",
+  "Grey",
+  "Silver",
+  "Red",
+  "Orange",
+  "Yellow",
+  "Green",
+  "Lime",
+  "Blue",
+  "Navy",
+  "Purple",
+  "Pink",
+  "Brown",
+  "Beige",
+  "Gold",
+  "Bronze",
+  "Natural / Clear",
+  "Multi-colour",
+];
+const FINISHES = [
+  "Standard",
+  "Matte",
+  "Silk",
+  "Dual-colour",
+  "Tri-colour",
+  "Rainbow",
+  "Translucent",
+  "Glow in the dark",
+  "Marble",
+  "Wood",
+  "Carbon fibre",
+  "Sparkle",
+  "Colour-changing",
+];
+const swatch = (color: string) => {
+  const c = color.toLowerCase();
+  if (c.includes("black")) return "#17191B";
+  if (c.includes("white")) return "#F7F7F5";
+  if (c.includes("grey") || c.includes("silver")) return "#8A9198";
+  if (c.includes("red")) return "#A82D3F";
+  if (c.includes("orange")) return "#D66A22";
+  if (c.includes("yellow") || c.includes("gold")) return "#D5A71B";
+  if (c.includes("green") || c.includes("lime")) return "#388353";
+  if (c.includes("blue") || c.includes("navy")) return "#315E91";
+  if (c.includes("purple")) return "#76528C";
+  if (c.includes("pink")) return "#D4879B";
+  if (c.includes("brown") || c.includes("bronze")) return "#795B43";
+  if (c.includes("clear") || c.includes("natural")) return "#E8E5DC";
+  if (c.includes("multi") || c.includes("rainbow")) return "#8D5E91";
+  return "#A9AFB4";
+};
 
-function SearchChoice({label,value,onChange,options,placeholder}:{label:string;value:string;onChange:(v:string)=>void;options:string[];placeholder:string}){
-  const [open,setOpen]=useState(false);const matches=options.filter(x=>!value.trim()||x.toLowerCase().includes(value.toLowerCase())).slice(0,8);
-  return <View><Text style={s.label}>{label}</Text><View style={s.searchField}><TextInput style={s.searchInput} value={value} onChangeText={v=>{onChange(v);setOpen(true);}} onFocus={()=>setOpen(true)} placeholder={placeholder}/><Pressable onPress={()=>setOpen(!open)}><Ionicons name={open?"chevron-up":"chevron-down"} size={20} color="#667078"/></Pressable></View>{open?<View style={s.options}>{matches.length?matches.map(x=><Pressable key={x} style={s.option} onPress={()=>{onChange(x);setOpen(false);}}><Text style={s.optionText}>{x}</Text>{value===x?<Ionicons name="checkmark" size={18} color={PRODUCTION}/>:null}</Pressable>):<Pressable style={s.option} onPress={()=>setOpen(false)}><Text style={s.optionText}>Use “{value}”</Text></Pressable>}</View>:null}</View>;
-}
-
-export function FilamentsScreen({businessId,locationId,onBack}:{businessId:string;locationId:string;onBack:()=>void}){
-  const {width}=useWindowDimensions();const [items,setItems]=useState<Filament[]>([]);const [loading,setLoading]=useState(true);const [editing,setEditing]=useState<Filament|"new"|null>(null);const [brand,setBrand]=useState("Bambu Lab");const [material,setMaterial]=useState("PLA");const [color,setColor]=useState("");const [finish,setFinish]=useState("Standard");const [count,setCount]=useState("1");const [notes,setNotes]=useState("");const [saving,setSaving]=useState(false);const [search,setSearch]=useState("");
-  const load=useCallback(async()=>{setLoading(true);const {data,error}=await supabase.from("filaments").select("id,brand,material,color,finish,spool_count,notes").eq("business_id",businessId).order("material").order("color");if(error)Alert.alert("Filaments not loaded",error.message);setItems((data??[]) as Filament[]);setLoading(false);},[businessId]);useEffect(()=>{void load();},[load]);
-  const total=items.reduce((sum,x)=>sum+x.spool_count,0);const types=new Set(items.map(x=>x.material)).size;const filtered=useMemo(()=>items.filter(x=>`${x.brand} ${x.material} ${x.color} ${x.finish}`.toLowerCase().includes(search.toLowerCase())),[items,search]);
-  const openNew=()=>{setEditing("new");setBrand("Bambu Lab");setMaterial("PLA");setColor("");setFinish("Standard");setCount("1");setNotes("");};const openEdit=(x:Filament)=>{setEditing(x);setBrand(x.brand);setMaterial(x.material);setColor(x.color);setFinish(x.finish);setCount(String(x.spool_count));setNotes(x.notes??"");};
-  const save=async()=>{const qty=Number(count);if(!brand.trim()||!material.trim()||!color.trim())return Alert.alert("Details needed","Enter the brand, material and colour.");if(!Number.isInteger(qty)||qty<0)return Alert.alert("Check spool count","Enter a whole number of spools.");setSaving(true);const payload={business_id:businessId,location_id:locationId,brand:brand.trim(),material:material.trim(),color:color.trim(),finish:finish.trim()||"Standard",spool_count:qty,notes:notes.trim()||null,updated_at:new Date().toISOString()};const result=editing==="new"?await supabase.from("filaments").insert(payload):await supabase.from("filaments").update(payload).eq("id",editing!.id);setSaving(false);if(result.error)return Alert.alert("Filament not saved",result.error.message);setEditing(null);await load();};
-  const remove=()=>{if(!editing||editing==="new")return;Alert.alert("Remove this filament?","This entry will be removed from the shop list.",[{text:"Keep",style:"cancel"},{text:"Remove",style:"destructive",onPress:async()=>{const {error}=await supabase.from("filaments").delete().eq("id",editing.id);if(error)return Alert.alert("Not removed",error.message);setEditing(null);await load();}}]);};
-  if(editing)return <ScrollView contentContainerStyle={s.page}>
-    <Pressable style={s.back} onPress={()=>setEditing(null)}><Ionicons name="arrow-back" size={22} color="#111820"/><Text style={s.backText}>{editing==="new"?"Add filament":"Edit filament"}</Text></Pressable>
-    <View style={s.form}>
-      <Text style={s.formTitle}>Filament details</Text>
-      <Text style={s.help}>Brand, material, colour and spool count are required. Finish and note are optional.</Text>
-      <SearchChoice label="Brand · Required" value={brand} onChange={setBrand} options={BRANDS} placeholder="Search or type brand"/>
-      <SearchChoice label="Material · Required" value={material} onChange={setMaterial} options={MATERIALS} placeholder="Example: PLA"/>
-      <SearchChoice label="Colour · Required" value={color} onChange={setColor} options={COLORS} placeholder="Search or type colour"/>
-      <SearchChoice label="Finish · Optional" value={finish} onChange={setFinish} options={FINISHES} placeholder="Example: Matte"/>
-      <Text style={s.label}>Number of spools · Required</Text>
-      <View style={s.quantity}><Pressable style={s.qtyButton} onPress={()=>setCount(String(Math.max(0,Number(count||0)-1)))}><Ionicons name="remove" size={23} color="#111820"/></Pressable><TextInput style={s.qtyInput} value={count} onChangeText={setCount} keyboardType="number-pad"/><Pressable style={s.qtyButton} onPress={()=>setCount(String(Number(count||0)+1))}><Ionicons name="add" size={23} color="#111820"/></Pressable></View>
-      <Text style={s.label}>Note · Optional</Text>
-      <TextInput style={[s.input,s.notes]} value={notes} onChangeText={setNotes} multiline placeholder="Storage or purchase note"/>
-      <Pressable style={[s.save,{backgroundColor:PRODUCTION},saving&&{opacity:.6}]} onPress={()=>void save()} disabled={saving}><Ionicons name="checkmark" size={21} color="#FFF"/><Text style={s.saveText}>{saving?"Saving…":"Save filament"}</Text></Pressable>
-      {editing!=="new"?<Pressable style={s.remove} onPress={remove}><Text style={s.removeText}>Remove filament</Text></Pressable>:null}
+function SearchChoice({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const matches = options
+    .filter(
+      (x) => !value.trim() || x.toLowerCase().includes(value.toLowerCase()),
+    )
+    .slice(0, 8);
+  return (
+    <View>
+      <Text style={s.label}>{label}</Text>
+      <View style={s.searchField}>
+        <TextInput
+          style={s.searchInput}
+          value={value}
+          onChangeText={(v) => {
+            onChange(v);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+        />
+        <Pressable onPress={() => setOpen(!open)}>
+          <Ionicons
+            name={open ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#667078"
+          />
+        </Pressable>
+      </View>
+      {open ? (
+        <View style={s.options}>
+          {matches.length ? (
+            matches.map((x) => (
+              <Pressable
+                key={x}
+                style={s.option}
+                onPress={() => {
+                  onChange(x);
+                  setOpen(false);
+                }}
+              >
+                <Text style={s.optionText}>{x}</Text>
+                {value === x ? (
+                  <Ionicons name="checkmark" size={18} color={PRODUCTION} />
+                ) : null}
+              </Pressable>
+            ))
+          ) : (
+            <Pressable style={s.option} onPress={() => setOpen(false)}>
+              <Text style={s.optionText}>Use “{value}”</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
     </View>
-  </ScrollView>;
-  const columns=width>=1000?3:width>=680?2:1;const cardWidth=columns===3?"32.3%":columns===2?"49%":"100%";
-  return <ScrollView contentContainerStyle={s.page}><View style={s.heading}><View style={{flex:1}}><Pressable style={s.back} onPress={onBack}><Ionicons name="arrow-back" size={22} color="#111820"/><Text style={s.backText}>Filaments</Text></Pressable><Text style={s.help}>Know what materials and colours the shop has.</Text></View><Pressable style={s.add} onPress={openNew}><Ionicons name="add" size={22} color="#FFF"/><Text style={s.addText}>Add filament</Text></Pressable></View><View style={s.hero}><View><Text style={s.kicker}>MATERIAL LIBRARY</Text><Text style={s.heroValue}>{total} spools</Text><Text style={s.heroHelp}>{types} material {types===1?"type":"types"} · {items.length} entries</Text></View><Ionicons name="color-filter-outline" size={42} color="#00AE42"/></View><View style={s.search}><Ionicons name="search" size={20} color="#626A73"/><TextInput style={s.searchInput} value={search} onChangeText={setSearch} placeholder="Search brand, material or colour"/></View>{loading?<ActivityIndicator size="large" color="#00AE42"/>:filtered.length?<View style={s.grid}>{filtered.map(x=><Pressable key={x.id} style={[s.card,{width:cardWidth}]} onPress={()=>openEdit(x)}><View style={s.cardTop}><View style={[s.swatch,{backgroundColor:swatch(x.color)}]}/><View style={s.spools}><Text style={s.spoolNumber}>{x.spool_count}</Text><Text style={s.spoolLabel}>SPOOLS</Text></View></View><Text style={s.color}>{x.color}</Text><Text style={s.material}>{x.material} · {x.finish}</Text><Text style={s.brand}>{x.brand}</Text>{x.notes?<Text style={s.note} numberOfLines={2}>{x.notes}</Text>:null}<View style={s.cardFoot}><Text style={s.editText}>View or update</Text><Ionicons name="arrow-forward" size={18} color="#111820"/></View></Pressable>)}</View>:<View style={s.empty}><Ionicons name="color-filter-outline" size={38} color="#00AE42"/><Text style={s.emptyTitle}>{search?"No matching filament":"Add your first filament"}</Text><Text style={s.help}>{search?"Try another brand, material or colour.":"Record each brand, material and colour the shop owns."}</Text>{!search?<Pressable style={s.emptyButton} onPress={openNew}><Text style={s.emptyButtonText}>Add filament</Text></Pressable>:null}</View>}</ScrollView>;
+  );
 }
 
-const s=StyleSheet.create({page:{paddingTop:18,paddingBottom:40},heading:{flexDirection:"row",alignItems:"center",gap:12},back:{minHeight:48,flexDirection:"row",alignItems:"center",gap:9},backText:{color:"#111820",fontSize:28,lineHeight:34,fontWeight:"700"},help:{marginTop:3,color:"#626A73",fontSize:14,lineHeight:21},add:{minHeight:48,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:7,borderRadius:12,backgroundColor:"#142C47"},addText:{color:"#FFF",fontSize:14,fontWeight:"700"},hero:{marginTop:18,padding:22,flexDirection:"row",alignItems:"center",justifyContent:"space-between",borderRadius:16,backgroundColor:"#0D1722"},kicker:{color:"#B8C1C9",fontSize:11,fontWeight:"700",letterSpacing:1.7},heroValue:{marginTop:6,color:"#FFF",fontSize:32,fontWeight:"700"},heroHelp:{marginTop:5,color:"#D5DBE0",fontSize:14},search:{minHeight:54,marginVertical:14,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:9,borderWidth:1,borderColor:"#E0E3E7",borderRadius:12,backgroundColor:"#FFF"},searchInput:{flex:1,minHeight:52,color:"#111820",fontSize:16},grid:{flexDirection:"row",flexWrap:"wrap",gap:10},card:{minHeight:220,padding:18,borderWidth:1,borderColor:"#E0E3E7",borderRadius:16,backgroundColor:"#FFF"},cardTop:{flexDirection:"row",alignItems:"center",justifyContent:"space-between"},swatch:{width:48,height:48,borderWidth:1,borderColor:"#D9DDE0",borderRadius:14},spools:{alignItems:"flex-end"},spoolNumber:{color:"#111820",fontSize:24,fontWeight:"700"},spoolLabel:{color:"#737B82",fontSize:9,fontWeight:"700",letterSpacing:.8},color:{marginTop:15,color:"#111820",fontSize:20,fontWeight:"700"},material:{marginTop:4,color:"#264A3B",fontSize:14,fontWeight:"700"},brand:{marginTop:4,color:"#626A73",fontSize:13},note:{marginTop:9,flex:1,color:"#626A73",fontSize:12,lineHeight:17},cardFoot:{minHeight:38,marginTop:12,paddingTop:10,flexDirection:"row",alignItems:"center",justifyContent:"space-between",borderTopWidth:1,borderTopColor:"#ECEEEF"},editText:{color:"#111820",fontSize:12,fontWeight:"700"},empty:{padding:32,alignItems:"center",borderWidth:1,borderColor:"#E0E3E7",borderRadius:16,backgroundColor:"#F8F9FA"},emptyTitle:{marginTop:11,color:"#111820",fontSize:20,fontWeight:"700"},emptyButton:{minHeight:46,marginTop:17,paddingHorizontal:18,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:"#142C47"},emptyButtonText:{color:"#FFF",fontWeight:"700"},form:{width:"100%",maxWidth:680,alignSelf:"center",marginTop:10,padding:20,borderWidth:1,borderColor:"#E0E3E7",borderRadius:16,backgroundColor:"#FFF"},formTitle:{color:"#111820",fontSize:28,fontWeight:"700"},label:{marginTop:17,marginBottom:7,color:"#111820",fontSize:13,fontWeight:"700"},searchField:{minHeight:54,paddingHorizontal:14,flexDirection:"row",alignItems:"center",borderWidth:1,borderColor:"#D9DDE0",borderRadius:12,backgroundColor:"#FFF"},options:{overflow:"hidden",marginTop:5,borderWidth:1,borderColor:"#E0E3E7",borderRadius:12,backgroundColor:"#FFF"},option:{minHeight:44,paddingHorizontal:13,flexDirection:"row",alignItems:"center",justifyContent:"space-between",borderBottomWidth:1,borderBottomColor:"#EEF0F1"},optionText:{color:"#26313A",fontSize:14},input:{minHeight:54,paddingHorizontal:14,borderWidth:1,borderColor:"#D9DDE0",borderRadius:12,color:"#111820",fontSize:16},notes:{minHeight:100,paddingTop:14,textAlignVertical:"top"},quantity:{flexDirection:"row",alignItems:"center",gap:8},qtyButton:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:"#F0F1F2"},qtyInput:{flex:1,minHeight:54,textAlign:"center",borderWidth:1,borderColor:"#D9DDE0",borderRadius:12,color:"#111820",fontSize:22,fontWeight:"700"},save:{minHeight:56,marginTop:22,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,borderRadius:12,backgroundColor:"#142C47"},saveText:{color:"#FFF",fontSize:16,fontWeight:"700"},remove:{minHeight:48,marginTop:8,alignItems:"center",justifyContent:"center"},removeText:{color:"#65243A",fontSize:14,fontWeight:"700"}});
+export function FilamentsScreen({
+  businessId,
+  locationId,
+  onBack,
+}: {
+  businessId: string;
+  locationId: string;
+  onBack: () => void;
+}) {
+  const { width } = useWindowDimensions();
+  const [items, setItems] = useState<Filament[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<Filament | "new" | null>(null);
+  const [brand, setBrand] = useState("Bambu Lab");
+  const [material, setMaterial] = useState("PLA");
+  const [color, setColor] = useState("");
+  const [finish, setFinish] = useState("Standard");
+  const [count, setCount] = useState("1");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("filaments")
+      .select("id,brand,material,color,finish,spool_count,notes")
+      .eq("business_id", businessId)
+      .order("material")
+      .order("color");
+    if (error) Alert.alert("Filaments not loaded", error.message);
+    setItems((data ?? []) as Filament[]);
+    setLoading(false);
+  }, [businessId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  const total = items.reduce((sum, x) => sum + x.spool_count, 0);
+  const types = new Set(items.map((x) => x.material)).size;
+  const filtered = useMemo(
+    () =>
+      items.filter((x) =>
+        `${x.brand} ${x.material} ${x.color} ${x.finish}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+      ),
+    [items, search],
+  );
+  const openNew = () => {
+    setEditing("new");
+    setBrand("Bambu Lab");
+    setMaterial("PLA");
+    setColor("");
+    setFinish("Standard");
+    setCount("1");
+    setNotes("");
+  };
+  const openEdit = (x: Filament) => {
+    setEditing(x);
+    setBrand(x.brand);
+    setMaterial(x.material);
+    setColor(x.color);
+    setFinish(x.finish);
+    setCount(String(x.spool_count));
+    setNotes(x.notes ?? "");
+  };
+  const save = async () => {
+    const qty = Number(count);
+    if (!brand.trim() || !material.trim() || !color.trim())
+      return Alert.alert(
+        "Details needed",
+        "Enter the brand, material and colour.",
+      );
+    if (!Number.isInteger(qty) || qty < 0)
+      return Alert.alert(
+        "Check spool count",
+        "Enter a whole number of spools.",
+      );
+    setSaving(true);
+    const payload = {
+      business_id: businessId,
+      location_id: locationId,
+      brand: brand.trim(),
+      material: material.trim(),
+      color: color.trim(),
+      finish: finish.trim() || "Standard",
+      spool_count: qty,
+      notes: notes.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+    const result =
+      editing === "new"
+        ? await supabase.from("filaments").insert(payload)
+        : await supabase
+            .from("filaments")
+            .update(payload)
+            .eq("id", editing!.id);
+    setSaving(false);
+    if (result.error)
+      return Alert.alert("Filament not saved", result.error.message);
+    setEditing(null);
+    await load();
+  };
+  const remove = () => {
+    if (!editing || editing === "new") return;
+    Alert.alert(
+      "Remove this filament?",
+      "This entry will be removed from the shop list.",
+      [
+        { text: "Keep", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            const { error } = await supabase
+              .from("filaments")
+              .delete()
+              .eq("id", editing.id);
+            if (error) return Alert.alert("Not removed", error.message);
+            setEditing(null);
+            await load();
+          },
+        },
+      ],
+    );
+  };
+  if (editing)
+    return (
+      <ScrollView contentContainerStyle={s.page}>
+        <Pressable style={s.back} onPress={() => setEditing(null)}>
+          <Ionicons name="arrow-back" size={22} color="#111820" />
+          <Text style={s.backText}>
+            {editing === "new" ? "Add filament" : "Edit filament"}
+          </Text>
+        </Pressable>
+        <View style={s.form}>
+          <Text style={s.formTitle}>Filament details</Text>
+          <Text style={s.help}>
+            Brand, material, colour and spool count are required. Finish and
+            note are optional.
+          </Text>
+          <SearchChoice
+            label="Brand · Required"
+            value={brand}
+            onChange={setBrand}
+            options={BRANDS}
+            placeholder="Search or type brand"
+          />
+          <SearchChoice
+            label="Material · Required"
+            value={material}
+            onChange={setMaterial}
+            options={MATERIALS}
+            placeholder="Example: PLA"
+          />
+          <SearchChoice
+            label="Colour · Required"
+            value={color}
+            onChange={setColor}
+            options={COLORS}
+            placeholder="Search or type colour"
+          />
+          <SearchChoice
+            label="Finish · Optional"
+            value={finish}
+            onChange={setFinish}
+            options={FINISHES}
+            placeholder="Example: Matte"
+          />
+          <Text style={s.label}>Number of spools · Required</Text>
+          <View style={s.quantity}>
+            <Pressable
+              style={s.qtyButton}
+              onPress={() =>
+                setCount(String(Math.max(0, Number(count || 0) - 1)))
+              }
+            >
+              <Ionicons name="remove" size={23} color="#111820" />
+            </Pressable>
+            <TextInput
+              style={s.qtyInput}
+              value={count}
+              onChangeText={setCount}
+              keyboardType="number-pad"
+            />
+            <Pressable
+              style={s.qtyButton}
+              onPress={() => setCount(String(Number(count || 0) + 1))}
+            >
+              <Ionicons name="add" size={23} color="#111820" />
+            </Pressable>
+          </View>
+          <Text style={s.label}>Note · Optional</Text>
+          <TextInput
+            style={[s.input, s.notes]}
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            placeholder="Storage or purchase note"
+          />
+          <Pressable
+            style={[
+              s.save,
+              { backgroundColor: PRODUCTION },
+              saving && { opacity: 0.6 },
+            ]}
+            onPress={() => void save()}
+            disabled={saving}
+          >
+            <Ionicons name="checkmark" size={21} color="#FFF" />
+            <Text style={s.saveText}>
+              {saving ? "Saving…" : "Save filament"}
+            </Text>
+          </Pressable>
+          {editing !== "new" ? (
+            <Pressable style={s.remove} onPress={remove}>
+              <Text style={s.removeText}>Remove filament</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </ScrollView>
+    );
+  const columns = width >= 1000 ? 3 : width >= 680 ? 2 : 1;
+  const cardWidth = columns === 3 ? "32.3%" : columns === 2 ? "49%" : "100%";
+  return (
+    <ScrollView contentContainerStyle={s.page}>
+      <View style={[s.heading, width < 520 && s.headingMobile]}>
+        <View style={{ flex: 1 }}>
+          <Pressable style={s.back} onPress={onBack}>
+            <Ionicons name="arrow-back" size={22} color="#111820" />
+            <Text style={s.backText}>Filaments</Text>
+          </Pressable>
+          <Text style={s.help}>
+            Know what materials and colours the shop has.
+          </Text>
+        </View>
+        <Pressable style={[s.add, width < 520 && s.addMobile]} onPress={openNew}>
+          <Ionicons name="add" size={22} color="#FFF" />
+          <Text style={s.addText}>Add filament</Text>
+        </Pressable>
+      </View>
+      <View style={s.hero}>
+        <View>
+          <Text style={s.kicker}>MATERIAL LIBRARY</Text>
+          <Text style={s.heroValue}>{total} spools</Text>
+          <Text style={s.heroHelp}>
+            {types} material {types === 1 ? "type" : "types"} · {items.length}{" "}
+            entries
+          </Text>
+        </View>
+        <Ionicons name="color-filter-outline" size={42} color="#00AE42" />
+      </View>
+      <View style={s.search}>
+        <Ionicons name="search" size={20} color="#626A73" />
+        <TextInput
+          style={s.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search brand, material or colour"
+        />
+      </View>
+      {loading ? (
+        <ActivityIndicator size="large" color="#00AE42" />
+      ) : filtered.length ? (
+        <View style={s.grid}>
+          {filtered.map((x) => (
+            <Pressable
+              key={x.id}
+              style={[s.card, { width: cardWidth }]}
+              onPress={() => openEdit(x)}
+            >
+              <View style={s.cardTop}>
+                <View
+                  style={[s.swatch, { backgroundColor: swatch(x.color) }]}
+                />
+                <View style={s.spools}>
+                  <Text style={s.spoolNumber}>{x.spool_count}</Text>
+                  <Text style={s.spoolLabel}>SPOOLS</Text>
+                </View>
+              </View>
+              <Text style={s.color}>{x.color}</Text>
+              <Text style={s.material}>
+                {x.material} · {x.finish}
+              </Text>
+              <Text style={s.brand}>{x.brand}</Text>
+              {x.notes ? (
+                <Text style={s.note} numberOfLines={2}>
+                  {x.notes}
+                </Text>
+              ) : null}
+              <View style={s.cardFoot}>
+                <Text style={s.editText}>View or update</Text>
+                <Ionicons name="arrow-forward" size={18} color="#111820" />
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <View style={s.empty}>
+          <Ionicons name="color-filter-outline" size={38} color="#00AE42" />
+          <Text style={s.emptyTitle}>
+            {search ? "No matching filament" : "Add your first filament"}
+          </Text>
+          <Text style={s.help}>
+            {search
+              ? "Try another brand, material or colour."
+              : "Record each brand, material and colour the shop owns."}
+          </Text>
+          {!search ? (
+            <Pressable style={s.emptyButton} onPress={openNew}>
+              <Text style={s.emptyButtonText}>Add filament</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
+    </ScrollView>
+  );
+}
+
+const s = StyleSheet.create({
+  page: { paddingTop: 18, paddingBottom: 40 },
+  heading: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headingMobile: { flexDirection: "column", alignItems: "stretch" },
+  back: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 9 },
+  backText: {
+    color: "#111820",
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "700",
+  },
+  help: { marginTop: 3, color: "#626A73", fontSize: 14, lineHeight: 21 },
+  add: {
+    minHeight: 48,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderRadius: 12,
+    backgroundColor: "#142C47",
+  },
+  addText: { color: "#FFF", fontSize: 14, fontWeight: "700" },
+  addMobile: { width: "100%", justifyContent: "center" },
+  hero: {
+    marginTop: 18,
+    padding: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 16,
+    backgroundColor: "#0D1722",
+  },
+  kicker: {
+    color: "#B8C1C9",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.7,
+  },
+  heroValue: { marginTop: 6, color: "#FFF", fontSize: 32, fontWeight: "700" },
+  heroHelp: { marginTop: 5, color: "#D5DBE0", fontSize: 14 },
+  search: {
+    minHeight: 54,
+    marginVertical: 14,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    borderWidth: 1,
+    borderColor: "#E0E3E7",
+    borderRadius: 12,
+    backgroundColor: "#FFF",
+  },
+  searchInput: { flex: 1, minHeight: 52, color: "#111820", fontSize: 16 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  card: {
+    minHeight: 220,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#E0E3E7",
+    borderRadius: 16,
+    backgroundColor: "#FFF",
+  },
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  swatch: {
+    width: 48,
+    height: 48,
+    borderWidth: 1,
+    borderColor: "#D9DDE0",
+    borderRadius: 14,
+  },
+  spools: { alignItems: "flex-end" },
+  spoolNumber: { color: "#111820", fontSize: 24, fontWeight: "700" },
+  spoolLabel: {
+    color: "#737B82",
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+  },
+  color: { marginTop: 15, color: "#111820", fontSize: 20, fontWeight: "700" },
+  material: { marginTop: 4, color: "#264A3B", fontSize: 14, fontWeight: "700" },
+  brand: { marginTop: 4, color: "#626A73", fontSize: 13 },
+  note: {
+    marginTop: 9,
+    flex: 1,
+    color: "#626A73",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  cardFoot: {
+    minHeight: 38,
+    marginTop: 12,
+    paddingTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "#ECEEEF",
+  },
+  editText: { color: "#111820", fontSize: 12, fontWeight: "700" },
+  empty: {
+    padding: 32,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E0E3E7",
+    borderRadius: 16,
+    backgroundColor: "#F8F9FA",
+  },
+  emptyTitle: {
+    marginTop: 11,
+    color: "#111820",
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  emptyButton: {
+    minHeight: 46,
+    marginTop: 17,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#142C47",
+  },
+  emptyButtonText: { color: "#FFF", fontWeight: "700" },
+  form: {
+    width: "100%",
+    maxWidth: 680,
+    alignSelf: "center",
+    marginTop: 10,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#E0E3E7",
+    borderRadius: 16,
+    backgroundColor: "#FFF",
+  },
+  formTitle: { color: "#111820", fontSize: 28, fontWeight: "700" },
+  label: {
+    marginTop: 17,
+    marginBottom: 7,
+    color: "#111820",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  searchField: {
+    minHeight: 54,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#D9DDE0",
+    borderRadius: 12,
+    backgroundColor: "#FFF",
+  },
+  options: {
+    overflow: "hidden",
+    marginTop: 5,
+    borderWidth: 1,
+    borderColor: "#E0E3E7",
+    borderRadius: 12,
+    backgroundColor: "#FFF",
+  },
+  option: {
+    minHeight: 44,
+    paddingHorizontal: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF0F1",
+  },
+  optionText: { color: "#26313A", fontSize: 14 },
+  input: {
+    minHeight: 54,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#D9DDE0",
+    borderRadius: 12,
+    color: "#111820",
+    fontSize: 16,
+  },
+  notes: { minHeight: 100, paddingTop: 14, textAlignVertical: "top" },
+  quantity: { flexDirection: "row", alignItems: "center", gap: 8 },
+  qtyButton: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#F0F1F2",
+  },
+  qtyInput: {
+    flex: 1,
+    minHeight: 54,
+    textAlign: "center",
+    borderWidth: 1,
+    borderColor: "#D9DDE0",
+    borderRadius: 12,
+    color: "#111820",
+    fontSize: 22,
+    fontWeight: "700",
+  },
+  save: {
+    minHeight: 56,
+    marginTop: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 12,
+    backgroundColor: "#142C47",
+  },
+  saveText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+  remove: {
+    minHeight: 48,
+    marginTop: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  removeText: { color: "#65243A", fontSize: 14, fontWeight: "700" },
+});

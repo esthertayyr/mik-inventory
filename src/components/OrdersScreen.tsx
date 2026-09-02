@@ -92,6 +92,7 @@ function dueInfo(order: Order) {
 }
 
 export function OrdersScreen({ businessId, locationId }: { businessId: string; locationId: string }) {
+  const { width } = useWindowDimensions();
   const [orders,setOrders] = useState<Order[]>([]);
   const [sources,setSources] = useState<Source[]>([]);
   const [loading,setLoading] = useState(true);
@@ -127,9 +128,7 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
   const paymentSummary = useMemo(() => {
     const paid = orders.reduce((sum,o)=>sum+Number(o.amount_paid),0);
     const outstanding = orders.filter(o=>o.status!=="cancelled").reduce((sum,o)=>sum+Math.max(0,Number(o.total_price)-Number(o.amount_paid)),0);
-    const sourceCounts = orders.reduce<Record<string,number>>((acc,o)=>(acc[o.source]=(acc[o.source]??0)+1,acc),{});
-    const topSource = Object.entries(sourceCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? "—";
-    return { paid, outstanding, topSource };
+    return { paid, outstanding };
   },[orders]);
 
   const startNew = () => { setForm(emptyForm()); setEditing("new"); };
@@ -208,9 +207,9 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
 
   if(editing) return <OrderForm form={form} setForm={setForm} saving={saving} editing={editing!=="new"} onBack={()=>setEditing(null)} onSave={save} onPhoto={choosePhoto}/>;
   return <ScrollView contentContainerStyle={s.page}>
-    <View style={s.headingRow}><View><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Customer orders received outside Mik</Text></View><Pressable style={s.add} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
+    <View style={[s.headingRow,width<520&&s.headingRowMobile]}><View style={s.headingCopy}><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Customer orders received outside Mik</Text></View><Pressable style={[s.add,width<520&&s.addMobile]} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
     <View style={s.hero}><Text style={s.heroKicker}>ORDER TRACKER</Text><Text style={s.heroValue}>{counts.open} open</Text><Text style={s.heroHelp}>{urgent?`${urgent} need attention today`:"Orders are up to date"}</Text></View>
-    <View style={s.summaryRow}><View style={s.summaryItem}><Text style={s.factLabel}>PAID ELSEWHERE</Text><Text style={s.summaryValue}>{peso(paymentSummary.paid)}</Text></View><View style={s.summaryItem}><Text style={s.factLabel}>OUTSTANDING</Text><Text style={s.summaryValue}>{peso(paymentSummary.outstanding)}</Text></View><View style={s.summaryItem}><Text style={s.factLabel}>TOP SOURCE</Text><Text style={s.summaryValue} numberOfLines={1}>{paymentSummary.topSource}</Text></View></View>
+    <View style={s.summaryRow}><View style={s.summaryItem}><Text style={s.factLabel}>PAID</Text><Text style={s.summaryValue}>{peso(paymentSummary.paid)}</Text></View><View style={s.summaryItem}><Text style={s.factLabel}>BALANCE TO COLLECT</Text><Text style={s.summaryValue}>{peso(paymentSummary.outstanding)}</Text></View></View>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
       {([['open',`Open ${counts.open}`],['stopped',`Stopped ${counts.stopped}`],['completed','Completed'],['all','All']] as const).map(([id,label])=><Pressable accessibilityRole="button" key={id} style={[s.tab,view===id&&s.tabOn]} onPress={()=>setView(id)}><Text pointerEvents="none" style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
     </ScrollView>
@@ -276,7 +275,7 @@ function FormSection({number,title,help}:{number:string;title:string;help:string
 function Field(props:TextInputProps&{label:string}) { return <View><Text style={s.label}>{props.label}</Text><TextInput {...props} style={[s.input,props.multiline&&s.notes]} placeholderTextColor="#8A9199"/></View>; }
 
 const s=StyleSheet.create({
-  page:{paddingTop:18,paddingBottom:40},headingRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:12},title:{fontSize:28,lineHeight:34,fontWeight:"700",color:C.ink,letterSpacing:-.6},subtitle:{marginTop:3,fontSize:15,lineHeight:22,color:C.muted},add:{minHeight:48,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:7,borderRadius:12,backgroundColor:C.navy},addText:{color:C.white,fontSize:14,fontWeight:"700"},
+  page:{paddingTop:18,paddingBottom:40},headingRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:12},headingRowMobile:{flexDirection:"column",alignItems:"stretch"},headingCopy:{flex:1},title:{fontSize:28,lineHeight:34,fontWeight:"700",color:C.ink,letterSpacing:-.6},subtitle:{marginTop:3,fontSize:15,lineHeight:22,color:C.muted},add:{minHeight:48,paddingHorizontal:16,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:12,backgroundColor:C.navy},addMobile:{width:"100%"},addText:{color:C.white,fontSize:14,fontWeight:"700"},
   hero:{marginTop:18,padding:22,borderWidth:1,borderColor:"#DCE5EB",borderRadius:14,backgroundColor:"#EEF3F7"},heroKicker:{color:C.navy,fontSize:11,fontWeight:"700",letterSpacing:1.6},heroValue:{marginTop:6,color:C.ink,fontSize:34,fontWeight:"700"},heroHelp:{marginTop:5,color:C.muted,fontSize:14,fontWeight:"600"},tabs:{gap:8,paddingVertical:14},tab:{minHeight:44,paddingHorizontal:15,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},tabOn:{backgroundColor:C.ink,borderColor:C.ink},tabText:{color:C.ink,fontSize:13,fontWeight:"700"},tabTextOn:{color:C.white},
   summaryRow:{marginTop:10,flexDirection:"row",gap:7},summaryItem:{minWidth:0,flex:1,padding:11,borderRadius:10,backgroundColor:C.pale},summaryValue:{marginTop:5,color:C.ink,fontSize:13,fontWeight:"700"},
   search:{minHeight:52,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:9,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},searchInput:{flex:1,minHeight:50,color:C.ink,fontSize:16},sourceRow:{gap:7,paddingVertical:10},sourceChip:{minHeight:36,paddingHorizontal:12,alignItems:"center",justifyContent:"center",borderRadius:18,backgroundColor:C.pale},sourceChipOn:{backgroundColor:C.green},sourceText:{color:C.ink,fontSize:12,fontWeight:"700"},sourceTextOn:{color:C.white},

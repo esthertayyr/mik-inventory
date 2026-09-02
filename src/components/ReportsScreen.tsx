@@ -170,10 +170,12 @@ export function ReportsScreen({
   locationId,
   hideTitle = false,
   correctionMode = false,
+  onBack,
 }: {
   locationId: string;
   hideTitle?: boolean;
   correctionMode?: boolean;
+  onBack?: () => void;
 }) {
   const [period, setPeriod] = useState<Period>("daily");
   const [offset, setOffset] = useState(0);
@@ -437,6 +439,7 @@ export function ReportsScreen({
     <ScrollView contentContainerStyle={s.page}>
       {correctionMode ? (
         <>
+          {onBack ? <Pressable style={s.correctionBack} onPress={onBack}><Ionicons name="arrow-back" size={22} color="#101318" /><Text style={s.correctionBackText}>Fix sales records</Text></Pressable> : null}
           <Text style={s.title}>Cancel wrong sale</Text>
           <View style={s.correctionGuide}>
             <Ionicons name="return-up-back" size={26} color="#FFF" />
@@ -650,6 +653,8 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 const s = StyleSheet.create({
+  correctionBack: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8 },
+  correctionBackText: { color: "#101318", fontSize: 17, fontWeight: "700" },
   page: { paddingBottom: 32 },
   title: { fontSize: 28, fontWeight: "700", color: "#11151A", marginTop: 16 },
   correctionGuide: { marginTop: 12, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 12, backgroundColor: "#65243A" },
