@@ -2261,7 +2261,7 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
-  const [openHomeGroups, setOpenHomeGroups] = useState<string[]>(["Run today"]);
+  const [openHomeGroups, setOpenHomeGroups] = useState<string[]>(["Start here"]);
   useEffect(() => {
     setEventReminder(null);
     supabase
@@ -2312,40 +2312,40 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
   };
   const groups: HomeGroup[] = [
     {
-      title: "Run today", help: "Start here for today's work.", ...SECTION.sales, actions: [
-        { title: "Sell", help: "Start a shop or fast event sale", icon: "cart", screen: "sell_start" },
-        { title: "Sales today", help: "See today's total and receipts", icon: "today", screen: "dashboard" },
-        { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active · ${orderSummary.urgent} due now` : "Track customer orders", icon: "clipboard", screen: "orders" },
-        { title: "Print Queue", help: "See what must be printed next", icon: "layers", screen: "print_queue" },
+      title: "Start here", help: "Choose what you want to do now.", ...SECTION.sales, actions: [
+        { title: "Make a sale", help: "Choose normal or fast event checkout", icon: "cart", screen: "sell_start" },
+        { title: "Sales today", help: "See what you sold today", icon: "today", screen: "dashboard" },
+        { title: "Customer orders", help: orderSummary.active ? `${orderSummary.active} active · ${orderSummary.urgent} need attention` : "Add or update customer orders", icon: "clipboard", screen: "orders" },
+        { title: "What to print", help: "Start or update a printing job", icon: "layers", screen: "print_queue" },
       ],
     },
     {
-      title: "Stock & products", help: "Keep products ready to sell.", ...SECTION.stock, actions: [
-        { title: "Stock", help: "Choose how to check or update stock", icon: "cube", screen: "stock_start" },
+      title: "Stock & products", help: "Check stock, products and prices.", ...SECTION.stock, actions: [
+        { title: "Update stock", help: "Add stock or change the number", icon: "cube", screen: "stock_start" },
         { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products" },
-        { title: "Price list", help: "View or print prices", icon: "receipt", screen: "price_list" },
+        { title: "Customer price list", help: "View or print product prices", icon: "receipt", screen: "price_list" },
       ],
     },
     {
-      title: "Production", help: "Manage printing equipment and materials.", ...SECTION.production, actions: [
-        { title: "Price calculator", help: "Estimate a selling price", icon: "calculator", screen: "price_calculator" },
-        { title: "Printers", help: "See which printers are working", icon: "hardware-chip", screen: "printers" },
-        { title: "Filaments", help: "Track colours and spools", icon: "color-filter", screen: "filaments" },
+      title: "Printing work", help: "Manage prices, printers and filament.", ...SECTION.production, actions: [
+        { title: "Price calculator", help: "Work out a selling price", icon: "calculator", screen: "price_calculator" },
+        { title: "Printers", help: "See which printers are working or broken", icon: "hardware-chip", screen: "printers" },
+        { title: "Filament", help: "See colours and spools", icon: "color-filter", screen: "filaments" },
       ],
     },
     {
-      title: "Records & planning", help: "Fix records and look ahead.", ...SECTION.records, actions: [
-        { title: "Sales reports", help: "Daily, weekly or monthly totals", icon: "bar-chart", screen: "reports" },
-        { title: "Calendar", help: "Events and reminders", icon: "calendar", screen: "calendar" },
-        { title: "Cancel wrong sale", help: "Find and cancel a mistaken sale", icon: "return-up-back", screen: "correct" },
-        { title: "Add an earlier sale", help: "Forgot one? Choose the date it happened", icon: "calendar-number", screen: "missed" },
+      title: "Sales history & calendar", help: "See past sales, fix mistakes and plan events.", ...SECTION.records, actions: [
+        { title: "Sales reports", help: "See daily, weekly or monthly sales", icon: "bar-chart", screen: "reports" },
+        { title: "Events calendar", help: "Add events and reminders", icon: "calendar", screen: "calendar" },
+        { title: "Remove a wrong sale", help: "Cancel a sale entered by mistake", icon: "return-up-back", screen: "correct" },
+        { title: "Add a missed sale", help: "Choose an earlier date and add the sale", icon: "calendar-number", screen: "missed" },
       ],
     },
     {
-      title: "Shop & help", help: "Shop details, guides and support.", ...SECTION.settings, actions: [
-        { title: "Shop profile", help: "Change the shop logo", icon: "storefront", screen: "shop" },
-        { title: "More & help", help: "Settings and simple guides", icon: "grid", screen: "more" },
-        { title: "Report a problem", help: "Send a message and optional photo", icon: "chatbox-ellipses", screen: "report_issue" },
+      title: "Shop & help", help: "Change shop details or ask for help.", ...SECTION.settings, actions: [
+        { title: "Shop profile", help: "Change the shop name or logo", icon: "storefront", screen: "shop" },
+        { title: "More tools & guides", help: "Open settings and simple guides", icon: "grid", screen: "more" },
+        { title: "Report a problem", help: "Tell Esther what needs fixing", icon: "chatbox-ellipses", screen: "report_issue" },
       ],
     },
   ];
@@ -2361,8 +2361,8 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
   const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>!permissions||permissions.includes(permissionFor(action.screen)))})).filter(group=>group.actions.length);
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
-      <Text style={s.pageTitle}>Your shop</Text>
-      <Text style={s.subtitle}>Everything you need, grouped by task.</Text>
+      <Text style={s.pageTitle}>What do you want to do?</Text>
+      <Text style={s.subtitle}>Open a section, then tap the action you need.</Text>
       {eventReminder ? (
         <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
           <View style={s.homeReminderIcon}><Ionicons name="notifications" size={23} color={C.white} /></View>
