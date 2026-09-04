@@ -417,6 +417,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const [openShop, setOpenShop] = useState<AdminShop | null>(null);
   const [showActivity, setShowActivity] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
+  const [showAccounts, setShowAccounts] = useState(false);
   const [staffShop, setStaffShop] = useState<AdminShop | null>(null);
   const [actionShop,setActionShop]=useState<AdminShop|null>(null);
   const [manageShop, setManageShop] = useState<{ shop: AdminShop; mode: "edit" | "duplicate" } | null>(null);
@@ -518,6 +519,8 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     return <OwnerActivityLog shops={shops} onBack={() => setShowActivity(false)} />;
   if (showIssues)
     return <OwnerIssueReports onBack={() => setShowIssues(false)} />;
+  if (showAccounts)
+    return <OwnerAccounts onBack={() => setShowAccounts(false)} onManage={(account)=>{const shop=shops.find(item=>item.id===account.shop_id);if(!shop)return;setShowAccounts(false);if(account.role==="staff")setStaffShop(shop);else setActionShop(shop);}} />;
   if (staffShop)
     return <AdminStaffManager shop={staffShop} onBack={() => setStaffShop(null)} />;
   if(actionShop)
@@ -561,6 +564,11 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
           <View style={[s.activityButtonIcon,{backgroundColor:C.accent}]}><Ionicons name="chatbox-ellipses-outline" size={23} color={C.white} /></View>
           <View style={s.flex}><Text style={s.activityButtonTitle}>Problem reports</Text><Text style={s.activityButtonHelp}>Messages sent by shop users</Text></View>
           <Ionicons name="chevron-forward" size={21} color={C.accent} />
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="View all accounts" style={s.activityButton} onPress={() => setShowAccounts(true)}>
+          <View style={[s.activityButtonIcon,{backgroundColor:SECTION.support.color}]}><Ionicons name="people-outline" size={23} color={C.white} /></View>
+          <View style={s.flex}><Text style={s.activityButtonTitle}>All accounts</Text><Text style={s.activityButtonHelp}>Shop owners, shop logins and staff</Text></View>
+          <Ionicons name="chevron-forward" size={21} color={SECTION.support.color} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Export all shop sales" style={s.ownerExportButton} onPress={() => void exportOwnerSales()} disabled={exporting}>
           <Ionicons name="download-outline" size={22} color={C.accent} />
@@ -652,6 +660,34 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
 }
 
 type StaffPermission = "sell"|"sales"|"orders"|"stock"|"products"|"reports"|"production"|"calendar"|"settings";
+type OwnerAccount = {user_id:string;shop_id:string|null;shop_name:string;display_name:string;login_username:string;role:"platform_owner"|"shop_owner"|"staff";permissions:StaffPermission[];active:boolean;created_at:string|null;last_login:string|null};
+function OwnerAccounts({onBack,onManage}:{onBack:()=>void;onManage:(account:OwnerAccount)=>void}){
+  const [accounts,setAccounts]=useState<OwnerAccount[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [filter,setFilter]=useState<"all"|"owners"|"staff">("all");
+  const load=useCallback(async()=>{
+    setLoading(true);
+    const {data,error}=await supabase.functions.invoke("admin-list-accounts",{body:{}});
+    if(error){let message=error.message;try{message=(await error.context?.json())?.error??message;}catch{}Alert.alert("Accounts not loaded",message);}
+    else setAccounts(data?.accounts??[]);
+    setLoading(false);
+  },[]);
+  useEffect(()=>{void load();},[load]);
+  const shown=accounts.filter(account=>filter==="all"||(filter==="staff"?account.role==="staff":account.role!=="staff"));
+  const roleName=(role:OwnerAccount["role"])=>role==="platform_owner"?"MIK OWNER":role==="shop_owner"?"SHOP OWNER":"STAFF";
+  return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}>
+    <Back title="Owner portal" onPress={onBack}/>
+    <Text style={s.pageTitle}>All accounts</Text><Text style={s.subtitle}>Every username connected to MIK and its shop.</Text>
+    <View style={s.accountSafetyNote}><Ionicons name="shield-checkmark-outline" size={22} color={SECTION.support.color}/><Text style={s.accountSafetyText}>Passwords cannot be viewed. To give someone access, change their password from Manage shop.</Text></View>
+    <View style={s.stockSortRow}><Chip label={`All ${accounts.length}`} selected={filter==="all"} onPress={()=>setFilter("all")}/><Chip label="Owners" selected={filter==="owners"} onPress={()=>setFilter("owners")}/><Chip label="Staff" selected={filter==="staff"} onPress={()=>setFilter("staff")}/></View>
+    {loading?<ActivityIndicator color={C.green}/>:shown.length?shown.map(account=><View key={`${account.shop_id??"platform"}-${account.user_id}`} style={s.accountListCard}>
+      <View style={s.adminShopTop}><View style={[s.shopAvatar,{backgroundColor:account.role==="platform_owner"?SECTION.support.soft:account.role==="shop_owner"?SECTION.records.soft:SECTION.sales.soft}]}><Ionicons name={account.role==="staff"?"person-outline":"person-circle-outline"} size={24} color={account.role==="platform_owner"?SECTION.support.color:account.role==="shop_owner"?SECTION.records.color:SECTION.sales.color}/></View><View style={s.flex}><Text style={s.rowTitle}>{account.display_name}</Text><Text style={s.accountUsername}>@{account.login_username}</Text><Text style={s.rowHelp}>{account.shop_name}</Text></View><View style={[s.statusPill,!account.active&&s.statusPillPaused]}><Text style={[s.statusText,!account.active&&s.statusTextPaused]}>{account.active?"ACTIVE":"DISABLED"}</Text></View></View>
+      <View style={s.accountMetaRow}><Text style={s.accountRole}>{roleName(account.role)}</Text><Text style={s.adminLastLogin}>{account.last_login?`Last login: ${friendlyDateTime(account.last_login)}`:"No login yet"}</Text></View>
+      {account.role==="staff"&&account.permissions.length?<Text style={s.staffAccessSummary}>{account.permissions.map(id=>STAFF_PERMISSIONS.find(item=>item.id===id)?.label).filter(Boolean).join(" · ")}</Text>:null}
+      {account.shop_id?<Pressable style={s.accountManageButton} onPress={()=>onManage(account)}><Ionicons name="settings-outline" size={18} color={C.green}/><Text style={s.accountManageText}>Manage account</Text><Ionicons name="chevron-forward" size={18} color={C.green}/></Pressable>:null}
+    </View>):<Empty title="No accounts found"/>}
+  </ScrollView></SafeAreaView>;
+}
 type AdminStaff = { user_id:string;display_name:string;login_username:string;permissions:StaffPermission[];active:boolean;created_at:string;last_login:string|null };
 const STAFF_PERMISSIONS:Array<{id:StaffPermission;label:string;help:string;icon:Icon}>=[
   {id:"sell",label:"Make sales",help:"Shop and Event checkout",icon:"cart-outline"},
@@ -732,6 +768,7 @@ function ShopApp({
   const [staffPermissions,setStaffPermissions]=useState<StaffPermission[]|null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
   const [saleInProgress, setSaleInProgress] = useState(false);
+  const [updatesOpen,setUpdatesOpen]=useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [productsBackScreen, setProductsBackScreen] = useState<Screen>("more");
   const [priceListBackScreen, setPriceListBackScreen] = useState<Screen>("home");
@@ -886,6 +923,15 @@ function ShopApp({
     await AsyncStorage.setItem(`mik-guide-v1-${session?.user.id ?? "platform-admin"}`, "done").catch(
       () => undefined,
     );
+  };
+  useEffect(()=>{
+    if(loading||needsSetup||!business)return;
+    const key=`mik-daily-updates-2026-09-04-${business.id}-${localDateKey()}`;
+    AsyncStorage.getItem(key).then(seen=>{if(seen!=="done")setUpdatesOpen(true);}).catch(()=>setUpdatesOpen(true));
+  },[business,loading,needsSetup]);
+  const closeUpdates=async()=>{
+    setUpdatesOpen(false);
+    if(business)await AsyncStorage.setItem(`mik-daily-updates-2026-09-04-${business.id}-${localDateKey()}`,"done").catch(()=>undefined);
   };
   if (loading)
     return (
@@ -1168,6 +1214,7 @@ function ShopApp({
       </View>
       </View>
       <GuideModal visible={guideOpen} onClose={closeGuide} />
+      <WhatsNewModal visible={updatesOpen&&!guideOpen} onClose={closeUpdates}/>
     </SafeAreaView>
   );
 }
@@ -4221,6 +4268,19 @@ const guideSteps: GuideStep[] = [
   },
 ];
 
+function WhatsNewModal({visible,onClose}:{visible:boolean;onClose:()=>void}){
+  const updates=[
+    {icon:"calendar-number-outline" as Icon,title:"Earlier sales are clearer",text:"Use the current price or enter the price charged on that date."},
+    {icon:"archive-outline" as Icon,title:"Past orders are easier to record",text:"Past orders show their order date and no longer appear hundreds of days overdue."},
+    {icon:"people-outline" as Icon,title:"Account visibility improved",text:"Owners can see shop owners, shop logins and staff more clearly."},
+  ];
+  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><SafeAreaView style={s.whatsNewOverlay}><View style={s.whatsNewCard}>
+    <View style={s.whatsNewIcon}><Ionicons name="sparkles" size={28} color={C.white}/></View><Text style={s.whatsNewKicker}>WHAT'S NEW IN MIK</Text><Text style={s.whatsNewTitle}>Small improvements, easier days.</Text><Text style={s.whatsNewDate}>{friendlyLocalDate()}</Text>
+    <View style={s.whatsNewList}>{updates.map(item=><View key={item.title} style={s.whatsNewRow}><View style={s.whatsNewRowIcon}><Ionicons name={item.icon} size={21} color={C.green}/></View><View style={s.flex}><Text style={s.whatsNewRowTitle}>{item.title}</Text><Text style={s.whatsNewRowText}>{item.text}</Text></View></View>)}</View>
+    <BigButton label="Continue to MIK" icon="arrow-forward" onPress={onClose}/>
+  </View></SafeAreaView></Modal>;
+}
+
 function GuideModal({
   visible,
   onClose,
@@ -4842,6 +4902,14 @@ const s = StyleSheet.create({
   ownerExportButton:{minHeight:68,marginBottom:14,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   ownerExportTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
   activityButton:{minHeight:72,marginBottom:14,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  accountSafetyNote:{marginBottom:14,padding:14,flexDirection:"row",alignItems:"flex-start",gap:10,borderWidth:1,borderColor:SECTION.support.border,borderRadius:13,backgroundColor:SECTION.support.soft},
+  accountSafetyText:{flex:1,color:C.ink,fontSize:13,lineHeight:19,fontWeight:"600"},
+  accountListCard:{marginTop:12,padding:15,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  accountUsername:{marginTop:2,color:C.ink,fontSize:14,fontWeight:"700"},
+  accountMetaRow:{marginTop:11,paddingTop:10,flexDirection:"row",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:8,borderTopWidth:1,borderTopColor:C.border},
+  accountRole:{color:SECTION.support.color,fontSize:11,fontWeight:"800",letterSpacing:.8},
+  accountManageButton:{minHeight:44,marginTop:10,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:7,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:10,backgroundColor:SECTION.stock.soft},
+  accountManageText:{flex:1,color:C.green,fontSize:13,fontWeight:"700"},
   activityButtonIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.green},
   activityButtonTitle:{color:C.ink,fontSize:16,fontWeight:"700"},
   activityButtonHelp:{marginTop:2,color:C.muted,fontSize:13},
@@ -5874,6 +5942,17 @@ const s = StyleSheet.create({
     borderRadius: 21,
     backgroundColor: C.white,
   },
+  whatsNewOverlay:{flex:1,padding:18,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(13,23,34,.58)"},
+  whatsNewCard:{width:"100%",maxWidth:470,maxHeight:"92%",padding:22,borderRadius:19,backgroundColor:C.white,shadowColor:"#0D1722",shadowOpacity:.24,shadowRadius:24,shadowOffset:{width:0,height:12},elevation:10},
+  whatsNewIcon:{width:54,height:54,alignItems:"center",justifyContent:"center",borderRadius:16,backgroundColor:C.green},
+  whatsNewKicker:{marginTop:18,color:C.green,fontSize:11,fontWeight:"800",letterSpacing:1.4},
+  whatsNewTitle:{marginTop:5,color:C.ink,fontSize:25,lineHeight:31,fontWeight:"700",letterSpacing:-.4},
+  whatsNewDate:{marginTop:5,color:C.muted,fontSize:13,fontWeight:"600"},
+  whatsNewList:{marginTop:18,gap:9},
+  whatsNewRow:{padding:12,flexDirection:"row",alignItems:"flex-start",gap:10,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.soft},
+  whatsNewRowIcon:{width:37,height:37,alignItems:"center",justifyContent:"center",borderRadius:11,backgroundColor:C.white},
+  whatsNewRowTitle:{color:C.ink,fontSize:14,fontWeight:"700"},
+  whatsNewRowText:{marginTop:3,color:C.muted,fontSize:13,lineHeight:18},
   guideOverlay: {
     flex: 1,
     padding: 18,

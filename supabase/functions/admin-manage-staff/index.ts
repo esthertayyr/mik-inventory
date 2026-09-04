@@ -21,13 +21,55 @@ Deno.serve(async(req:Request)=>{
   const input=await req.json().catch(()=>({}));
   const action=String(input.action??'list');
   const shopId=String(input.shopId??'');
+  const {data:platform}=await admin.from('platform_admins').select('user_id').eq('user_id',auth.user.id).maybeSingle();
+
+  if(action==='list_all'){
+    if(!platform) return reply({error:'MIK owner access required'},403);
+    const [{data:memberships,error:membershipError},{data:businesses},{data:profiles},{data:staffRows},{data:platformRows}]=await Promise.all([
+      admin.from('business_memberships').select('user_id,business_id,role'),
+      admin.from('businesses').select('id,name,status'),
+      admin.from('profiles').select('id,display_name,username'),
+      admin.from('shop_staff_accounts').select('user_id,business_id,display_name,login_username,permissions,active'),
+      admin.from('platform_admins').select('user_id'),
+    ]);
+    if(membershipError) return reply({error:membershipError.message},400);
+    const shopMap=new Map((businesses??[]).map(item=>[item.id,item]));
+    const profileMap=new Map((profiles??[]).map(item=>[item.id,item]));
+    const staffMap=new Map((staffRows??[]).map(item=>[`${item.business_id}:${item.user_id}`,item]));
+    const platformIds=new Set((platformRows??[]).map(item=>item.user_id));
+    const accounts=[];
+    const addedPlatform=new Set<string>();
+    for(const membership of memberships??[]){
+      if(platformIds.has(membership.user_id)){
+        if(addedPlatform.has(membership.user_id)) continue;
+        addedPlatform.add(membership.user_id);
+      }
+      const profile=profileMap.get(membership.user_id);
+      const staff=staffMap.get(`${membership.business_id}:${membership.user_id}`);
+      const shop=shopMap.get(membership.business_id);
+      const {data:userResult}=await admin.auth.admin.getUserById(membership.user_id);
+      const user=userResult.user;
+      const banned=Boolean(user?.banned_until&&new Date(user.banned_until).getTime()>Date.now());
+      accounts.push({
+        user_id:membership.user_id,
+        shop_id:platformIds.has(membership.user_id)?null:membership.business_id,
+        shop_name:platformIds.has(membership.user_id)?'All shops':shop?.name??'Unknown shop',
+        display_name:staff?.display_name??profile?.display_name??'Shop user',
+        login_username:staff?.login_username??profile?.username??user?.email?.replace(/@login\.mik\.app$/,'')??'No username',
+        role:platformIds.has(membership.user_id)?'platform_owner':membership.role==='owner'?'shop_owner':'staff',
+        permissions:staff?.permissions??[],
+        active:!banned&&(staff?staff.active:shop?.status==='active'),
+        created_at:user?.created_at??null,
+        last_login:user?.last_sign_in_at??null,
+      });
+    }
+    return reply({accounts});
+  }
+
   if(!shopId) return reply({error:'Choose a shop'},400);
   const {data:shop}=await admin.from('businesses').select('id,name,login_username').eq('id',shopId).maybeSingle();
   if(!shop) return reply({error:'Shop not found'},404);
-  const [{data:platform},{data:shopOwner}]=await Promise.all([
-    admin.from('platform_admins').select('user_id').eq('user_id',auth.user.id).maybeSingle(),
-    admin.from('business_memberships').select('user_id').eq('user_id',auth.user.id).eq('business_id',shopId).eq('role','owner').maybeSingle(),
-  ]);
+  const {data:shopOwner}=await admin.from('business_memberships').select('user_id').eq('user_id',auth.user.id).eq('business_id',shopId).eq('role','owner').maybeSingle();
   if(!platform&&!shopOwner) return reply({error:'Shop owner access required'},403);
 
   if(action==='list'){
