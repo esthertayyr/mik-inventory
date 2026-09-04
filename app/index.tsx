@@ -1216,7 +1216,7 @@ function ShopApp({
         ))}
       </View>
       </View>
-      {screen!=="report_issue"?<Pressable accessibilityRole="button" accessibilityLabel="Send an issue, feedback or change request to Esther" style={[s.floatingFeedback,width>=900&&s.floatingFeedbackDesktop]} onPress={()=>{setReportBackScreen(screen);setScreen("report_issue");}}><Ionicons name="chatbubble-ellipses-outline" size={20} color={C.white}/><Text style={s.floatingFeedbackText}>Help & feedback</Text></Pressable>:null}
+      {screen!=="report_issue"?<Pressable accessibilityRole="button" accessibilityLabel="Send an issue, feedback or change request to Esther" style={[s.floatingFeedback,width<520&&s.floatingFeedbackMobile,width>=900&&s.floatingFeedbackDesktop]} onPress={()=>{setReportBackScreen(screen);setScreen("report_issue");}}><Ionicons name="chatbubble-ellipses-outline" size={20} color={C.white}/>{width>=520?<Text style={s.floatingFeedbackText}>Help & feedback</Text>:null}</Pressable>:null}
       <GuideModal visible={guideOpen} onClose={closeGuide} />
       <WhatsNewModal visible={updatesOpen&&!guideOpen} onClose={closeUpdates}/>
     </SafeAreaView>
@@ -4979,6 +4979,7 @@ const s = StyleSheet.create({
   },
   desktopNav:{minHeight:62,paddingHorizontal:22,paddingBottom:0,borderTopWidth:0,borderBottomWidth:1},
   floatingFeedback:{position:"absolute",right:14,bottom:84,zIndex:30,minHeight:44,paddingHorizontal:13,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:"rgba(255,255,255,.3)",borderRadius:22,backgroundColor:SECTION.support.color,shadowColor:"#0D1722",shadowOpacity:.2,shadowRadius:10,shadowOffset:{width:0,height:5},elevation:7},
+  floatingFeedbackMobile:{width:46,height:46,minHeight:46,paddingHorizontal:0,borderRadius:23},
   floatingFeedbackDesktop:{right:24,bottom:22},
   floatingFeedbackText:{color:C.white,fontSize:12,fontWeight:"700"},
   navItem: {
