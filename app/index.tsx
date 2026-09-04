@@ -4271,7 +4271,7 @@ const guideSteps: GuideStep[] = [
 function WhatsNewModal({visible,onClose}:{visible:boolean;onClose:()=>void}){
   const updates=[
     {icon:"calendar-number-outline" as Icon,title:"Earlier sales are clearer",text:"Use the current price or enter the price charged on that date."},
-    {icon:"archive-outline" as Icon,title:"Past orders are easier to record",text:"Past orders show their order date and no longer appear hundreds of days overdue."},
+    {icon:"archive-outline" as Icon,title:"Past orders are easier to record",text:"Mark an older order as still in progress or already completed."},
     {icon:"people-outline" as Icon,title:"Account visibility improved",text:"Owners can see shop owners, shop logins and staff more clearly."},
   ];
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><SafeAreaView style={s.whatsNewOverlay}><View style={s.whatsNewCard}>
