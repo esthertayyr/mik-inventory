@@ -1052,7 +1052,7 @@ function ShopApp({
   else if (screen === "sell_start")
     body = <SellStart businessId={business!.id} deviceUserName={deviceUserName} onOpen={setScreen} />;
   else if (screen === "print_queue")
-    body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
+    body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} onOpenOrders={() => setScreen("orders")} />;
   else if (screen === "price_calculator")
     body = <PrintPriceCalculator onBack={() => setScreen("home")} />;
   else if (screen === "correct")
@@ -2261,6 +2261,7 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
+  const [openHomeGroups, setOpenHomeGroups] = useState<string[]>(["Run today"]);
   useEffect(() => {
     setEventReminder(null);
     supabase
@@ -2311,12 +2312,11 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
   };
   const groups: HomeGroup[] = [
     {
-      title: "Sales & customers", help: "Sell and follow customer work.", ...SECTION.sales, actions: [
-        { title: "Sell", help: "Start a shop or event sale", icon: "cart", screen: "sell_start" },
+      title: "Run today", help: "Start here for today's work.", ...SECTION.sales, actions: [
+        { title: "Sell", help: "Start a shop or fast event sale", icon: "cart", screen: "sell_start" },
         { title: "Sales today", help: "See today's total and receipts", icon: "today", screen: "dashboard" },
-        { title: "View all sales", help: "Daily, weekly or monthly reports", icon: "bar-chart", screen: "reports" },
         { title: "Orders", help: orderSummary.active ? `${orderSummary.active} active · ${orderSummary.urgent} due now` : "Track customer orders", icon: "clipboard", screen: "orders" },
-        { title: "Calendar", help: "Events and reminders", icon: "calendar", screen: "calendar" },
+        { title: "Print Queue", help: "See what must be printed next", icon: "layers", screen: "print_queue" },
       ],
     },
     {
@@ -2327,27 +2327,24 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
       ],
     },
     {
-      title: "Production", help: "Check the equipment and materials used to make products.", ...SECTION.production, actions: [
-        { title: "Print Queue", help: "To print, printing and ready", icon: "layers", screen: "print_queue" },
+      title: "Production", help: "Manage printing equipment and materials.", ...SECTION.production, actions: [
         { title: "Price calculator", help: "Estimate a selling price", icon: "calculator", screen: "price_calculator" },
         { title: "Printers", help: "See which printers are working", icon: "hardware-chip", screen: "printers" },
         { title: "Filaments", help: "Track colours and spools", icon: "color-filter", screen: "filaments" },
       ],
     },
     {
-      title: "Records & planning", help: "Review sales records and important dates.", ...SECTION.records, actions: [
+      title: "Records & planning", help: "Fix records and look ahead.", ...SECTION.records, actions: [
+        { title: "Sales reports", help: "Daily, weekly or monthly totals", icon: "bar-chart", screen: "reports" },
+        { title: "Calendar", help: "Events and reminders", icon: "calendar", screen: "calendar" },
         { title: "Cancel wrong sale", help: "Find and cancel a mistaken sale", icon: "return-up-back", screen: "correct" },
         { title: "Add an earlier sale", help: "Forgot one? Choose the date it happened", icon: "calendar-number", screen: "missed" },
       ],
     },
     {
-      title: "Shop & help", help: "Change shop details or get help.", ...SECTION.settings, actions: [
+      title: "Shop & help", help: "Shop details, guides and support.", ...SECTION.settings, actions: [
         { title: "Shop profile", help: "Change the shop logo", icon: "storefront", screen: "shop" },
         { title: "More & help", help: "Settings and simple guides", icon: "grid", screen: "more" },
-      ],
-    },
-    {
-      title: "Support", help: "Tell us when something is not working.", ...SECTION.support, actions: [
         { title: "Report a problem", help: "Send a message and optional photo", icon: "chatbox-ellipses", screen: "report_issue" },
       ],
     },
@@ -2379,12 +2376,21 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
       ) : null}
       {visibleGroups.map((group) => (
         <View key={group.title} style={s.quickSection}>
-          <View style={s.quickSectionHeading}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${group.title}. ${width >= 760 || openHomeGroups.includes(group.title) ? "Hide" : "Show"} tools`}
+            disabled={width >= 760}
+            style={s.quickSectionHeading}
+            onPress={() => setOpenHomeGroups((current) => current.includes(group.title) ? current.filter((title) => title !== group.title) : [...current, group.title])}
+          >
             <View style={[s.quickSectionMark,{backgroundColor:group.color}]} />
-            <Text style={s.quickSectionTitle}>{group.title}</Text>
-          </View>
-          <Text style={s.quickSectionHelp}>{group.help}</Text>
-          <View style={s.quickGrid}>
+            <View style={s.flex}>
+              <Text style={s.quickSectionTitle}>{group.title}</Text>
+              <Text style={s.quickSectionHelp}>{group.help}</Text>
+            </View>
+            {width < 760 ? <Ionicons name={openHomeGroups.includes(group.title) ? "chevron-up" : "chevron-down"} size={21} color={group.color} /> : null}
+          </Pressable>
+          {width >= 760 || openHomeGroups.includes(group.title) ? <View style={s.quickGrid}>
             {group.actions.map((action) => (
               <Pressable
                 key={action.title}
@@ -2399,7 +2405,7 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
                 <View pointerEvents="none" style={s.quickGo}><Text style={[s.quickGoText,{color:group.color}]}>Open</Text><Ionicons name="arrow-forward" size={18} color={group.color} /></View>
               </Pressable>
             ))}
-          </View>
+          </View> : null}
         </View>
       ))}
     </ScrollView>
@@ -2676,6 +2682,9 @@ function Products({
   const [regular, setRegular] = useState("");
   const [sale, setSale] = useState("");
   const [startingStock, setStartingStock] = useState("0");
+  const [productKind, setProductKind] = useState<"other" | "clicker">("other");
+  const [clickerStyleId, setClickerStyleId] = useState<string | null>(null);
+  const [clickerSlots, setClickerSlots] = useState(1);
   const [hasChoices, setHasChoices] = useState(false);
   const [extraAlphabetMode, setExtraAlphabetMode] = useState(false);
   const [designPrices, setDesignPrices] = useState("Normal: 20\nSuperman: 50");
@@ -2690,6 +2699,17 @@ function Products({
   const [categoryBusy, setCategoryBusy] = useState(false);
   const category = (id: string | null) =>
     categories.find((c) => c.id === id)?.name ?? "Other";
+  const alphabetStyles = Array.from(
+    new Map(
+      products
+        .filter((product) => product.alphabet_style)
+        .map((product) => [product.alphabet_style!.id, product.alphabet_style!]),
+    ).values(),
+  );
+  const clickerName = (styleId = clickerStyleId, slots = clickerSlots) => {
+    const style = alphabetStyles.find((item) => item.id === styleId)?.name ?? "Universal";
+    return `Keyboard Clicker ${style} ${slots} Slot${slots === 1 ? "" : "s"}`;
+  };
   const reset = () => {
     setSelected(null);
     setCreating(false);
@@ -2698,6 +2718,9 @@ function Products({
     setRegular("");
     setSale("");
     setStartingStock("0");
+    setProductKind("other");
+    setClickerStyleId(null);
+    setClickerSlots(1);
     setHasChoices(false);
     setExtraAlphabetMode(false);
     setDesignPrices("Normal: 20\nSuperman: 50");
@@ -2717,6 +2740,10 @@ function Products({
     setChoiceLabel(p.variant_label ?? "Choice");
     setChoiceText(p.variants.map((v) => v.name).join(", "));
     setPickedUri(null);
+    const isClicker = p.letters_required > 0 && /keyboard\s+clicker/i.test(p.name);
+    setProductKind(isClicker ? "clicker" : "other");
+    setClickerStyleId(isClicker ? p.alphabet_style?.id ?? null : null);
+    setClickerSlots(isClicker ? p.letters_required : 1);
   };
   useEffect(() => {
     if (!initialProductId || openedInitial || selected || creating) return;
@@ -2912,6 +2939,20 @@ function Products({
       },
     );
   };
+  const chooseProductKind = (kind: "other" | "clicker") => {
+    setProductKind(kind);
+    if (kind === "clicker") {
+      const firstStyle = clickerStyleId ?? alphabetStyles[0]?.id ?? null;
+      setClickerStyleId(firstStyle);
+      setCategoryId(
+        categories.find((item) => /keyboard|clicker|keycap/i.test(item.name))?.id ??
+          categories[0]?.id ??
+          null,
+      );
+      setHasChoices(false);
+      setName(clickerName(firstStyle, clickerSlots));
+    }
+  };
   const duplicateProduct = () => {
     if (!selected) return;
     Alert.alert(
@@ -3000,6 +3041,11 @@ function Products({
       );
     if (!extraAlphabetMode && prices.r === null)
       return Alert.alert("Normal price needed", "Enter the product's usual selling price. The sale price can stay empty.");
+    if (productKind === "clicker" && !clickerStyleId)
+      return Alert.alert(
+        "Keycap set needed",
+        "Choose Universal or Character so Mik knows which shared A–Z stock to use.",
+      );
     if (extraAlphabetMode) {
       const designs = extraAlphabetDesigns();
       if (!designs.length || designs.some((design) => design.price < 20 || design.price > 50))
@@ -3064,6 +3110,22 @@ function Products({
           error?.message ?? "Please try again.",
         );
       }
+      if (productKind === "clicker") {
+        const { error: clickerError } = await supabase
+          .from("products")
+          .update({
+            alphabet_style_id: clickerStyleId,
+            letters_required: clickerSlots,
+          })
+          .eq("id", createdId);
+        if (clickerError) {
+          setSaving(false);
+          return Alert.alert(
+            "Clicker setup not saved",
+            "The product was created, but its shared A–Z stock was not connected. Open it and try again.",
+          );
+        }
+      }
       if (extraAlphabetMode) {
         const { data: createdVariants } = await supabase
           .from("product_variants")
@@ -3122,6 +3184,8 @@ function Products({
         regular_price: prices.r,
         sale_price: prices.sp,
         image_url,
+        alphabet_style_id: productKind === "clicker" ? clickerStyleId : null,
+        letters_required: productKind === "clicker" ? clickerSlots : 0,
       })
       .eq("id", selected.id);
     setSaving(false);
@@ -3148,6 +3212,68 @@ function Products({
             <Text style={s.requiredNoteText}><Text style={s.requiredNoteStrong}>Required:</Text> product name, category and normal price. <Text style={s.requiredNoteStrong}>Optional:</Text> photo, sale price and choices.</Text>
           </View>
           <View style={s.formStep}><View style={[s.formStepNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.formStepNumberText}>1</Text></View><View style={s.flex}><Text style={s.formStepTitle}>Help the cashier recognise it</Text><Text style={s.formStepHelp}>Use a short product name. Add a photo when one is available.</Text></View></View>
+          <Label>What are you adding?</Label>
+          <View style={s.productKindChoices}>
+            <Pressable
+              style={[s.productKindChoice, productKind === "other" && s.productKindChoiceOn]}
+              onPress={() => chooseProductKind("other")}
+            >
+              <Ionicons name="cube-outline" size={24} color={productKind === "other" ? C.white : SECTION.stock.color} />
+              <View style={s.flex}>
+                <Text style={[s.productKindTitle, productKind === "other" && s.productKindTextOn]}>Other product</Text>
+                <Text style={[s.productKindHelp, productKind === "other" && s.productKindHelpOn]}>Fidget, keychain, display item or anything else</Text>
+              </View>
+            </Pressable>
+            <Pressable
+              style={[s.productKindChoice, productKind === "clicker" && s.productKindChoiceOn]}
+              onPress={() => chooseProductKind("clicker")}
+            >
+              <Ionicons name="keypad-outline" size={24} color={productKind === "clicker" ? C.white : SECTION.stock.color} />
+              <View style={s.flex}>
+                <Text style={[s.productKindTitle, productKind === "clicker" && s.productKindTextOn]}>Keyboard clicker</Text>
+                <Text style={[s.productKindHelp, productKind === "clicker" && s.productKindHelpOn]}>MIK connects it to the correct shared A–Z stock</Text>
+              </View>
+            </Pressable>
+          </View>
+          {productKind === "clicker" ? (
+            <View style={s.clickerSetup}>
+              <Text style={s.clickerSetupTitle}>Set up the clicker</Text>
+              <Text style={s.rowHelp}>1. Choose the keycaps included by default.</Text>
+              <View style={s.choicePills}>
+                {alphabetStyles.map((style) => (
+                  <Pressable
+                    key={style.id}
+                    style={[s.clickerOption, clickerStyleId === style.id && s.clickerOptionOn]}
+                    onPress={() => {
+                      setClickerStyleId(style.id);
+                      setName(clickerName(style.id, clickerSlots));
+                    }}
+                  >
+                    <Text style={[s.clickerOptionText, clickerStyleId === style.id && s.clickerOptionTextOn]}>{style.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={[s.rowHelp,{marginTop:12}]}>2. Choose how many keycaps fit in the empty base.</Text>
+              <View style={s.choicePills}>
+                {[1,2,3,4,5,6].map((slots) => (
+                  <Pressable
+                    key={slots}
+                    style={[s.clickerSlot, clickerSlots === slots && s.clickerOptionOn]}
+                    onPress={() => {
+                      setClickerSlots(slots);
+                      setName(clickerName(clickerStyleId, slots));
+                    }}
+                  >
+                    <Text style={[s.clickerOptionText, clickerSlots === slots && s.clickerOptionTextOn]}>{slots}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={s.clickerLogicNote}>
+                <Ionicons name="information-circle-outline" size={21} color={SECTION.stock.color}/>
+                <Text style={s.clickerLogicText}>Each sale removes 1 empty clicker base and {clickerSlots} chosen keycap{clickerSlots === 1 ? "" : "s"} from the shared {alphabetStyles.find((item) => item.id === clickerStyleId)?.name ?? "selected"} A–Z stock.</Text>
+              </View>
+            </View>
+          ) : null}
           <View style={s.productPhoto}>
             {image || placeholder ? (
               <Image source={image ? { uri: image } : placeholder} style={s.productPhotoImage} />
@@ -3282,7 +3408,9 @@ function Products({
             <>
               <View style={s.formStep}><View style={[s.formStepNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.formStepNumberText}>4</Text></View><View style={s.flex}><Text style={s.formStepTitle}>Enter what you have now</Text><Text style={s.formStepHelp}>This becomes the starting stock. You can correct it later from Stock.</Text></View></View>
               <Label>
-                {hasChoices
+                {productKind === "clicker"
+                  ? "Empty clicker bases ready to use · Required"
+                  : hasChoices
                   ? "Starting stock for each choice · Required"
                   : "Starting stock at this shop · Required"}
               </Label>
@@ -3380,14 +3508,13 @@ function Products({
         color={SECTION.stock.color}
         onPress={startCreate}
       />
-      <Pressable style={s.manageCategoryButton} onPress={startExtraAlphabet}>
-        <Ionicons name="text-outline" size={20} color={C.dark} />
+      <View style={s.manageCategoryButton}>
+        <Ionicons name="information-circle-outline" size={20} color={SECTION.stock.color} />
         <View style={s.flex}>
-          <Text style={s.manageCategoryText}>Set up Extra Alphabet</Text>
-          <Text style={s.rowHelp}>Each design gets A–Z and its own ₱20–₱50 price</Text>
+          <Text style={s.manageCategoryText}>Adding a clicker?</Text>
+          <Text style={s.rowHelp}>Tap Create a new product, then choose Keyboard clicker. MIK will connect its Universal or Character A–Z stock.</Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={C.muted} />
-      </Pressable>
+      </View>
       <Pressable style={s.manageCategoryButton} onPress={() => setManagingCategories(true)}>
         <Ionicons name="albums-outline" size={20} color={C.dark} />
         <Text style={s.manageCategoryText}>Add, rename or remove categories</Text>
@@ -3725,6 +3852,12 @@ function Inventory({
                 <Text style={s.stockManageButtonText}>Manage products</Text>
               </Pressable> : null}
             </View>
+            {alphabetOnly ? (
+              <View style={s.clickerLogicNote}>
+                <Ionicons name="information-circle-outline" size={21} color={SECTION.stock.color}/>
+                <Text style={s.clickerLogicText}>Universal and Character are shared A–Z stock pools. Every clicker sale removes its selected letters from the matching pool automatically.</Text>
+              </View>
+            ) : null}
             <Search value={search} onChange={setSearch} />
             <View style={[s.stockFilters, width >= 900 && s.stockFiltersDesktop]}>
               {!alphabetOnly ? <View style={s.stockFilterGroup}>
@@ -3775,9 +3908,11 @@ function Inventory({
                 />
               </View>}
               <View style={s.flex}>
-                <Text style={s.rowTitle}>{item.name}</Text>
+                <Text style={s.rowTitle}>{alphabetOnly ? `${item.alphabet_style?.name ?? "A–Z"} keycaps` : item.name}</Text>
                 <Text style={[s.rowHelp, low && s.low]}>
-                  {needsCount(item)
+                  {alphabetOnly
+                    ? "Tap to update each A–Z letter"
+                    : needsCount(item)
                     ? "Please count this stock"
                     : item.variants.length
                       ? `${item.variants.length} choices · tap to see each one`
@@ -3790,7 +3925,7 @@ function Inventory({
                 <Text style={[s.stockNumText, low && s.low]}>
                   {quantityShown}
                 </Text>
-                <Text style={[s.stockNumLabel, low && s.low]}>left</Text>
+                <Text style={[s.stockNumLabel, low && s.low]}>{alphabetOnly ? "total" : "left"}</Text>
               </View>
               <Pressable
                 accessibilityRole="button"
@@ -6329,6 +6464,60 @@ const s = StyleSheet.create({
     backgroundColor: C.green,
   },
   letterAddText: { color: C.white, fontSize: 18, fontWeight: "700" },
+  productKindChoices: { marginTop: 8, gap: 8 },
+  productKindChoice: {
+    minHeight: 72,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 14,
+    backgroundColor: C.white,
+  },
+  productKindChoiceOn: {
+    borderColor: SECTION.stock.color,
+    backgroundColor: SECTION.stock.color,
+  },
+  productKindTitle: { color: C.ink, fontSize: 16, fontWeight: "700" },
+  productKindTextOn: { color: C.white },
+  productKindHelp: { marginTop: 3, color: C.muted, fontSize: 13, lineHeight: 18 },
+  productKindHelpOn: { color: "#E3ECE7" },
+  clickerSetup: {
+    marginTop: 12,
+    padding: 15,
+    borderWidth: 1,
+    borderColor: SECTION.stock.border,
+    borderRadius: 14,
+    backgroundColor: SECTION.stock.soft,
+  },
+  clickerSetupTitle: { color: C.ink, fontSize: 18, fontWeight: "700", marginBottom: 4 },
+  clickerOption: {
+    minHeight: 44,
+    paddingHorizontal: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: SECTION.stock.border,
+    borderRadius: 10,
+    backgroundColor: C.white,
+  },
+  clickerSlot: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: SECTION.stock.border,
+    borderRadius: 10,
+    backgroundColor: C.white,
+  },
+  clickerOptionOn: { borderColor: SECTION.stock.color, backgroundColor: SECTION.stock.color },
+  clickerOptionText: { color: C.ink, fontSize: 14, fontWeight: "700" },
+  clickerOptionTextOn: { color: C.white },
+  clickerLogicNote: { marginTop: 14, flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  clickerLogicText: { flex: 1, color: C.ink, fontSize: 13, lineHeight: 19 },
   choiceSetup: {
     marginTop: 18,
     padding: 16,

@@ -65,10 +65,12 @@ export function PrintQueueScreen({
   businessId,
   locationId,
   onBack,
+  onOpenOrders,
 }: {
   businessId: string;
   locationId: string;
   onBack: () => void;
+  onOpenOrders: () => void;
 }) {
   const { width } = useWindowDimensions();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -168,6 +170,17 @@ export function PrintQueueScreen({
       .update({ status: next })
       .eq("id", job.id);
     if (error) return Alert.alert("Job not updated", error.message);
+    if (job.external_order_id && (next === "printing" || next === "ready")) {
+      const { error: orderError } = await supabase
+        .from("external_orders")
+        .update({ status: next === "printing" ? "making" : "ready" })
+        .eq("id", job.external_order_id);
+      if (orderError)
+        Alert.alert(
+          "Order needs checking",
+          "The Print Queue was updated, but the customer order did not move with it. Open Orders and update it there.",
+        );
+    }
     await load();
   };
   if (creating)
@@ -276,6 +289,23 @@ export function PrintQueueScreen({
           follow: To print → Printing → Ready → Done.
         </Text>
       </View>
+      {jobs.some((job) => job.status !== "done") ? (
+        <View style={s.nextPrompt}>
+          <View style={s.nextPromptIcon}>
+            <Ionicons name="arrow-forward" size={21} color={C.white} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.nextPromptTitle}>Keep every job up to date</Text>
+            <Text style={s.nextPromptText}>
+              {counts.printing > 0
+                ? `${counts.printing} ${counts.printing === 1 ? "job is" : "jobs are"} printing. Tap Mark as ready when printing finishes.`
+                : counts.ready > 0
+                  ? `${counts.ready} ${counts.ready === 1 ? "job is" : "jobs are"} ready. Open the customer order to collect the balance and finish it.`
+                  : `${counts.to_print} ${counts.to_print === 1 ? "job is" : "jobs are"} waiting. Tap Start printing when work begins.`}
+            </Text>
+          </View>
+        </View>
+      ) : null}
       <View style={s.summary}>
         {steps.map((x) => (
           <View key={x.id} style={s.summaryCard}>
@@ -315,13 +345,18 @@ export function PrintQueueScreen({
                 </Text>
                 {job.notes ? <Text style={s.note}>{job.notes}</Text> : null}
                 {next ? (
-                  <Pressable style={s.move} onPress={() => void move(job)}>
+                  <Pressable
+                    style={s.move}
+                    onPress={next === "done" && job.external_order_id ? onOpenOrders : () => void move(job)}
+                  >
                     <Text style={s.moveText}>
                       {next === "printing"
                         ? "Start printing"
                         : next === "ready"
                           ? "Mark as ready"
-                          : "Mark as done"}
+                          : job.external_order_id
+                            ? "Open order · collect final payment"
+                            : "Mark as done"}
                     </Text>
                     <Ionicons name="arrow-forward" size={20} color={C.white} />
                   </Pressable>
@@ -382,6 +417,27 @@ const s = StyleSheet.create({
   },
   guideNumberText: { color: C.white, fontWeight: "800" },
   guideText: { flex: 1, color: C.muted, fontSize: 13, lineHeight: 19 },
+  nextPrompt: {
+    marginTop: 10,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 14,
+    backgroundColor: C.white,
+  },
+  nextPromptIcon: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    backgroundColor: C.production,
+  },
+  nextPromptTitle: { color: C.ink, fontSize: 15, fontWeight: "700" },
+  nextPromptText: { marginTop: 3, color: C.muted, fontSize: 13, lineHeight: 19 },
   summary: { marginTop: 13, flexDirection: "row", gap: 6 },
   summaryCard: {
     minWidth: 0,
