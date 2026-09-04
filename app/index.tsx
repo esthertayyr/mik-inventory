@@ -772,6 +772,7 @@ function ShopApp({
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [productsBackScreen, setProductsBackScreen] = useState<Screen>("more");
   const [priceListBackScreen, setPriceListBackScreen] = useState<Screen>("home");
+  const [reportBackScreen,setReportBackScreen]=useState<Screen>("home");
   const loadData = useCallback(
     async (businessId: string, selectedLocationId: string) => {
       const start = new Date();
@@ -970,6 +971,7 @@ function ShopApp({
             setProductsBackScreen("home");
           }
           if (next === "price_list") setPriceListBackScreen("home");
+          if (next === "report_issue") setReportBackScreen("home");
           setScreen(next);
           if (next === "dashboard") void reload();
         }}
@@ -1046,7 +1048,7 @@ function ShopApp({
       </View>
     );
   else if (screen === "report_issue")
-    body = <ReportIssue businessId={business!.id} onBack={() => setScreen("more")} />;
+    body = <ReportIssue businessId={business!.id} onBack={() => setScreen(reportBackScreen)} />;
   else if (screen === "sell_start")
     body = <SellStart businessId={business!.id} deviceUserName={deviceUserName} onOpen={setScreen} />;
   else if (screen === "print_queue")
@@ -1098,6 +1100,7 @@ function ShopApp({
             setProductsBackScreen("more");
           }
           if (next === "price_list") setPriceListBackScreen("more");
+          if (next === "report_issue") setReportBackScreen("more");
           setScreen(next);
         }}
         onGuide={() => setGuideOpen(true)}
@@ -1213,6 +1216,7 @@ function ShopApp({
         ))}
       </View>
       </View>
+      {screen!=="report_issue"?<Pressable accessibilityRole="button" accessibilityLabel="Send an issue, feedback or change request to Esther" style={[s.floatingFeedback,width>=900&&s.floatingFeedbackDesktop]} onPress={()=>{setReportBackScreen(screen);setScreen("report_issue");}}><Ionicons name="chatbubble-ellipses-outline" size={20} color={C.white}/><Text style={s.floatingFeedbackText}>Help & feedback</Text></Pressable>:null}
       <GuideModal visible={guideOpen} onClose={closeGuide} />
       <WhatsNewModal visible={updatesOpen&&!guideOpen} onClose={closeUpdates}/>
     </SafeAreaView>
@@ -3925,7 +3929,7 @@ type IssueReport = {
 };
 
 function ReportIssue({businessId,onBack}:{businessId:string;onBack:()=>void}) {
-  const choices = ["Sales", "Stock", "Orders", "Account", "Something else"];
+  const choices = ["Sales", "Stock", "Orders", "Account", "Feedback / change", "Something else"];
   const [category,setCategory] = useState(choices[0]);
   const [message,setMessage] = useState("");
   const [sending,setSending] = useState(false);
@@ -3957,15 +3961,15 @@ function ReportIssue({businessId,onBack}:{businessId:string;onBack:()=>void}) {
     if (data?.id) await supabase.functions.invoke("notify-issue-report", { body: { issueId: data.id } });
     setMessage("");
     setPhoto(null);
-    Alert.alert("Report sent", "The MIK owner can now see your report.", [{text:"Done",onPress:onBack}]);
+    Alert.alert("Sent to Esther", "Esther can now see your message and will review it.", [{text:"Done",onPress:onBack}]);
   };
   return <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-    <Back title="Report a problem" onPress={onBack}/>
-    <View style={s.issueIntro}><View style={s.issueIntroIcon}><Ionicons name="chatbox-ellipses-outline" size={27} color={C.white}/></View><View style={s.flex}><Text style={s.issueIntroTitle}>Something not working?</Text><Text style={s.issueIntroHelp}>Send a short message. The MIK owner will see it in the Owner dashboard.</Text></View></View>
-    <Text style={s.issueStep}>1 · Where is the problem?</Text>
+    <Back title="Help & feedback" onPress={onBack}/>
+    <View style={s.issueIntro}><View style={s.issueIntroIcon}><Ionicons name="chatbox-ellipses-outline" size={27} color={C.white}/></View><View style={s.flex}><Text style={s.issueIntroTitle}>How can MIK help?</Text><Text style={s.issueIntroHelp}>Report a problem, share feedback or request a change. Esther will receive and review your message.</Text></View></View>
+    <Text style={s.issueStep}>1 · What is this about?</Text>
     <View style={s.issueChoices}>{choices.map(choice=><Pressable key={choice} style={[s.issueChoice,category===choice&&s.issueChoiceOn]} onPress={()=>setCategory(choice)}><Text style={[s.issueChoiceText,category===choice&&s.issueChoiceTextOn]}>{choice}</Text></Pressable>)}</View>
-    <Text style={s.issueStep}>2 · What happened?</Text>
-    <TextInput style={[s.input,s.issueMessage]} multiline textAlignVertical="top" value={message} onChangeText={setMessage} placeholder="Example: I tapped Clear Sale but the products stayed." maxLength={1000}/>
+    <Text style={s.issueStep}>2 · What would you like to tell Esther?</Text>
+    <TextInput style={[s.input,s.issueMessage]} multiline textAlignVertical="top" value={message} onChangeText={setMessage} placeholder="Example: Clear Sale did not work, or I would like a new feature for…" maxLength={1000}/>
     <Text style={s.issueStep}>3 · Add a photo (optional)</Text>
     <Pressable style={s.issuePhotoButton} onPress={()=>void choosePhoto()}><Ionicons name="camera-outline" size={22} color={C.accent}/><View style={s.flex}><Text style={s.rowTitle}>{photo?"Change photo":"Add screenshot or photo"}</Text><Text style={s.rowHelp}>{photo?"Photo ready to send":"This can help us understand the problem"}</Text></View>{photo?<Image source={{uri:photo.uri}} style={s.issuePhotoThumb}/>:<Ionicons name="add" size={22} color={C.muted}/>}</Pressable>
     <Text style={s.issuePrivacy}>Do not include passwords or payment account numbers.</Text>
@@ -4839,6 +4843,9 @@ const s = StyleSheet.create({
     alignSelf: "center",
   },
   desktopNav:{minHeight:62,paddingHorizontal:22,paddingBottom:0,borderTopWidth:0,borderBottomWidth:1},
+  floatingFeedback:{position:"absolute",right:14,bottom:84,zIndex:30,minHeight:44,paddingHorizontal:13,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:"rgba(255,255,255,.3)",borderRadius:22,backgroundColor:SECTION.support.color,shadowColor:"#0D1722",shadowOpacity:.2,shadowRadius:10,shadowOffset:{width:0,height:5},elevation:7},
+  floatingFeedbackDesktop:{right:24,bottom:22},
+  floatingFeedbackText:{color:C.white,fontSize:12,fontWeight:"700"},
   navItem: {
     flex: 1,
     minHeight: 70,
