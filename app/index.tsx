@@ -1405,7 +1405,7 @@ function SaleScreen({
   );
   const choosingCategory = category === null && search.trim() === "";
   const cardWidth =
-    (saleContentWidth - (productColumns - 1) * 11) / productColumns;
+    Math.floor((saleContentWidth - (productColumns - 1) * 11 - 1) / productColumns);
   const total = cart.reduce((n, x) => n + x.quantity * x.unitPrice, 0);
   const cashAmount = Number(cashReceived);
   const cashIsEnough =
@@ -1824,7 +1824,7 @@ function SaleScreen({
       </View>
     );
   return (
-    <View style={s.flex} onLayout={(event) => setSaleContentWidth(event.nativeEvent.layout.width)}>
+    <View style={s.flex}>
       <FlatList
         key={`products-${productColumns}`}
         data={choosingCategory ? [] : filtered}
@@ -1837,6 +1837,7 @@ function SaleScreen({
         ]}
         ListHeaderComponent={
           <>
+            <View style={{height:1,width:"100%"}} onLayout={(event)=>setSaleContentWidth(event.nativeEvent.layout.width)}/>
             {!startPastSale ? (
               <View style={s.saleDateBar}>
                 <Ionicons name="calendar-outline" size={20} color={C.green} />
