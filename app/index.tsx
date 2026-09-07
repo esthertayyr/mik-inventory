@@ -34,6 +34,7 @@ import { PrintersScreen } from "@/src/components/PrintersScreen";
 import { FilamentsScreen } from "@/src/components/FilamentsScreen";
 import { CalendarScreen, type ShopEvent } from "@/src/components/CalendarScreen";
 import { ToolGrid } from "@/src/components/ToolGrid";
+import { WorkspaceAction } from "@/src/components/WorkspaceAction";
 import { PrintQueueScreen } from "@/src/components/PrintQueueScreen";
 import { PrintPriceCalculator } from "@/src/components/PrintPriceCalculator";
 import type {
@@ -944,11 +945,17 @@ function ShopApp({
     );
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
-  const nav = role === "owner" ? ownerNav : ownerNav.filter((x) =>
+  const availableNav = width>=900 ? [...ownerNav.filter(x=>x.id!=="more"),
+    {id:"print_queue" as Screen,label:"Printing",icon:"layers-outline" as Icon,color:SECTION.production.color,soft:SECTION.production.soft},
+    {id:"reports" as Screen,label:"Reports",icon:"bar-chart-outline" as Icon,color:SECTION.records.color,soft:SECTION.records.soft},
+    {id:"more" as Screen,label:"Tools & settings",icon:"options-outline" as Icon,color:SECTION.settings.color,soft:SECTION.settings.soft}] : ownerNav;
+  const nav = role === "owner" ? availableNav : availableNav.filter((x) =>
     x.id === "home" ||
     (x.id === "sell_start" && staffPermissions?.includes("sell")) ||
     (x.id === "orders" && staffPermissions?.includes("orders")) ||
-    (x.id === "stock_start" && staffPermissions?.includes("stock"))
+    (x.id === "stock_start" && staffPermissions?.includes("stock")) ||
+    (x.id === "print_queue" && staffPermissions?.includes("production")) ||
+    (x.id === "reports" && staffPermissions?.includes("reports"))
   );
   const current = locations.find((x) => x.id === locationId);
   const reload = () =>
@@ -965,6 +972,7 @@ function ShopApp({
     body = (
       <QuickStart
         locationId={locationId}
+        sales={sales}
         permissions={staffPermissions}
         onOpen={(next) => {
           if (next === "products") {
@@ -1113,6 +1121,8 @@ function ShopApp({
   const selected =
     screen === "inventory" || screen === "alphabet_inventory" || screen === "products" || screen === "price_list"
       ? "stock_start"
+      : screen === "reports" && width>=900 ? "reports"
+      : width>=900 && (["printers","filaments","print_queue","price_calculator"] as Screen[]).includes(screen) ? "print_queue"
       : screen === "reports" || screen === "shop" || screen === "report_issue" || screen === "staff"
       ? "more"
       : screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "print_queue" || screen === "price_calculator"
@@ -1136,16 +1146,13 @@ function ShopApp({
           <Text style={s.shopName} numberOfLines={1}>
             {business?.name}
           </Text>
-          <Text style={s.locationName}>
+          {locations.length>1?<Text style={s.locationName}>
             {(current?.name ?? "Shop location").toLowerCase().includes("sebu")
               ? "Pixelbug"
               : current?.name ?? "Shop location"}
-          </Text>
+          </Text>:null}
         </View>
-        {width < 900 ? <Pressable style={s.headerHome} onPress={() => setScreen("home")} accessibilityLabel="Go to home page" accessibilityRole="button">
-          <Ionicons name="home" size={19} color={C.white} />
-          <Text style={s.headerHomeText}>Home</Text>
-        </Pressable> : null}
+        <Text style={s.workspaceBrand}>MIK</Text>
       </View>
       {locations.length > 1 ? (
         <ScrollView
@@ -1167,6 +1174,7 @@ function ShopApp({
       <View style={[s.workspace,width>=900&&s.desktopWorkspace]}>
       <View style={[s.content,width>=900&&s.desktopContent]}>{body}</View>
       <View style={[s.nav,width>=900&&s.desktopNav]}>
+        {width>=900?<Text style={s.sidebarLabel}>WORKSPACE</Text>:null}
         {nav.map((item) => (
           <Pressable
             key={item.id}
@@ -1292,15 +1300,13 @@ function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceU
 function StockStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   return <ScrollView contentContainerStyle={s.sellStartPage}>
     <Text style={s.pageTitle}>Stock</Text>
-    <Text style={s.subtitle}>Choose what you want to do. Mik will guide you one step at a time.</Text>
-    <View style={[s.flowGuide,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]}>
-      <View style={[s.flowGuideNumber,{backgroundColor:SECTION.stock.color}]}><Text style={s.flowGuideNumberText}>1</Text></View>
-      <View style={s.flex}><Text style={s.flowGuideTitle}>Start here</Text><Text style={s.flowGuideText}>Choose a card below. Nothing changes until you press the final save button.</Text></View>
-    </View>
-    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("inventory")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="cube" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Check or update stock</Text><Text style={s.sellModeHelp}>See what is low, add stock or correct the number</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("alphabet_inventory")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="text" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Update A–Z letters</Text><Text style={s.sellModeHelp}>Only keycap designs and their A–Z stock appear here</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("products")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="cube-outline" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Manage products</Text><Text style={s.sellModeHelp}>Add, edit or delete products and categories</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
-    <Pressable style={[s.sellModeCard,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]} onPress={()=>onOpen("price_list")}><View style={[s.sellModeIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="receipt-outline" size={29} color={C.white}/></View><View style={s.flex}><Text style={s.sellModeTitle}>Price list</Text><Text style={s.sellModeHelp}>See or print the prices shown to customers</Text></View><Ionicons name="arrow-forward" size={23} color={SECTION.stock.color}/></Pressable>
+    <Text style={s.subtitle}>Products, quantities and keycap letters.</Text>
+    <ToolGrid minCardWidth={320} maxColumns={2}>
+      <WorkspaceAction title="Update stock" help="Add stock or correct the quantity on hand" icon="cube-outline" color={SECTION.stock.color} onPress={()=>onOpen("inventory")}/>
+      <WorkspaceAction title="A–Z keycap stock" help="Choose a design, then update its letters" icon="text-outline" color={SECTION.stock.color} onPress={()=>onOpen("alphabet_inventory")}/>
+      <WorkspaceAction title="Manage products" help="Edit products, photos, prices and categories" icon="pricetags-outline" color={SECTION.stock.color} onPress={()=>onOpen("products")}/>
+      <WorkspaceAction title="Customer price list" help="View or print your product prices" icon="receipt-outline" color={SECTION.stock.color} onPress={()=>onOpen("price_list")}/>
+    </ToolGrid>
   </ScrollView>;
 }
 
@@ -2260,7 +2266,7 @@ function SaleScreen({
   );
 }
 
-function QuickStart({ locationId, onOpen, permissions }: { locationId: string; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null }) {
+function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null }) {
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
@@ -2365,9 +2371,13 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
       <View style={s.homeIntro}>
-        <Text style={s.homeEyebrow}>YOUR SHOP, AT A GLANCE</Text>
-        <Text style={[s.pageTitle,width>=900&&s.homeDesktopTitle]}>A clear start to your day.</Text>
-        <Text style={s.subtitle}>Sales, stock and printing. Choose where to begin.</Text>
+        <Text style={s.homeEyebrow}>{friendlyLocalDate()}</Text>
+        <Text style={[s.pageTitle,width>=900&&s.homeDesktopTitle]}>Shop overview</Text>
+        <Text style={s.subtitle}>Everything you need, organised by task.</Text>
+      </View>
+      <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
+        {(!permissions||permissions.includes("sales"))?<Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Sales today</Text><Text style={s.overviewMetricValue}>{peso(sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0))}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable>:null}
+        {(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable>:null}
       </View>
       {eventReminder ? (
         <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
@@ -2396,21 +2406,8 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
             </View>
             {width < 760 ? <Ionicons name={openHomeGroups.includes(group.title) ? "chevron-up" : "chevron-down"} size={21} color={group.color} /> : null}
           </Pressable>
-          {width >= 760 || openHomeGroups.includes(group.title) ? <ToolGrid>
-            {group.actions.map((action) => (
-              <Pressable
-                key={action.title}
-                accessibilityRole="button"
-                accessibilityLabel={`${action.title}. ${action.help}`}
-                style={({ pressed }) => [s.quickCard, { backgroundColor: C.white, borderColor: group.border, width: "100%", borderTopColor:group.color, borderTopWidth:3 }, pressed && { backgroundColor:group.soft, transform: [{ scale: .985 }] }]}
-                onPress={() => onOpen(action.screen)}
-              >
-                <View pointerEvents="none" style={[s.quickIcon,{backgroundColor:group.soft}]}><Ionicons name={`${action.icon}-outline` as Icon} size={24} color={group.color} /></View>
-                <Text pointerEvents="none" style={s.quickTitle}>{action.title}</Text>
-                <Text pointerEvents="none" style={s.quickHelp}>{action.help}</Text>
-                <View pointerEvents="none" style={s.quickGo}><Ionicons name="arrow-forward" size={19} color={group.color} /></View>
-              </Pressable>
-            ))}
+          {width >= 760 || openHomeGroups.includes(group.title) ? <ToolGrid minCardWidth={320} maxColumns={2}>
+            {group.actions.map(action=><WorkspaceAction key={action.title} title={action.title} help={action.help} icon={`${action.icon}-outline` as Icon} color={group.color} onPress={()=>onOpen(action.screen)}/>)}
           </ToolGrid> : null}
         </View>
       ))}
@@ -4015,21 +4012,8 @@ function More({
             <View style={[s.quickSectionMark,{backgroundColor:group.color}]} />
             <Text style={s.quickSectionTitle}>{group.title}</Text>
           </View>
-          <ToolGrid>
-            {group.tools.map((tool) => (
-              <Pressable
-                key={tool.title}
-                accessibilityRole="button"
-                accessibilityLabel={`${tool.title}. ${tool.help}`}
-                style={({pressed})=>[s.quickCard,{width:"100%",backgroundColor:C.white,borderColor:group.border,borderTopColor:group.color,borderTopWidth:3},pressed&&{backgroundColor:group.soft,transform:[{scale:.985}]}]}
-                onPress={() => tool.guide ? onGuide() : tool.screen && onOpen(tool.screen)}
-              >
-                <View style={[s.quickIcon,{backgroundColor:group.soft}]}><Ionicons name={tool.icon} size={24} color={group.color}/></View>
-                <Text style={s.quickTitle}>{tool.title}</Text>
-                <Text style={s.quickHelp}>{tool.help}</Text>
-                <View style={s.quickGo}><Ionicons name="arrow-forward" size={19} color={group.color}/></View>
-              </Pressable>
-            ))}
+          <ToolGrid minCardWidth={320} maxColumns={2}>
+            {group.tools.map(tool=><WorkspaceAction key={tool.title} title={tool.title} help={tool.help} icon={tool.icon} color={group.color} onPress={()=>tool.guide?onGuide():tool.screen&&onOpen(tool.screen)}/>)}
           </ToolGrid>
         </View>
       ))}
@@ -4916,7 +4900,9 @@ const s = StyleSheet.create({
     borderColor: C.border,
     backgroundColor: C.white,
   },
-  shopLogo: { width: 42, height: 42, borderRadius: 13 },
+  shopLogo: { width: 34, height: 34, borderRadius: 8, resizeMode:"contain",backgroundColor:C.white },
+  workspaceBrand:{fontSize:12,fontWeight:"600",letterSpacing:3,color:C.muted},
+  sidebarLabel:{paddingHorizontal:12,marginBottom:10,color:C.muted,fontSize:10,fontWeight:"700",letterSpacing:1.6},
   shopLogoPreview: {
     width: 180,
     height: 180,
@@ -5158,9 +5144,13 @@ const s = StyleSheet.create({
   subtitle: { marginTop: 4, color: C.muted, fontSize: 16, lineHeight: 24 },
   scroll: { paddingBottom: 96 },
   quickScroll: { paddingHorizontal: 0, paddingTop: 12, paddingBottom: 96 },
-  homeIntro:{paddingTop:20,paddingBottom:22,borderBottomWidth:1,borderBottomColor:C.border},
+  homeIntro:{paddingTop:10,paddingBottom:16,borderBottomWidth:1,borderBottomColor:C.border},
+  overviewMetric:{flex:1,minWidth:130,padding:16,borderRadius:12,borderWidth:1,borderColor:C.border,backgroundColor:C.soft},
+  overviewMetricLabel:{color:C.muted,fontSize:13,fontWeight:"500"},
+  overviewMetricValue:{marginTop:6,color:C.ink,fontSize:26,lineHeight:32,fontWeight:"600"},
+  overviewMetricHelp:{marginTop:6,color:C.green,fontSize:12,lineHeight:17},
   homeEyebrow:{fontSize:11,lineHeight:16,fontWeight:"700",letterSpacing:2,color:C.muted},
-  homeDesktopTitle:{fontSize:38,lineHeight:46,fontWeight:"600",letterSpacing:-1.2},
+  homeDesktopTitle:{fontSize:32,lineHeight:40,fontWeight:"600",letterSpacing:-.8},
   quickSection:{marginTop:24},
   quickSectionHeading:{minHeight:56,flexDirection:"row",alignItems:"center",gap:12},
   quickSectionMark:{width:5,height:22,borderRadius:3},
@@ -5313,10 +5303,10 @@ const s = StyleSheet.create({
   saleDateBar:{marginBottom:14,paddingVertical:11,paddingHorizontal:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
   saleDateBarLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.45},
   saleDateBarValue:{marginTop:2,color:C.ink,fontSize:14,fontWeight:"700"},
-  sellModeCard:{minHeight:108,marginTop:12,padding:17,flexDirection:"row",alignItems:"center",gap:14,borderWidth:1,borderColor:C.border,borderRadius:16},
-  sellModeIcon:{width:56,height:56,alignItems:"center",justifyContent:"center",borderRadius:15},
-  sellModeTitle:{color:C.ink,fontSize:21,fontWeight:"700"},
-  sellModeHelp:{marginTop:4,color:C.muted,fontSize:14},
+  sellModeCard:{minHeight:88,marginTop:12,padding:16,flexDirection:"row",alignItems:"center",gap:14,borderWidth:1,borderColor:C.border,borderRadius:12},
+  sellModeIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:10},
+  sellModeTitle:{color:C.ink,fontSize:17,lineHeight:22,fontWeight:"600"},
+  sellModeHelp:{marginTop:4,color:C.muted,fontSize:13,lineHeight:19},
   earlierSale:{minHeight:72,marginTop:14,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   missedSaleFeature:{minHeight:112,marginTop:14,marginBottom:24,padding:16,flexDirection:"row",alignItems:"center",gap:13,borderWidth:1.5,borderColor:SECTION.records.border,borderRadius:18,backgroundColor:SECTION.records.soft},
   missedSaleFeatureIcon:{width:52,height:52,alignItems:"center",justifyContent:"center",borderRadius:15,backgroundColor:SECTION.records.color},
