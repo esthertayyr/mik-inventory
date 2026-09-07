@@ -33,6 +33,7 @@ import { OrdersScreen } from "@/src/components/OrdersScreen";
 import { PrintersScreen } from "@/src/components/PrintersScreen";
 import { FilamentsScreen } from "@/src/components/FilamentsScreen";
 import { CalendarScreen, type ShopEvent } from "@/src/components/CalendarScreen";
+import { ToolGrid } from "@/src/components/ToolGrid";
 import { PrintQueueScreen } from "@/src/components/PrintQueueScreen";
 import { PrintPriceCalculator } from "@/src/components/PrintPriceCalculator";
 import type {
@@ -50,7 +51,7 @@ import type {
 } from "@/src/types";
 
 const APP_FONT = Platform.select({
-  web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  web: "Arial, Helvetica, sans-serif",
   ios: "System",
   android: "sans-serif",
   default: "System",
@@ -331,7 +332,7 @@ function Login() {
           style={s.brandLogo}
           resizeMode="cover"
         />
-        {!wide?<Text style={s.loginMobileName}>MIK. · MIKAEL</Text>:null}
+        {!wide?<Text style={s.loginMobileName}>MIK · MIKAEL</Text>:null}
         <Text style={s.loginTitle}>Welcome back.</Text>
         <Text style={s.centerHelp}>Your shop is ready for the day.</Text>
         <Label>Username</Label>
@@ -1376,7 +1377,8 @@ function SaleScreen({
   onNavigate: (screen: Screen) => void;
 }) {
   const { width } = useWindowDimensions();
-  const productColumns = width >= 980 ? 4 : width >= 700 ? 3 : 2;
+  const [saleContentWidth, setSaleContentWidth] = useState(Math.max(280, width - 36));
+  const productColumns = saleContentWidth >= 900 ? 4 : saleContentWidth >= 600 ? 3 : 2;
   const [category, setCategory] = useState<string | null>(null);
   const [saleCategoryOpen, setSaleCategoryOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -1402,7 +1404,6 @@ function SaleScreen({
       p.name.toLowerCase().includes(search.toLowerCase()),
   );
   const choosingCategory = category === null && search.trim() === "";
-  const saleContentWidth = Math.min(width, 1180) - (width >= 900 ? 56 : 36);
   const cardWidth =
     (saleContentWidth - (productColumns - 1) * 11) / productColumns;
   const total = cart.reduce((n, x) => n + x.quantity * x.unitPrice, 0);
@@ -1823,7 +1824,7 @@ function SaleScreen({
       </View>
     );
   return (
-    <View style={s.flex}>
+    <View style={s.flex} onLayout={(event) => setSaleContentWidth(event.nativeEvent.layout.width)}>
       <FlatList
         key={`products-${productColumns}`}
         data={choosingCategory ? [] : filtered}
@@ -1898,7 +1899,7 @@ function SaleScreen({
             </Step>
             <Search value={search} onChange={setSearch} />
             {choosingCategory ? (
-              <View style={s.categoryGrid}>
+              <ToolGrid>
                 {categories.map((c) => {
                   const tone = categoryTone(c.name);
                   return (
@@ -1911,8 +1912,9 @@ function SaleScreen({
                         {
                           backgroundColor: tone.soft,
                           borderColor: `${tone.color}26`,
-                          width: width >= 980 ? "23.5%" : width >= 700 ? "31.8%" : "48%",
-                          minHeight: width >= 700 ? 148 : 126,
+                          width: "100%",
+                          flex: 1,
+                          minHeight: 150,
                         },
                       ]}
                       onPress={() => setCategory(c.id)}
@@ -1924,7 +1926,7 @@ function SaleScreen({
                     </Pressable>
                   );
                 })}
-              </View>
+              </ToolGrid>
             ) : (
               width < 700 ? (
                 <>
@@ -2390,13 +2392,13 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
             </View>
             {width < 760 ? <Ionicons name={openHomeGroups.includes(group.title) ? "chevron-up" : "chevron-down"} size={21} color={group.color} /> : null}
           </Pressable>
-          {width >= 760 || openHomeGroups.includes(group.title) ? <View style={s.quickGrid}>
+          {width >= 760 || openHomeGroups.includes(group.title) ? <ToolGrid>
             {group.actions.map((action) => (
               <Pressable
                 key={action.title}
                 accessibilityRole="button"
                 accessibilityLabel={`${action.title}. ${action.help}`}
-                style={({ pressed }) => [s.quickCard, { backgroundColor: group.soft, borderColor: group.border, width: width >= 920 ? "23.8%" : "48%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
+                style={({ pressed }) => [s.quickCard, { backgroundColor: group.soft, borderColor: group.border, width: "100%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
                 onPress={() => onOpen(action.screen)}
               >
                 <View pointerEvents="none" style={[s.quickIcon,{backgroundColor:group.color}]}><Ionicons name={action.icon} size={25} color={C.white} /></View>
@@ -2405,7 +2407,7 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
                 <View pointerEvents="none" style={s.quickGo}><Text style={[s.quickGoText,{color:group.color}]}>Open</Text><Ionicons name="arrow-forward" size={18} color={group.color} /></View>
               </Pressable>
             ))}
-          </View> : null}
+          </ToolGrid> : null}
         </View>
       ))}
     </ScrollView>
@@ -4009,13 +4011,13 @@ function More({
             <View style={[s.quickSectionMark,{backgroundColor:group.color}]} />
             <Text style={s.quickSectionTitle}>{group.title}</Text>
           </View>
-          <View style={s.quickGrid}>
+          <ToolGrid>
             {group.tools.map((tool) => (
               <Pressable
                 key={tool.title}
                 accessibilityRole="button"
                 accessibilityLabel={`${tool.title}. ${tool.help}`}
-                style={({pressed})=>[s.moreToolCard,{width:width>=920?"31.8%":"48%",backgroundColor:group.soft,borderColor:group.border},pressed&&{opacity:.82,transform:[{scale:.985}]}]}
+                style={({pressed})=>[s.moreToolCard,{width:"100%",backgroundColor:group.soft,borderColor:group.border},pressed&&{opacity:.82,transform:[{scale:.985}]}]}
                 onPress={() => tool.guide ? onGuide() : tool.screen && onOpen(tool.screen)}
               >
                 <View style={[s.quickIcon,{backgroundColor:group.color}]}><Ionicons name={tool.icon} size={24} color={C.white}/></View>
@@ -4024,7 +4026,7 @@ function More({
                 <View style={s.quickGo}><Text style={[s.quickGoText,{color:group.color}]}>Open</Text><Ionicons name="arrow-forward" size={18} color={group.color}/></View>
               </Pressable>
             ))}
-          </View>
+          </ToolGrid>
         </View>
       ))}
       <Text style={s.section}>Shop login</Text>
@@ -4963,8 +4965,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
   },
   workspace:{flex:1},
-  desktopWorkspace:{flexDirection:"column-reverse"},
-  desktopContent:{paddingHorizontal:28},
+  desktopWorkspace:{flexDirection:"row-reverse",width:"100%",maxWidth:1440,alignSelf:"center"},
+  desktopContent:{paddingHorizontal:32,minWidth:0},
   nav: {
     minHeight: 76,
     paddingHorizontal: 8,
@@ -4977,7 +4979,7 @@ const s = StyleSheet.create({
     maxWidth: 1180,
     alignSelf: "center",
   },
-  desktopNav:{minHeight:62,paddingHorizontal:22,paddingBottom:0,borderTopWidth:0,borderBottomWidth:1},
+  desktopNav:{width:190,maxWidth:190,alignSelf:"stretch",flexDirection:"column",paddingHorizontal:12,paddingTop:24,paddingBottom:24,borderTopWidth:0,borderRightWidth:1,gap:8},
   floatingFeedback:{position:"absolute",right:14,bottom:84,zIndex:30,minHeight:44,paddingHorizontal:13,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:"rgba(255,255,255,.3)",borderRadius:22,backgroundColor:SECTION.support.color,shadowColor:"#0D1722",shadowOpacity:.2,shadowRadius:10,shadowOffset:{width:0,height:5},elevation:7},
   floatingFeedbackMobile:{width:46,height:46,minHeight:46,paddingHorizontal:0,borderRadius:23},
   floatingFeedbackDesktop:{right:24,bottom:22},
@@ -4988,7 +4990,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  desktopNavItem:{minHeight:61,flexDirection:"row",gap:8},
+  desktopNavItem:{flex:0,minHeight:56,flexDirection:"row",justifyContent:"flex-start",paddingHorizontal:12,gap:10},
   navIcon: {
     width: 42,
     height: 34,
@@ -5144,10 +5146,10 @@ const s = StyleSheet.create({
     letterSpacing: -0.5,
   },
   subtitle: { marginTop: 4, color: C.muted, fontSize: 16, lineHeight: 24 },
-  scroll: { paddingBottom: 34 },
-  quickScroll: { paddingHorizontal: 4, paddingTop: 18, paddingBottom: 34 },
+  scroll: { paddingBottom: 96 },
+  quickScroll: { paddingHorizontal: 0, paddingTop: 12, paddingBottom: 96 },
   quickSection:{marginTop:24},
-  quickSectionHeading:{flexDirection:"row",alignItems:"center",gap:9},
+  quickSectionHeading:{minHeight:56,flexDirection:"row",alignItems:"center",gap:12},
   quickSectionMark:{width:5,height:22,borderRadius:3},
   quickSectionTitle:{color:C.ink,fontSize:18,fontWeight:"700",letterSpacing:-.25},
   quickSectionHelp:{marginTop:3,color:C.muted,fontSize:13,lineHeight:18},
@@ -5198,7 +5200,8 @@ const s = StyleSheet.create({
   statusTextPaused:{color:C.red},
   clearSaleText: { color: C.red, fontSize: 13, fontWeight: "700" },
   quickCard: {
-    minHeight: 148,
+    minHeight: 222,
+    flex: 1,
     padding: 15,
     borderWidth:1,
     borderColor:C.border,
@@ -5210,7 +5213,8 @@ const s = StyleSheet.create({
     elevation: 1,
   },
   moreToolCard:{
-    minHeight:148,
+    minHeight:222,
+    flex:1,
     padding:15,
     borderWidth:1,
     borderRadius:18,
@@ -5227,8 +5231,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 14,
   },
-  quickTitle: { marginTop: 11, color: C.ink, fontSize: 17, lineHeight: 21, fontWeight: "700", letterSpacing:-.25 },
-  quickHelp: { marginTop: 4, flex: 1, color: C.muted, fontSize: 12.5, lineHeight: 17, fontWeight: "500" },
+  quickTitle: { minHeight: 42, marginTop: 11, color: C.ink, fontSize: 17, lineHeight: 21, fontWeight: "700", letterSpacing:-.25 },
+  quickHelp: { minHeight: 54, marginTop: 4, flex: 1, color: C.muted, fontSize: 14, lineHeight: 18, fontWeight: "500" },
   quickGo: {
     minHeight: 38,
     marginTop: 9,
@@ -5486,7 +5490,7 @@ const s = StyleSheet.create({
   },
   disabled: { opacity: 0.78 },
   productOn: {
-    borderWidth: 2.5,
+    borderWidth: 1,
     borderColor: C.green,
     backgroundColor: "#FCFDFF",
   },
@@ -5839,6 +5843,9 @@ const s = StyleSheet.create({
     backgroundColor: "#FFE1B5",
   },
   editCard: {
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
     marginTop: 8,
     padding: 20,
     borderWidth: 1,

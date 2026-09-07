@@ -5,11 +5,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
+  Text as NativeText,
+  TextInput as NativeInput,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Text, TextInput } from "./AppTypography";
+import { ToolGrid } from "./ToolGrid";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/src/lib/supabase";
 
@@ -422,7 +424,7 @@ export function FilamentsScreen({
             entries
           </Text>
         </View>
-        <Ionicons name="color-filter-outline" size={42} color="#00AE42" />
+        <Ionicons name="color-filter-outline" size={42} color="#65243A" />
       </View>
       <View style={s.search}>
         <Ionicons name="search" size={20} color="#626A73" />
@@ -434,13 +436,13 @@ export function FilamentsScreen({
         />
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#00AE42" />
+        <ActivityIndicator size="large" color="#65243A" />
       ) : filtered.length ? (
-        <View style={s.grid}>
+        <ToolGrid minCardWidth={260} maxColumns={3}>
           {filtered.map((x) => (
             <Pressable
               key={x.id}
-              style={[s.card, { width: cardWidth }]}
+              style={s.card}
               onPress={() => openEdit(x)}
             >
               <View style={s.cardTop}>
@@ -468,10 +470,10 @@ export function FilamentsScreen({
               </View>
             </Pressable>
           ))}
-        </View>
+        </ToolGrid>
       ) : (
         <View style={s.empty}>
-          <Ionicons name="color-filter-outline" size={38} color="#00AE42" />
+          <Ionicons name="color-filter-outline" size={38} color="#65243A" />
           <Text style={s.emptyTitle}>
             {search ? "No matching filament" : "Add your first filament"}
           </Text>
@@ -492,7 +494,7 @@ export function FilamentsScreen({
 }
 
 const s = StyleSheet.create({
-  page: { paddingTop: 18, paddingBottom: 40 },
+  page: { paddingTop: 18, paddingBottom: 96 },
   heading: { flexDirection: "row", alignItems: "center", gap: 12 },
   headingMobile: { flexDirection: "column", alignItems: "stretch" },
   back: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 9 },
@@ -546,7 +548,8 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, minHeight: 52, color: "#111820", fontSize: 16 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   card: {
-    minHeight: 220,
+    minHeight: 250,
+    flex: 1,
     padding: 18,
     borderWidth: 1,
     borderColor: "#E0E3E7",

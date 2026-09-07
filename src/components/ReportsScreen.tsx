@@ -7,10 +7,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text as RNText,
+  Text as NativeText,
   type TextProps,
   View,
 } from "react-native";
+import { Text } from "./AppTypography";
 import { Ionicons } from "@expo/vector-icons";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -18,7 +19,6 @@ import { supabase } from "@/src/lib/supabase";
 import { peso } from "@/src/lib/format";
 
 const APP_FONT = Platform.select({ web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", ios: "System", android: "sans-serif", default: "System" });
-function Text({ style, ...props }: TextProps) { return <RNText {...props} style={[{ fontFamily: APP_FONT }, style]} />; }
 
 const publicShopName = (value: string | null | undefined) =>
   value?.toLowerCase().includes("sebu") ? "Pixelbug" : value ?? "";

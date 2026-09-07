@@ -5,12 +5,14 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
+  Text as NativeText,
+  TextInput as NativeInput,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Text, TextInput } from "./AppTypography";
 import { Ionicons } from "@expo/vector-icons";
+import { ToolGrid } from "./ToolGrid";
 import { supabase } from "@/src/lib/supabase";
 
 type Status = "to_print" | "printing" | "ready" | "done";
@@ -317,7 +319,7 @@ export function PrintQueueScreen({
       {loading ? (
         <ActivityIndicator size="large" color={C.production} />
       ) : jobs.filter((j) => j.status !== "done").length ? (
-        jobs
+        <ToolGrid minCardWidth={300} maxColumns={2}>{jobs
           .filter((j) => j.status !== "done")
           .map((job) => {
             const current = steps.find((x) => x.id === job.status)!;
@@ -355,7 +357,7 @@ export function PrintQueueScreen({
                         : next === "ready"
                           ? "Mark as ready"
                           : job.external_order_id
-                            ? "Open order · collect final payment"
+                            ? "Open customer order"
                             : "Mark as done"}
                     </Text>
                     <Ionicons name="arrow-forward" size={20} color={C.white} />
@@ -363,7 +365,7 @@ export function PrintQueueScreen({
                 ) : null}
               </View>
             );
-          })
+          })}</ToolGrid>
       ) : (
         <View style={s.empty}>
           <Ionicons name="layers-outline" size={38} color={C.production} />
@@ -378,7 +380,7 @@ export function PrintQueueScreen({
 }
 
 const s = StyleSheet.create({
-  page: { paddingTop: 18, paddingBottom: 40 },
+  page: { paddingTop: 18, paddingBottom: 96 },
   heading: { flexDirection: "row", alignItems: "center", gap: 12 },
   headingMobile: { flexDirection: "column", alignItems: "stretch" },
   back: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8 },
@@ -454,8 +456,9 @@ const s = StyleSheet.create({
     fontWeight: "700",
   },
   card: {
+    flex: 1,
     marginTop: 11,
-    padding: 16,
+    padding: 20,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 15,

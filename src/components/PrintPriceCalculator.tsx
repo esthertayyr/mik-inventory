@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text as NativeText, TextInput as NativeInput, View } from "react-native";
+import { Text, TextInput } from "./AppTypography";
 import { Ionicons } from "@expo/vector-icons";
 import { peso } from "@/src/lib/format";
 const C={ink:"#101318",muted:"#626A73",production:"#65243A",soft:"#F8F1F3",border:"#E8D8DE",white:"#FFF",green:"#264A3B"};

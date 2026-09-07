@@ -7,11 +7,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
+  Text as NativeText,
+  TextInput as NativeInput,
   useWindowDimensions,
   View,
 } from "react-native";
+import { Text, TextInput } from "./AppTypography";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/src/lib/supabase";
 
