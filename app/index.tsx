@@ -325,7 +325,7 @@ function Login() {
     <SafeAreaView style={s.login}>
       <StatusBar style="dark" />
       <View style={[s.loginShell, wide && s.loginShellWide]}>
-        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK · MIKAEL</Text><Text style={s.loginEditorialTitle}>Your 3D printing shop, made simple.</Text><Text style={s.loginEditorialBody}>Sell products · Track stock · Follow every order</Text></View> : null}
+        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK · MIKAEL</Text><View style={s.loginAccent}/><Text style={s.loginEditorialTitle}>More clarity.\nLess busywork.</Text><Text style={s.loginEditorialBody}>A thoughtful workspace for your 3D printing shop.</Text><View style={s.loginFeatures}>{[{icon:"cart-outline",title:"Sell with confidence",help:"Simple checkout, clear sales records."},{icon:"cube-outline",title:"Know what is in stock",help:"Products, keycaps and supplies together."},{icon:"layers-outline",title:"Keep orders moving",help:"From the first payment to collection."}].map(item=><View key={item.title} style={s.loginFeature}><Ionicons name={item.icon as Icon} size={23} color={C.green}/><View style={s.flex}><Text style={s.loginFeatureTitle}>{item.title}</Text><Text style={s.loginFeatureHelp}>{item.help}</Text></View></View>)}</View></View> : null}
         <View style={[s.loginCard, wide && s.loginCardWide]}>
         <Image
           source={require("../assets/mik-logo.png")}
@@ -1172,7 +1172,7 @@ function ShopApp({
             key={item.id}
             accessibilityRole="button"
             accessibilityLabel={`Open ${item.label}`}
-            style={[s.navItem,width>=900&&s.desktopNavItem]}
+            style={[s.navItem,width>=900&&s.desktopNavItem,selected===item.id&&s.navItemSelected]}
             onPress={() => {
               const openScreen = () => {
                 setScreen(item.id);
@@ -1193,14 +1193,14 @@ function ShopApp({
                 s.navIcon,
                 width>=900&&s.desktopNavIcon,
                 {
-                  backgroundColor: selected === item.id ? item.color : "transparent",
+                  backgroundColor: "transparent",
                 },
               ]}
             >
               <Ionicons
                 name={item.icon}
                 size={24}
-                color={selected === item.id ? C.white : C.muted}
+                color={selected === item.id ? item.color : C.muted}
               />
             </View>
             <Text
@@ -2363,8 +2363,11 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
   const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>!permissions||permissions.includes(permissionFor(action.screen)))})).filter(group=>group.actions.length);
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
-      <Text style={s.pageTitle}>What do you want to do?</Text>
-      <Text style={s.subtitle}>Open a section, then tap the action you need.</Text>
+      <View style={s.homeIntro}>
+        <Text style={s.homeEyebrow}>YOUR SHOP, AT A GLANCE</Text>
+        <Text style={[s.pageTitle,width>=900&&s.homeDesktopTitle]}>A clear start to your day.</Text>
+        <Text style={s.subtitle}>Sales, stock and printing. Choose where to begin.</Text>
+      </View>
       {eventReminder ? (
         <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
           <View style={s.homeReminderIcon}><Ionicons name="notifications" size={23} color={C.white} /></View>
@@ -2398,13 +2401,13 @@ function QuickStart({ locationId, onOpen, permissions }: { locationId: string; o
                 key={action.title}
                 accessibilityRole="button"
                 accessibilityLabel={`${action.title}. ${action.help}`}
-                style={({ pressed }) => [s.quickCard, { backgroundColor: group.soft, borderColor: group.border, width: "100%" }, pressed && { opacity: 0.82, transform: [{ scale: .985 }] }]}
+                style={({ pressed }) => [s.quickCard, { backgroundColor: C.white, borderColor: group.border, width: "100%", borderTopColor:group.color, borderTopWidth:3 }, pressed && { backgroundColor:group.soft, transform: [{ scale: .985 }] }]}
                 onPress={() => onOpen(action.screen)}
               >
-                <View pointerEvents="none" style={[s.quickIcon,{backgroundColor:group.color}]}><Ionicons name={action.icon} size={25} color={C.white} /></View>
+                <View pointerEvents="none" style={[s.quickIcon,{backgroundColor:group.soft}]}><Ionicons name={`${action.icon}-outline` as Icon} size={24} color={group.color} /></View>
                 <Text pointerEvents="none" style={s.quickTitle}>{action.title}</Text>
                 <Text pointerEvents="none" style={s.quickHelp}>{action.help}</Text>
-                <View pointerEvents="none" style={s.quickGo}><Text style={[s.quickGoText,{color:group.color}]}>Open</Text><Ionicons name="arrow-forward" size={18} color={group.color} /></View>
+                <View pointerEvents="none" style={s.quickGo}><Ionicons name="arrow-forward" size={19} color={group.color} /></View>
               </Pressable>
             ))}
           </ToolGrid> : null}
@@ -4017,13 +4020,13 @@ function More({
                 key={tool.title}
                 accessibilityRole="button"
                 accessibilityLabel={`${tool.title}. ${tool.help}`}
-                style={({pressed})=>[s.moreToolCard,{width:"100%",backgroundColor:group.soft,borderColor:group.border},pressed&&{opacity:.82,transform:[{scale:.985}]}]}
+                style={({pressed})=>[s.quickCard,{width:"100%",backgroundColor:C.white,borderColor:group.border,borderTopColor:group.color,borderTopWidth:3},pressed&&{backgroundColor:group.soft,transform:[{scale:.985}]}]}
                 onPress={() => tool.guide ? onGuide() : tool.screen && onOpen(tool.screen)}
               >
-                <View style={[s.quickIcon,{backgroundColor:group.color}]}><Ionicons name={tool.icon} size={24} color={C.white}/></View>
+                <View style={[s.quickIcon,{backgroundColor:group.soft}]}><Ionicons name={tool.icon} size={24} color={group.color}/></View>
                 <Text style={s.quickTitle}>{tool.title}</Text>
                 <Text style={s.quickHelp}>{tool.help}</Text>
-                <View style={s.quickGo}><Text style={[s.quickGoText,{color:group.color}]}>Open</Text><Ionicons name="arrow-forward" size={18} color={group.color}/></View>
+                <View style={s.quickGo}><Ionicons name="arrow-forward" size={19} color={group.color}/></View>
               </Pressable>
             ))}
           </ToolGrid>
@@ -4779,13 +4782,18 @@ const s = StyleSheet.create({
   deviceWelcomeButton:{width:"100%"},
   loginShell:{width:"100%",maxWidth:1040,overflow:"hidden",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white,shadowColor:"#071521",shadowOpacity:.09,shadowRadius:28,shadowOffset:{width:0,height:14},elevation:8},
   loginShellWide:{minHeight:650,flexDirection:"row"},
-  loginEditorial:{width:"52%",padding:64,justifyContent:"center",backgroundColor:C.dark},
-  loginKicker:{color:C.white,fontSize:12,fontWeight:"700",letterSpacing:4},
+  loginEditorial:{width:"52%",padding:52,justifyContent:"center",backgroundColor:C.white,borderRightWidth:1,borderRightColor:C.border},
+  loginKicker:{color:C.green,fontSize:12,fontWeight:"700",letterSpacing:4},
+  loginAccent:{width:44,height:3,backgroundColor:C.orange,marginTop:32},
+  loginFeatures:{marginTop:32,gap:22},
+  loginFeature:{flexDirection:"row",alignItems:"flex-start",gap:13},
+  loginFeatureTitle:{color:C.ink,fontSize:15,lineHeight:21,fontWeight:"700"},
+  loginFeatureHelp:{marginTop:3,color:C.muted,fontSize:13,lineHeight:19},
   loginBrandLine:{flexDirection:"row",alignItems:"baseline",gap:12},
   loginBrandName:{color:"#BFC9D2",fontSize:12,fontWeight:"500",letterSpacing:2},
   loginMobileName:{marginTop:-5,marginBottom:8,color:C.muted,fontSize:12,fontWeight:"600",letterSpacing:2,textAlign:"center"},
-  loginEditorialTitle:{maxWidth:430,marginTop:30,color:C.white,fontSize:52,lineHeight:58,fontWeight:"600",letterSpacing:-1.8},
-  loginEditorialBody:{maxWidth:410,marginTop:26,color:"#D7DEE5",fontSize:15,lineHeight:24,fontWeight:"500",letterSpacing:1.2},
+  loginEditorialTitle:{maxWidth:430,marginTop:24,color:C.green,fontSize:46,lineHeight:53,fontWeight:"600",letterSpacing:-1.8},
+  loginEditorialBody:{maxWidth:410,marginTop:20,color:C.muted,fontSize:17,lineHeight:26,fontWeight:"400"},
   loginCard: {
     width: "100%",
     maxWidth: 520,
@@ -4979,7 +4987,8 @@ const s = StyleSheet.create({
     maxWidth: 1180,
     alignSelf: "center",
   },
-  desktopNav:{width:190,maxWidth:190,alignSelf:"stretch",flexDirection:"column",paddingHorizontal:12,paddingTop:24,paddingBottom:24,borderTopWidth:0,borderRightWidth:1,gap:8},
+  desktopNav:{width:204,maxWidth:204,alignSelf:"stretch",flexDirection:"column",paddingHorizontal:16,paddingTop:28,paddingBottom:24,borderTopWidth:0,borderRightWidth:1,gap:10},
+  navItemSelected:{backgroundColor:"#F0F3F6",borderRadius:12},
   floatingFeedback:{position:"absolute",right:14,bottom:84,zIndex:30,minHeight:44,paddingHorizontal:13,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:"rgba(255,255,255,.3)",borderRadius:22,backgroundColor:SECTION.support.color,shadowColor:"#0D1722",shadowOpacity:.2,shadowRadius:10,shadowOffset:{width:0,height:5},elevation:7},
   floatingFeedbackMobile:{width:46,height:46,minHeight:46,paddingHorizontal:0,borderRadius:23},
   floatingFeedbackDesktop:{right:24,bottom:22},
@@ -5148,6 +5157,9 @@ const s = StyleSheet.create({
   subtitle: { marginTop: 4, color: C.muted, fontSize: 16, lineHeight: 24 },
   scroll: { paddingBottom: 96 },
   quickScroll: { paddingHorizontal: 0, paddingTop: 12, paddingBottom: 96 },
+  homeIntro:{paddingTop:20,paddingBottom:22,borderBottomWidth:1,borderBottomColor:C.border},
+  homeEyebrow:{fontSize:11,lineHeight:16,fontWeight:"700",letterSpacing:2,color:C.muted},
+  homeDesktopTitle:{fontSize:38,lineHeight:46,fontWeight:"600",letterSpacing:-1.2},
   quickSection:{marginTop:24},
   quickSectionHeading:{minHeight:56,flexDirection:"row",alignItems:"center",gap:12},
   quickSectionMark:{width:5,height:22,borderRadius:3},
@@ -5200,14 +5212,14 @@ const s = StyleSheet.create({
   statusTextPaused:{color:C.red},
   clearSaleText: { color: C.red, fontSize: 13, fontWeight: "700" },
   quickCard: {
-    minHeight: 222,
+    minHeight: 188,
     flex: 1,
-    padding: 15,
+    padding: 18,
     borderWidth:1,
     borderColor:C.border,
     borderRadius: 18,
     shadowColor: "#0D1722",
-    shadowOpacity: 0.045,
+    shadowOpacity: 0,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
@@ -5231,17 +5243,15 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 14,
   },
-  quickTitle: { minHeight: 42, marginTop: 11, color: C.ink, fontSize: 17, lineHeight: 21, fontWeight: "700", letterSpacing:-.25 },
-  quickHelp: { minHeight: 54, marginTop: 4, flex: 1, color: C.muted, fontSize: 14, lineHeight: 18, fontWeight: "500" },
+  quickTitle: { marginTop: 14, color: C.ink, fontSize: 17, lineHeight: 22, fontWeight: "700", letterSpacing:-.25 },
+  quickHelp: { marginTop: 6, flex: 1, color: C.muted, fontSize: 14, lineHeight: 20, fontWeight: "400" },
   quickGo: {
-    minHeight: 38,
+    minHeight: 26,
     marginTop: 9,
     paddingHorizontal: 0,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    borderTopWidth: 1,
-    borderTopColor: C.border,
+    justifyContent: "flex-end",
   },
   quickGoText: { fontSize: 13, fontWeight: "700" },
   quickNote: {
@@ -5512,7 +5522,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 10,
-    backgroundColor: "#F0EDE7",
+    backgroundColor: "#F6F7F8",
   },
   missingPhotoText: {
     color: C.muted,

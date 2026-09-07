@@ -17,6 +17,7 @@ import {
 import { Text, TextInput } from "./AppTypography";
 import { FormActionBar } from "./FormActionBar";
 import { ToolGrid } from "./ToolGrid";
+import { FilterSelect } from "./FilterSelect";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -218,14 +219,14 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
   if(editing) return <OrderForm form={form} setForm={setForm} saving={saving} editing={editing!=="new"} onBack={()=>setEditing(null)} onSave={save} onPhoto={choosePhoto}/>;
   return <ScrollView contentContainerStyle={s.page}>
     <View style={[s.headingRow,width<520&&s.headingRowMobile]}><View style={s.headingCopy}><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Customer orders received outside Mik</Text></View><Pressable style={[s.add,width<520&&s.addMobile]} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
-    <View style={s.hero}><Text style={s.heroKicker}>ORDER TRACKER</Text><Text style={s.heroValue}>{counts.open} open</Text><Text style={s.heroHelp}>{urgent?`${urgent} need attention today`:"Orders are up to date"}</Text></View>
+    <View style={[s.hero,{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:16,padding:18}]}><View><Text style={s.heroKicker}>OPEN ORDERS</Text><Text style={[s.heroValue,{fontSize:28}]}>{counts.open}</Text></View><Text style={[s.heroHelp,{flexShrink:1,textAlign:"right",maxWidth:180}]}>{urgent?`${urgent} need attention today`:"Orders are up to date"}</Text></View>
     {missingPrices>0?<Pressable style={s.priceWarning} onPress={()=>setView("all")}><Ionicons name="alert-circle" size={22} color={C.ruby}/><View style={{flex:1}}><Text style={s.priceWarningTitle}>{missingPrices} order{missingPrices===1?" needs":"s need"} a price</Text><Text style={s.priceWarningText}>Open each order and enter the full customer price. A ₱0 order cannot continue.</Text></View></Pressable>:null}
     <View style={s.summaryRow}><View style={s.summaryItem}><Text style={s.factLabel}>PAID</Text><Text style={s.summaryValue}>{peso(paymentSummary.paid)}</Text></View><View style={s.summaryItem}><Text style={s.factLabel}>BALANCE TO COLLECT</Text><Text style={s.summaryValue}>{peso(paymentSummary.outstanding)}</Text></View></View>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs}>
+    <View style={[s.tabs,{flexDirection:"row",flexWrap:"wrap"}]}>
       {([['open',`Open ${counts.open}`],['stopped',`Stopped ${counts.stopped}`],['completed','Completed'],['all','All']] as const).map(([id,label])=><Pressable accessibilityRole="button" key={id} style={[s.tab,view===id&&s.tabOn]} onPress={()=>setView(id)}><Text pointerEvents="none" style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
-    </ScrollView>
+    </View>
     <View style={s.search}><Ionicons name="search" size={20} color={C.muted}/><TextInput style={s.searchInput} value={search} onChangeText={setSearch} placeholder="Search order or customer"/></View>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.sourceRow}>{["All",...ORDER_SOURCES].map(x=><Pressable key={x} style={[s.sourceChip,sourceFilter===x&&s.sourceChipOn]} onPress={()=>setSourceFilter(x)}><Text style={[s.sourceText,sourceFilter===x&&s.sourceTextOn]}>{x}</Text></Pressable>)}</ScrollView>
+    {width<620?<FilterSelect label="Order source" value={sourceFilter} options={["All",...ORDER_SOURCES]} onChange={setSourceFilter}/>:<View style={[s.sourceRow,{flexDirection:"row",flexWrap:"wrap"}]}>{["All",...ORDER_SOURCES].map(x=><Pressable key={x} accessibilityRole="button" style={[s.sourceChip,sourceFilter===x&&s.sourceChipOn]} onPress={()=>setSourceFilter(x)}><Text style={[s.sourceText,sourceFilter===x&&s.sourceTextOn]}>{x}</Text></Pressable>)}</View>}
     {loading?<ActivityIndicator size="large" color={C.navy}/>:filtered.length?<ToolGrid minCardWidth={360} maxColumns={2}>{filtered.map(o=><OrderCard key={o.id} order={o} onEdit={()=>startEdit(o)} onDuplicate={()=>duplicate(o)} onStatus={(st)=>void setStatus(o,st)}/>)}</ToolGrid>:<View style={s.empty}><Ionicons name="file-tray-outline" size={34} color={C.navy}/><Text style={s.emptyTitle}>No orders here</Text><Text style={s.emptyHelp}>Tap New order for social media, walk-in, referral, marketplace or website orders.</Text></View>}
     <Pressable style={s.export} onPress={()=>void exportOrders()}><Ionicons name="download-outline" size={22} color={C.navy}/><Text style={s.exportText}>Export all orders for Excel</Text></Pressable>
   </ScrollView>;
