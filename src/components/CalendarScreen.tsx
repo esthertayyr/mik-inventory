@@ -343,7 +343,7 @@ export function CalendarScreen({ businessId, locationId, onBack }: { businessId:
 const styles = StyleSheet.create({
   page: { flex: 1 },
   flex: { flex: 1 },
-  heading: { minHeight: 82, paddingVertical: 13, flexDirection: "row", alignItems: "center", gap: 12 },
+  heading: { minHeight: 76, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 12 },
   back: { width: 46, height: 46, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: C.line, borderRadius: 14, backgroundColor: C.white },
   title: { color: C.ink, fontSize: 28, lineHeight: 34, fontWeight: "700", letterSpacing: -0.5 },
   subtitle: { marginTop: 2, color: C.muted, fontSize: 14 },
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   sectionTitle: { marginTop: 8, color: C.ink, fontSize: 18, lineHeight:23, fontWeight: "700", letterSpacing: -0.2 },
   sectionHelp: { marginTop: 3, marginBottom: 6, color: C.muted, fontSize: 13 },
   loader: { marginTop: 34 },
-  eventCard: { minHeight: 90, marginTop: 10, padding: 12, flexDirection: "row", alignItems: "center", gap: 11, borderWidth: 1, borderColor: C.line, borderRadius: 15, backgroundColor: C.white },
+  eventCard: { minHeight: 76, marginTop: 10, padding: 11, flexDirection: "row", alignItems: "center", gap: 11, borderWidth: 1, borderColor: C.line, borderRadius: 13, backgroundColor: C.white },
   eventDone: { opacity: 0.62 },
   eventDateBox: { width: 50, minHeight: 58, alignItems: "center", justifyContent: "center", borderRadius: 13, backgroundColor: C.paleBlue },
   eventMonth: { color: C.navy, fontSize: 9, fontWeight: "700", letterSpacing: 0.8 },
