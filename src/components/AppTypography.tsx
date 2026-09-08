@@ -12,9 +12,9 @@ const family = Platform.select({
 const typeScale = [12, 14, 16, 18, 20, 24, 28, 34, 40, 46, 48];
 const nearestSize = (value?: number) => {
   if (!value || value <= 10) return value;
-  return typeScale.reduce((best, size) =>
-    Math.abs(size - value) < Math.abs(best - value) ? size : best,
-  );
+  // Snap upward to the next shared size. This keeps the type system orderly
+  // without quietly shrinking 13px copy to 12px or 15px copy to 14px.
+  return typeScale.find(size => size >= value) ?? typeScale[typeScale.length - 1];
 };
 const normalized = (style: TextProps["style"]): TextStyle => {
   const flat = StyleSheet.flatten(style) ?? {};

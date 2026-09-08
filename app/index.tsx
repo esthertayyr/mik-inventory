@@ -10,10 +10,6 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text as RNText,
-  TextInput as RNTextInput,
-  type TextInputProps,
-  type TextProps,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -38,6 +34,7 @@ import { ToolGrid } from "@/src/components/ToolGrid";
 import { WorkspaceAction } from "@/src/components/WorkspaceAction";
 import { PrintQueueScreen } from "@/src/components/PrintQueueScreen";
 import { PrintPriceCalculator } from "@/src/components/PrintPriceCalculator";
+import { Text, TextInput } from "@/src/components/AppTypography";
 import type {
   Business,
   CartItem,
@@ -51,21 +48,6 @@ import type {
   Sale,
   Screen,
 } from "@/src/types";
-
-const APP_FONT = Platform.select({
-  web: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif",
-  ios: "System",
-  android: "sans-serif",
-  default: "System",
-});
-
-function Text({ style, ...props }: TextProps) {
-  return <RNText {...props} style={[{ fontFamily: APP_FONT }, style]} />;
-}
-
-function TextInput({ style, ...props }: TextInputProps) {
-  return <RNTextInput {...props} style={[{ fontFamily: APP_FONT }, style]} />;
-}
 
 function confirmDestructive(
   title: string,
@@ -4988,7 +4970,7 @@ const s = StyleSheet.create({
   },
   desktopNavIcon:{width:30,height:30},
   navIconOn: { backgroundColor: C.green },
-  navText: { marginTop: 2, color: C.muted, fontSize: 12, fontWeight: "700" },
+  navText: { marginTop: 2, color: C.muted, fontSize: 14, lineHeight: 18, fontWeight: "700" },
   navTextOn: { color: C.dark, fontWeight: "700" },
   headerHome: {
     minHeight: 42,
