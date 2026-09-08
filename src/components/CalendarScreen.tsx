@@ -19,13 +19,13 @@ import { supabase } from "@/src/lib/supabase";
 const C = {
   ink: "#111820",
   muted: "#68717B",
-  green: "#795C2D",
-  navy: "#795C2D",
+  green: "#51456F",
+  navy: "#51456F",
   ruby: "#733342",
   white: "#FFFFFF",
   line: "#E0E4E7",
-  pale: "#F8F6F1",
-  paleBlue: "#F8F6F1",
+  pale: "#F4F2F8",
+  paleBlue: "#F4F2F8",
   paleRed: "#F8EFF1",
 };
 

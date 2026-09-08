@@ -123,8 +123,8 @@ const C = {
   cream: "#FFFFFF",
   white: "#FFFFFF",
   border: "#E0E3E7",
-  orange: "#795C2D",
-  orangeSoft: "#F8F6F1",
+  orange: "#7A315A",
+  orangeSoft: "#FAF1F6",
   red: "#65243A",
   redSoft: "#F8F4F5",
 };
@@ -132,7 +132,7 @@ const SECTION = {
   sales: { color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB" },
   stock: { color: "#264A3B", soft: "#F0F5F2", border: "#D6E3DC" },
   production: { color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE" },
-  records: { color: "#795C2D", soft: "#F8F6F1", border: "#E7DFD0" },
+  records: { color: "#51456F", soft: "#F4F2F8", border: "#DED9E8" },
   settings: { color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3" },
   support: { color: "#5A405F", soft: "#F7F3F8", border: "#E5DCE7" },
 } as const;
@@ -1266,7 +1266,8 @@ function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceU
           <Text style={s.saleWelcomeDate}>{friendlyLocalDate(today)}</Text>
           <Text style={s.saleWelcomeHelp}>Sales entered now will be recorded under today.</Text>
           <Pressable accessibilityRole="button" style={s.saleWelcomePrimary} onPress={() => void start("sale")}><Ionicons name="storefront" size={22} color={C.white}/><View style={s.flex}><Text style={s.saleWelcomePrimaryText}>Shop Sale</Text><Text style={s.saleWelcomePrimaryHelp}>Normal Checkout</Text></View></Pressable>
-          <Pressable accessibilityRole="button" style={s.saleWelcomeSecondary} onPress={() => void start("event_sale")}><View style={s.saleWelcomeSecondaryIcon}><Ionicons name="flash" size={22} color={C.white}/></View><View style={s.flex}><Text style={s.saleWelcomeSecondaryText}>Event Sale</Text><Text style={s.saleWelcomeSecondaryMode}>Fast checkout</Text><Text style={s.saleWelcomeSecondaryHelp}>Skip letter choices. Count A–Z keycaps after the event.</Text></View><Ionicons name="arrow-forward" size={20} color={SECTION.production.color}/></Pressable>
+          <Pressable accessibilityRole="button" style={s.saleWelcomeSecondary} onPress={() => void start("event_sale")}><View style={s.saleWelcomeSecondaryIcon}><Ionicons name="flash" size={22} color={C.white}/></View><View style={s.flex}><Text style={s.saleWelcomeSecondaryText}>Event Sale</Text><Text style={s.saleWelcomeSecondaryMode}>Fast checkout</Text></View><Ionicons name="arrow-forward" size={20} color={SECTION.production.color}/></Pressable>
+          <Text style={s.saleWelcomeEventNote}>Letter choices are skipped. Count A–Z keycaps after the event.</Text>
           <Pressable accessibilityRole="button" style={s.saleWelcomeLater} onPress={() => void closeWelcome()}><Text style={s.saleWelcomeLaterText}>Choose later</Text></Pressable>
         </View>
       </SafeAreaView>
@@ -1280,7 +1281,7 @@ function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceU
     <Text style={s.salesRecordHeading}>CORRECT A MISTAKE</Text>
     <Text style={s.salesRecordHelp}>Use this when a sale was entered incorrectly.</Text>
     <Pressable accessibilityRole="button" accessibilityLabel="Cancel wrong sale. Find a sale entered by mistake and cancel it." style={s.earlierSale} onPress={()=>onOpen("correct")}><Ionicons pointerEvents="none" name="return-up-back-outline" size={21} color={SECTION.records.color}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Cancel wrong sale</Text><Text style={s.earlierSaleHelp}>Find a mistaken sale and cancel it</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Forgot to enter a sale? Add it now using the actual earlier date." style={s.missedSaleFeature} onPress={()=>onOpen("missed")}><View pointerEvents="none" style={s.missedSaleFeatureIcon}><Ionicons name="calendar-number-outline" size={27} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.missedSaleFeatureTitle}>Forgot to enter a sale?</Text><Text style={s.missedSaleFeatureHelp}>Choose the date, products and price charged then.</Text><Text style={s.missedSaleFeatureAction}>ADD AN EARLIER SALE</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.records.color}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Add an earlier sale. Choose the date, products and price charged." style={s.missedSaleFeature} onPress={()=>onOpen("missed")}><View pointerEvents="none" style={s.missedSaleFeatureIcon}><Ionicons name="calendar-number-outline" size={20} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.missedSaleFeatureTitle}>Add an earlier sale</Text><Text style={s.missedSaleFeatureHelp}>Choose the date, products and price charged</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={19} color={SECTION.records.color}/></Pressable>
   </ScrollView>;
 }
 
@@ -5283,11 +5284,12 @@ const s = StyleSheet.create({
   saleWelcomePrimary:{minHeight:58,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderRadius:15,backgroundColor:C.green},
   saleWelcomePrimaryText:{color:C.white,fontSize:16,fontWeight:"700"},
   saleWelcomePrimaryHelp:{marginTop:2,color:"#DDE7F0",fontSize:13,fontWeight:"600"},
-  saleWelcomeSecondary:{minHeight:88,marginTop:12,padding:14,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.production.border,borderRadius:15,backgroundColor:SECTION.production.soft},
+  saleWelcomeSecondary:{minHeight:76,marginTop:12,paddingHorizontal:14,paddingVertical:11,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.production.border,borderRadius:15,backgroundColor:SECTION.production.soft},
   saleWelcomeSecondaryIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:SECTION.production.color},
   saleWelcomeSecondaryText:{color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
   saleWelcomeSecondaryMode:{marginTop:1,color:SECTION.production.color,fontSize:13,lineHeight:18,fontWeight:"700"},
   saleWelcomeSecondaryHelp:{marginTop:3,color:C.muted,fontSize:12,lineHeight:17},
+  saleWelcomeEventNote:{marginTop:8,color:C.muted,fontSize:12,lineHeight:18},
   saleWelcomeLater:{minHeight:44,marginTop:7,alignItems:"center",justifyContent:"center"},
   saleWelcomeLaterText:{color:C.muted,fontSize:14,fontWeight:"600"},
   sellTodayCard:{marginBottom:18,padding:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
@@ -5301,9 +5303,9 @@ const s = StyleSheet.create({
   sellModeTitle:{color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
   sellModeHelp:{marginTop:4,color:C.muted,fontSize:13,lineHeight:19},
   earlierSale:{minHeight:72,marginTop:14,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
-  missedSaleFeature:{minHeight:112,marginTop:14,marginBottom:24,padding:16,flexDirection:"row",alignItems:"center",gap:13,borderWidth:1.5,borderColor:SECTION.records.border,borderRadius:18,backgroundColor:SECTION.records.soft},
-  missedSaleFeatureIcon:{width:52,height:52,alignItems:"center",justifyContent:"center",borderRadius:15,backgroundColor:SECTION.records.color},
-  missedSaleFeatureTitle:{color:C.ink,fontSize:18,lineHeight:23,fontWeight:"700"},
+  missedSaleFeature:{minHeight:76,marginTop:10,marginBottom:24,paddingHorizontal:14,paddingVertical:11,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.records.border,borderRadius:12,backgroundColor:SECTION.records.soft},
+  missedSaleFeatureIcon:{width:38,height:38,alignItems:"center",justifyContent:"center",borderRadius:10,backgroundColor:SECTION.records.color},
+  missedSaleFeatureTitle:{color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
   missedSaleFeatureHelp:{marginTop:3,color:C.muted,fontSize:14,lineHeight:20},
   missedSaleFeatureAction:{marginTop:8,color:SECTION.records.color,fontSize:12,fontWeight:"800",letterSpacing:.8},
   salesRecordHeading:{marginTop:28,color:SECTION.records.color,fontSize:18,lineHeight:24,fontWeight:"700"},

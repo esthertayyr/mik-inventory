@@ -122,7 +122,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex - 1, 1))}
         >
-          <Ionicons name="chevron-back" size={22} color="#795C2D" />
+          <Ionicons name="chevron-back" size={22} color="#51456F" />
         </Pressable>
         <Text style={s.calendarTitle}>
           {new Intl.DateTimeFormat("en-PH", {
@@ -135,7 +135,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex + 1, 1))}
         >
-          <Ionicons name="chevron-forward" size={22} color="#795C2D" />
+          <Ionicons name="chevron-forward" size={22} color="#51456F" />
         </Pressable>
       </View>
       <View style={s.weekRow}>
@@ -489,7 +489,7 @@ export function ReportsScreen({
               setCalendarOpen((v) => !v);
             }}
           >
-            <Ionicons name="calendar-outline" size={21} color="#795C2D" />
+            <Ionicons name="calendar-outline" size={21} color="#51456F" />
             <Text style={s.chooseDateText}>Choose exact date</Text>
           </Pressable>
           <Pressable
@@ -523,10 +523,10 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v - 1)}
         >
-          <Ionicons name="chevron-back" size={25} color="#795C2D" />
+          <Ionicons name="chevron-back" size={25} color="#51456F" />
         </Pressable>
         <View style={s.periodCenter}>
-          <Ionicons name="calendar-outline" size={19} color="#795C2D" />
+          <Ionicons name="calendar-outline" size={19} color="#51456F" />
           <Text style={s.periodTitle}>{title}</Text>
         </View>
         <Pressable
@@ -535,11 +535,11 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v + 1)}
         >
-          <Ionicons name="chevron-forward" size={25} color="#795C2D" />
+          <Ionicons name="chevron-forward" size={25} color="#51456F" />
         </Pressable>
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#795C2D" />
+        <ActivityIndicator size="large" color="#51456F" />
       ) : error ? (
         <Text style={s.error}>{error}</Text>
       ) : (
@@ -685,7 +685,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F4F5F6",
   },
-  tabOn: { backgroundColor: "#795C2D" },
+  tabOn: { backgroundColor: "#51456F" },
   tabText: { fontSize: 13, fontWeight: "700", color: "#626A73" },
   tabTextOn: { color: "#FFF" },
   voidButton: { marginTop: 8, minHeight: 38, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 9, borderWidth: 1, borderColor: "#65243A", backgroundColor: "#FFF" },
@@ -720,10 +720,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#795C2D",
+    borderColor: "#51456F",
     backgroundColor: "#FFF",
   },
-  todayText: { color: "#795C2D", fontSize: 14, fontWeight: "700" },
+  todayText: { color: "#51456F", fontSize: 14, fontWeight: "700" },
   calendar: {
     marginTop: 10,
     padding: 13,
@@ -762,7 +762,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 13,
   },
-  dayOn: { backgroundColor: "#795C2D" },
+  dayOn: { backgroundColor: "#51456F" },
   dayText: { color: "#16283A", fontSize: 14, fontWeight: "700" },
   dayTextOn: { color: "#FFF" },
   periodNav: {
@@ -795,7 +795,7 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: "#16283A",
   },
-  hero: { padding: 22, borderRadius: 16, backgroundColor: "#5C4522" },
+  hero: { padding: 22, borderRadius: 16, backgroundColor: "#51456F" },
   heroLabel: { color: "#DDE8F1", fontWeight: "700" },
   heroValue: { color: "#FFF", fontSize: 34, fontWeight: "700", marginTop: 5 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 9, marginTop: 10 },
@@ -833,10 +833,10 @@ const s = StyleSheet.create({
     borderColor: "#E0E3E7",
     borderRadius: 14,
   },
-  rank: { width: 22, fontWeight: "700", color: "#795C2D" },
+  rank: { width: 22, fontWeight: "700", color: "#51456F" },
   rowName: { flex: 1, fontSize: 15, fontWeight: "700", color: "#16283A" },
   rowSmall: { fontSize: 12, color: "#697582" },
-  rowValue: { fontWeight: "700", color: "#795C2D" },
+  rowValue: { fontWeight: "700", color: "#51456F" },
   empty: { padding: 14, color: "#697582", backgroundColor: "#FFF" },
   export: {
     minHeight: 60,
@@ -845,7 +845,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 9,
     borderRadius: 12,
-    backgroundColor: "#795C2D",
+    backgroundColor: "#51456F",
     alignItems: "center",
   },
   exportText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
