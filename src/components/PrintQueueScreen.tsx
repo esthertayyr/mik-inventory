@@ -319,7 +319,7 @@ export function PrintQueueScreen({
       {loading ? (
         <ActivityIndicator size="large" color={C.production} />
       ) : jobs.filter((j) => j.status !== "done").length ? (
-        <ToolGrid minCardWidth={300} maxColumns={2}>{jobs
+        <ToolGrid minCardWidth={340} maxColumns={2}>{jobs
           .filter((j) => j.status !== "done")
           .map((job) => {
             const current = steps.find((x) => x.id === job.status)!;
@@ -384,7 +384,7 @@ const s = StyleSheet.create({
   heading: { flexDirection: "row", alignItems: "center", gap: 12 },
   headingMobile: { flexDirection: "column", alignItems: "stretch" },
   back: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8 },
-  backText: { color: C.ink, fontSize: 22, fontWeight: "700" },
+  backText: { color: C.ink, fontSize: 28, lineHeight:34, fontWeight: "700" },
   title: { marginTop: 10, color: C.ink, fontSize: 28, fontWeight: "700" },
   help: { marginTop: 3, color: C.muted, fontSize: 14, lineHeight: 20 },
   add: {
@@ -448,7 +448,7 @@ const s = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: C.soft,
   },
-  summaryCount: { color: C.production, fontSize: 23, fontWeight: "800" },
+  summaryCount: { color: C.production, fontSize: 20, fontWeight: "700" },
   summaryLabel: {
     marginTop: 2,
     color: C.muted,
@@ -458,7 +458,7 @@ const s = StyleSheet.create({
   card: {
     flex: 1,
     marginTop: 11,
-    padding: 20,
+    padding: 14,
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 15,
@@ -478,8 +478,8 @@ const s = StyleSheet.create({
     letterSpacing: 0.7,
   },
   qty: { color: C.ink, fontWeight: "800" },
-  cardTitle: { marginTop: 13, color: C.ink, fontSize: 19, fontWeight: "700" },
-  meta: { marginTop: 6, color: C.muted, fontSize: 12, lineHeight: 18 },
+  cardTitle: { marginTop: 10, color: C.ink, fontSize: 16, lineHeight:21, fontWeight: "700" },
+  meta: { marginTop: 5, color: C.muted, fontSize: 14, lineHeight: 20 },
   note: {
     marginTop: 10,
     padding: 10,
@@ -491,9 +491,9 @@ const s = StyleSheet.create({
   move: {
     alignSelf: "flex-start",
     maxWidth: "100%",
-    minHeight: 51,
-    marginTop: 14,
-    paddingHorizontal: 15,
+    minHeight: 44,
+    marginTop: 11,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -511,7 +511,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: C.white,
   },
-  emptyTitle: { marginTop: 10, color: C.ink, fontSize: 19, fontWeight: "700" },
+  emptyTitle: { marginTop: 10, color: C.ink, fontSize: 18, fontWeight: "700" },
   label: {
     marginTop: 17,
     marginBottom: 6,
