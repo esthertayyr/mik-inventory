@@ -26,7 +26,7 @@ import * as Sharing from "expo-sharing";
 import { supabase } from "@/src/lib/supabase";
 import { peso } from "@/src/lib/format";
 
-const FONT = Platform.select({ web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", ios: "System", android: "sans-serif" });
+const FONT = Platform.select({ web: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif", ios: "System", android: "sans-serif" });
 
 type OrderStatus = "new" | "making" | "ready" | "completed" | "cancelled";
 type PaymentStatus = "unpaid" | "partial" | "paid";

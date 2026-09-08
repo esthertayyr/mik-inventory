@@ -53,7 +53,7 @@ import type {
 } from "@/src/types";
 
 const APP_FONT = Platform.select({
-  web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  web: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif",
   ios: "System",
   android: "sans-serif",
   default: "System",
