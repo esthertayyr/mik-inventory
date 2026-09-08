@@ -1891,15 +1891,16 @@ function SaleScreen({
                           borderColor: `${tone.color}26`,
                           width: "100%",
                           flex: 1,
-                          minHeight: 150,
+                          minHeight: width < 700 ? 108 : 116,
+                          height: width < 700 ? 108 : 116,
                         },
                       ]}
                       onPress={() => setCategory(c.id)}
                     >
                       <View style={[s.categoryCardIcon, { backgroundColor: tone.color }]}>
-                        <Ionicons name={categoryIcon(c.name)} size={28} color={C.white} />
+                        <Ionicons name={categoryIcon(c.name)} size={22} color={C.white} />
                       </View>
-                      <Text style={[s.categoryCardText, { color: tone.color }]}>{c.name}</Text>
+                      <Text numberOfLines={2} style={[s.categoryCardText, { color: tone.color }]}>{c.name}</Text>
                     </Pressable>
                   );
                 })}
@@ -5407,22 +5408,23 @@ const s = StyleSheet.create({
     gap: 12,
   },
   categoryCard: {
-    padding: 18,
+    padding: 14,
     alignItems: "flex-start",
     justifyContent: "space-between",
     borderRadius: 15,
     borderWidth: 1,
   },
   categoryCardIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
   categoryCardText: {
-    fontSize: 19,
-    lineHeight: 24,
+    minHeight: 40,
+    fontSize: 16,
+    lineHeight: 20,
     fontWeight: "700",
   },
   desktopCategoryTabs: {
