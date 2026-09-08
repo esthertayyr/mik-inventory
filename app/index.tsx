@@ -237,18 +237,18 @@ const ownerNav: {
     soft: SECTION.stock.soft,
   },
   {
-    id: "more",
-    label: "More",
-    icon: "grid-outline",
-    color: SECTION.settings.color,
-    soft: SECTION.settings.soft,
-  },
-  {
     id: "expenses",
     label: "Expenses",
     icon: "wallet-outline",
     color: SECTION.records.color,
     soft: SECTION.records.soft,
+  },
+  {
+    id: "more",
+    label: "More",
+    icon: "grid-outline",
+    color: SECTION.settings.color,
+    soft: SECTION.settings.soft,
   },
 ];
 
@@ -262,32 +262,7 @@ export default function Home() {
   }, []);
   if (!iconsReady)
     return <SafeAreaView style={s.loading}><ActivityIndicator size="large" color={C.green} /></SafeAreaView>;
-  return session ? <DeviceUserGate session={session} /> : <Login />;
-}
-
-function DeviceUserGate({session}:{session:Session}) {
-  const storageKey=`mik-device-user-${session.user.id}`;
-  const [loading,setLoading]=useState(true);
-  const [name,setName]=useState("");
-  const [draft,setDraft]=useState("");
-  const [editing,setEditing]=useState(false);
-  const [recorded,setRecorded]=useState(false);
-  useEffect(()=>{AsyncStorage.getItem(storageKey).then(value=>{setName(value??"");setDraft(value??"");setLoading(false);});},[storageKey]);
-  useEffect(()=>{
-    if(loading||!name||recorded)return;
-    setRecorded(true);
-    void supabase.rpc("record_login_activity",{p_device_name:name});
-  },[loading,name,recorded]);
-  const save=async()=>{
-    const clean=draft.trim().replace(/\s+/g," ");
-    if(clean.length<2)return Alert.alert("Enter a name","Use a name such as Anna, Cashier 1 or Front Counter.");
-    if(clean.length>30)return Alert.alert("Name is too long","Use 30 characters or fewer.");
-    await AsyncStorage.setItem(storageKey,clean);
-    setName(clean);setDraft(clean);setEditing(false);
-  };
-  if(loading)return <SafeAreaView style={s.loading}><ActivityIndicator size="large" color={C.green}/><Text style={s.help}>Opening MIK…</Text></SafeAreaView>;
-  if(!name||editing)return <SafeAreaView style={s.deviceWelcome}><View style={s.deviceWelcomeCard}><Image source={require("../assets/mik-app-icon.png")} style={s.deviceWelcomeLogo}/><Text style={s.deviceWelcomeKicker}>{editing?"THIS DEVICE":"FIRST TIME ON THIS DEVICE"}</Text><Text style={s.deviceWelcomeTitle}>{editing?"Change your name":"Who is using MIK?"}</Text><Text style={s.centerHelp}>Use a short name so MIK can guide and greet you personally.</Text><Text style={s.deviceWelcomeFieldLabel}>Your name</Text><TextInput style={[s.input,s.deviceWelcomeInput]} value={draft} onChangeText={setDraft} placeholder="Example: Anna or Cashier 1" autoCapitalize="words" maxLength={30} onSubmitEditing={()=>void save()}/><View style={s.deviceWelcomeButton}><BigButton label={editing?"Save name":"Continue to MIK"} icon="arrow-forward" onPress={()=>void save()}/></View>{editing?<Pressable style={s.cancel} onPress={()=>{setDraft(name);setEditing(false);}}><Text style={s.help}>Cancel</Text></Pressable>:null}</View></SafeAreaView>;
-  return <SignedIn session={session} deviceUserName={name} onChangeDeviceUser={()=>setEditing(true)}/>;
+  return session ? <SignedIn session={session} deviceUserName="team" /> : <Login />;
 }
 
 function Login() {
@@ -381,7 +356,7 @@ function Login() {
   );
 }
 
-function SignedIn({ session,deviceUserName,onChangeDeviceUser }: { session: Session;deviceUserName:string;onChangeDeviceUser:()=>void }) {
+function SignedIn({ session,deviceUserName,onChangeDeviceUser }: { session: Session;deviceUserName:string;onChangeDeviceUser?:()=>void }) {
   const [checking, setChecking] = useState(true);
   const [platformAdmin, setPlatformAdmin] = useState(false);
   useEffect(() => {
@@ -402,7 +377,7 @@ function SignedIn({ session,deviceUserName,onChangeDeviceUser }: { session: Sess
         <Text style={s.help}>Opening your account…</Text>
       </SafeAreaView>
     );
-  return platformAdmin ? <PlatformAdmin deviceUserName={deviceUserName} /> : <ShopApp session={session} deviceUserName={deviceUserName} onChangeDeviceUser={onChangeDeviceUser} />;
+  return platformAdmin ? <PlatformAdmin deviceUserName="Owner" /> : <ShopApp session={session} deviceUserName={deviceUserName} onChangeDeviceUser={onChangeDeviceUser} />;
 }
 
 type AdminShop = {
@@ -937,12 +912,12 @@ function ShopApp({
   };
   useEffect(()=>{
     if(loading||needsSetup||!business)return;
-    const key=`mik-daily-updates-2026-09-04-${business.id}-${localDateKey()}`;
+    const key=`mik-daily-updates-2026-09-08-${business.id}-${localDateKey()}`;
     AsyncStorage.getItem(key).then(seen=>{if(seen!=="done")setUpdatesOpen(true);}).catch(()=>setUpdatesOpen(true));
   },[business,loading,needsSetup]);
   const closeUpdates=async()=>{
     setUpdatesOpen(false);
-    if(business)await AsyncStorage.setItem(`mik-daily-updates-2026-09-04-${business.id}-${localDateKey()}`,"done").catch(()=>undefined);
+    if(business)await AsyncStorage.setItem(`mik-daily-updates-2026-09-08-${business.id}-${localDateKey()}`,"done").catch(()=>undefined);
   };
   if (loading)
     return (
@@ -4410,9 +4385,9 @@ const guideSteps: GuideStep[] = [
 
 function WhatsNewModal({visible,onClose}:{visible:boolean;onClose:()=>void}){
   const updates=[
-    {icon:"calendar-number-outline" as Icon,title:"Earlier sales are clearer",text:"Use the current price or enter the price charged on that date."},
-    {icon:"archive-outline" as Icon,title:"Past orders are easier to record",text:"Mark an older order as still in progress or already completed."},
-    {icon:"people-outline" as Icon,title:"Account visibility improved",text:"Owners can see shop owners, shop logins and staff more clearly."},
+    {icon:"desktop-outline" as Icon,title:"A cleaner desktop",text:"Use the familiar tabs at the top. Pages are wider, neater and easier to scan."},
+    {icon:"wallet-outline" as Icon,title:"Expenses are ready",text:"Record what the shop spent and see sales after expenses in Reports."},
+    {icon:"clipboard-outline" as Icon,title:"Orders are clearer",text:"View all open orders, filter by progress and see the actual due date."},
   ];
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><SafeAreaView style={s.whatsNewOverlay}><View style={s.whatsNewCard}>
     <View style={s.whatsNewIcon}><Ionicons name="sparkles" size={28} color={C.white}/></View><Text style={s.whatsNewKicker}>WHAT'S NEW IN MIK</Text><Text style={s.whatsNewTitle}>Small improvements, easier days.</Text><Text style={s.whatsNewDate}>{friendlyLocalDate()}</Text>
