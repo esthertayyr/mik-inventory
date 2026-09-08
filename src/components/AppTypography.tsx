@@ -1,7 +1,7 @@
 import { Platform, Text as NativeText, TextInput as NativeInput, type TextProps, type TextInputProps } from "react-native";
 
 const family = Platform.select({
-  web: "Arial, Helvetica, sans-serif",
+  web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   ios: "System",
   default: "sans-serif",
 });

@@ -20,6 +20,7 @@ export type Screen =
   | "inventory"
   | "alphabet_inventory"
   | "reports"
+  | "expenses"
   | "report_issue"
   | "staff"
   | "shop"

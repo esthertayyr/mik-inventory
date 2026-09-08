@@ -29,6 +29,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/src/lib/supabase";
 import { peso, shortDate } from "@/src/lib/format";
 import { ReportsScreen } from "@/src/components/ReportsScreen";
+import { ExpensesScreen } from "@/src/components/ExpensesScreen";
 import { OrdersScreen } from "@/src/components/OrdersScreen";
 import { PrintersScreen } from "@/src/components/PrintersScreen";
 import { FilamentsScreen } from "@/src/components/FilamentsScreen";
@@ -52,7 +53,7 @@ import type {
 } from "@/src/types";
 
 const APP_FONT = Platform.select({
-  web: "Arial, Helvetica, sans-serif",
+  web: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   ios: "System",
   android: "sans-serif",
   default: "System",
@@ -241,6 +242,13 @@ const ownerNav: {
     icon: "grid-outline",
     color: SECTION.settings.color,
     soft: SECTION.settings.soft,
+  },
+  {
+    id: "expenses",
+    label: "Expenses",
+    icon: "wallet-outline",
+    color: SECTION.records.color,
+    soft: SECTION.records.soft,
   },
 ];
 
@@ -945,17 +953,15 @@ function ShopApp({
     );
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
-  const availableNav = width>=900 ? [...ownerNav.filter(x=>x.id!=="more"),
-    {id:"print_queue" as Screen,label:"Printing",icon:"layers-outline" as Icon,color:SECTION.production.color,soft:SECTION.production.soft},
-    {id:"reports" as Screen,label:"Reports",icon:"bar-chart-outline" as Icon,color:SECTION.records.color,soft:SECTION.records.soft},
-    {id:"more" as Screen,label:"Tools & settings",icon:"options-outline" as Icon,color:SECTION.settings.color,soft:SECTION.settings.soft}] : ownerNav;
+  const availableNav = ownerNav;
   const nav = role === "owner" ? availableNav : availableNav.filter((x) =>
     x.id === "home" ||
     (x.id === "sell_start" && staffPermissions?.includes("sell")) ||
     (x.id === "orders" && staffPermissions?.includes("orders")) ||
     (x.id === "stock_start" && staffPermissions?.includes("stock")) ||
     (x.id === "print_queue" && staffPermissions?.includes("production")) ||
-    (x.id === "reports" && staffPermissions?.includes("reports"))
+    (x.id === "reports" && staffPermissions?.includes("reports")) ||
+    (x.id === "expenses" && staffPermissions?.includes("reports"))
   );
   const current = locations.find((x) => x.id === locationId);
   const reload = () =>
@@ -1056,6 +1062,8 @@ function ShopApp({
         <ReportsScreen locationId={locationId} hideTitle />
       </View>
     );
+  else if (screen === "expenses")
+    body = <ExpensesScreen businessId={business!.id} locationId={locationId} />;
   else if (screen === "report_issue")
     body = <ReportIssue businessId={business!.id} onBack={() => setScreen(reportBackScreen)} />;
   else if (screen === "sell_start")
@@ -1174,7 +1182,6 @@ function ShopApp({
       <View style={[s.workspace,width>=900&&s.desktopWorkspace]}>
       <View style={[s.content,width>=900&&s.desktopContent]}>{body}</View>
       <View style={[s.nav,width>=900&&s.desktopNav]}>
-        {width>=900?<Text style={s.sidebarLabel}>WORKSPACE</Text>:null}
         {nav.map((item) => (
           <Pressable
             key={item.id}
@@ -2269,10 +2276,12 @@ function SaleScreen({
 function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null }) {
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
+  const [expenseToday,setExpenseToday]=useState(0);
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
   const [openHomeGroups, setOpenHomeGroups] = useState<string[]>(["Start here"]);
   useEffect(() => {
     setEventReminder(null);
+    supabase.from("expenses").select("amount").eq("location_id",locationId).eq("expense_date",localDateKey()).then(({data})=>setExpenseToday((data??[]).reduce((sum,row)=>sum+Number(row.amount),0)));
     supabase
       .from("external_orders")
       .select("status,target_date")
@@ -2345,6 +2354,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
     {
       title: "Sales history & calendar", help: "See past sales, fix mistakes and plan events.", ...SECTION.records, actions: [
         { title: "Sales reports", help: "See daily, weekly or monthly sales", icon: "bar-chart", screen: "reports" },
+        { title: "Expenses", help: "Record and explain money spent", icon: "wallet", screen: "expenses" },
         { title: "Events calendar", help: "Add events and reminders", icon: "calendar", screen: "calendar" },
         { title: "Remove a wrong sale", help: "Cancel a sale entered by mistake", icon: "return-up-back", screen: "correct" },
         { title: "Add a missed sale", help: "Choose an earlier date and add the sale", icon: "calendar-number", screen: "missed" },
@@ -2364,7 +2374,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
     screen==="orders"?"orders":
     (["stock_start","inventory","alphabet_inventory"] as Screen[]).includes(screen)?"stock":
     (["products","price_list"] as Screen[]).includes(screen)?"products":
-    screen==="reports"?"reports":
+    (["reports","expenses"] as Screen[]).includes(screen)?"reports":
     (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
     screen==="calendar"?"calendar":"settings";
   const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>!permissions||permissions.includes(permissionFor(action.screen)))})).filter(group=>group.actions.length);
@@ -2376,7 +2386,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
         <Text style={s.subtitle}>Everything you need, organised by task.</Text>
       </View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
-        {(!permissions||permissions.includes("sales"))?<Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Sales today</Text><Text style={s.overviewMetricValue}>{peso(sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0))}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable>:null}
+        {(!permissions||permissions.includes("sales"))?(()=>{const todaySales=sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0);return <><Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Sales today</Text><Text style={s.overviewMetricValue}>{peso(todaySales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View expenses today" onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses today</Text><Text style={s.overviewMetricValue}>{peso(expenseToday)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>After expenses</Text><Text style={s.overviewMetricValue}>{peso(todaySales-expenseToday)}</Text><Text style={s.overviewMetricHelp}>Sales minus expenses</Text></View></>})():null}
         {(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable>:null}
       </View>
       {eventReminder ? (
@@ -3991,6 +4001,7 @@ function More({
     {
       title: "Reports", ...SECTION.records, tools: [
         { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports" },
+        { icon: "wallet-outline", title: "Expenses", help: "Record what the shop spent", screen: "expenses" },
       ],
     },
     {
@@ -4960,8 +4971,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
   },
   workspace:{flex:1},
-  desktopWorkspace:{flexDirection:"row-reverse",width:"100%",maxWidth:1440,alignSelf:"center"},
-  desktopContent:{paddingHorizontal:32,minWidth:0},
+  desktopWorkspace:{flexDirection:"column-reverse",width:"100%",maxWidth:1280,alignSelf:"center"},
+  desktopContent:{paddingHorizontal:28,minWidth:0,maxWidth:1180},
   nav: {
     minHeight: 76,
     paddingHorizontal: 8,
@@ -4974,7 +4985,7 @@ const s = StyleSheet.create({
     maxWidth: 1180,
     alignSelf: "center",
   },
-  desktopNav:{width:204,maxWidth:204,alignSelf:"stretch",flexDirection:"column",paddingHorizontal:16,paddingTop:28,paddingBottom:24,borderTopWidth:0,borderRightWidth:1,gap:10},
+  desktopNav:{width:"100%",maxWidth:1180,minHeight:70,alignSelf:"center",flexDirection:"row",paddingHorizontal:24,paddingTop:8,paddingBottom:8,borderTopWidth:0,borderBottomWidth:1,gap:6},
   navItemSelected:{backgroundColor:"#F0F3F6",borderRadius:12},
   floatingFeedback:{position:"absolute",right:14,bottom:84,zIndex:30,minHeight:44,paddingHorizontal:13,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:"rgba(255,255,255,.3)",borderRadius:22,backgroundColor:SECTION.support.color,shadowColor:"#0D1722",shadowOpacity:.2,shadowRadius:10,shadowOffset:{width:0,height:5},elevation:7},
   floatingFeedbackMobile:{width:46,height:46,minHeight:46,paddingHorizontal:0,borderRadius:23},
@@ -4986,7 +4997,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  desktopNavItem:{flex:0,minHeight:56,flexDirection:"row",justifyContent:"flex-start",paddingHorizontal:12,gap:10},
+  desktopNavItem:{flex:1,minHeight:52,flexDirection:"row",justifyContent:"center",paddingHorizontal:10,gap:7},
   navIcon: {
     width: 42,
     height: 34,
@@ -4994,7 +5005,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 8,
   },
-  desktopNavIcon:{width:36,height:32},
+  desktopNavIcon:{width:30,height:30},
   navIconOn: { backgroundColor: C.green },
   navText: { marginTop: 2, color: C.muted, fontSize: 12, fontWeight: "700" },
   navTextOn: { color: C.dark, fontWeight: "700" },
@@ -5030,7 +5041,7 @@ const s = StyleSheet.create({
   },
   adminPage: {
     width: "100%",
-    maxWidth: 720,
+    maxWidth: 1040,
     alignSelf: "center",
     padding: 18,
     paddingBottom: 38,
@@ -5182,10 +5193,10 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   adminShopTop:{flexDirection:"row",alignItems:"center",gap:11},
-  adminShopActions:{paddingTop:10,flexDirection:"row",flexWrap:"wrap",gap:9,borderTopWidth:1,borderTopColor:C.border},
-  adminShopAction:{flexGrow:0,flexShrink:1,flexBasis:"31%",minWidth:0,minHeight:46,paddingHorizontal:10,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:6,borderRadius:10,backgroundColor:C.soft},
+  adminShopActions:{paddingTop:12,flexDirection:"row",flexWrap:"wrap",gap:10,borderTopWidth:1,borderTopColor:C.border},
+  adminShopAction:{flexGrow:1,flexShrink:1,flexBasis:150,minWidth:130,minHeight:48,paddingHorizontal:12,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:10,backgroundColor:C.soft},
   adminShopActionsMobile:{flexWrap:"wrap",gap:9},
-  adminShopActionMobile:{flexGrow:0,flexShrink:1,flexBasis:"47%",minWidth:0,minHeight:50,paddingHorizontal:8},
+  adminShopActionMobile:{flexGrow:1,flexShrink:1,flexBasis:"46%",minWidth:130,minHeight:50,paddingHorizontal:10},
   adminShopActionPrimary:{backgroundColor:C.green},
   adminShopActionHalf:{flexBasis:"48%"},
   adminShopActionText:{color:C.dark,fontSize:12,fontWeight:"700"},
@@ -5198,7 +5209,7 @@ const s = StyleSheet.create({
   staffAccessSummary:{marginTop:11,marginBottom:10,color:C.muted,fontSize:13,lineHeight:19},
   manageShopHero:{marginTop:8,marginBottom:18,padding:18,flexDirection:"row",alignItems:"center",gap:13,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:C.white},
   manageShopGrid:{flexDirection:"row",flexWrap:"wrap",gap:12},
-  manageShopCard:{width:"48%",minHeight:168,padding:17,justifyContent:"space-between",borderWidth:1,borderColor:C.border,borderRadius:17,backgroundColor:C.white},
+  manageShopCard:{flexGrow:1,flexBasis:260,minWidth:240,minHeight:150,padding:17,justifyContent:"space-between",borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   statusPillPaused:{backgroundColor:C.redSoft},
   statusTextPaused:{color:C.red},
   clearSaleText: { color: C.red, fontSize: 13, fontWeight: "700" },
