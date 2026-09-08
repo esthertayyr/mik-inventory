@@ -4390,7 +4390,7 @@ const guideSteps: GuideStep[] = [
 
 function WhatsNewModal({visible,onClose}:{visible:boolean;onClose:()=>void}){
   const updates=[
-    {icon:"desktop-outline" as Icon,title:"A cleaner desktop",text:"Use the familiar tabs at the top. Pages are wider, neater and easier to scan."},
+    {icon:"color-palette-outline" as Icon,title:"A clearer look everywhere",text:"Desktop and mobile now share consistent type, spacing, coloured actions and compact cards."},
     {icon:"wallet-outline" as Icon,title:"Expenses are ready",text:"Record what the shop spent and see sales after expenses in Reports."},
     {icon:"clipboard-outline" as Icon,title:"Orders are clearer",text:"View all open orders, filter by progress and see the actual due date."},
   ];
