@@ -24,7 +24,7 @@ type Filament = {
   spool_count: number;
   notes: string | null;
 };
-const PRODUCTION = "#713B42";
+const PRODUCTION = "#65243A";
 const BRANDS = [
   "Bambu Lab",
   "eSUN",

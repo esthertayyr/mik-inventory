@@ -17,16 +17,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/src/lib/supabase";
 
 const C = {
-  ink: "#17191C",
-  muted: "#656B72",
-  green: "#535675",
-  navy: "#535675",
-  ruby: "#922F45",
+  ink: "#111820",
+  muted: "#68717B",
+  green: "#51456F",
+  navy: "#51456F",
+  ruby: "#733342",
   white: "#FFFFFF",
-  line: "#DEE1E3",
-  pale: "#F1F1F7",
-  paleBlue: "#F1F1F7",
-  paleRed: "#FAF0F2",
+  line: "#E0E4E7",
+  pale: "#F4F2F8",
+  paleBlue: "#F4F2F8",
+  paleRed: "#F8EFF1",
 };
 
 export type ShopEvent = {

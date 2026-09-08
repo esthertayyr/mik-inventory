@@ -90,34 +90,34 @@ function greetingForNow() {
 }
 
 const C = {
-  ink: "#17191C",
-  muted: "#656B72",
-  green: "#17253D",
-  dark: "#17253D",
-  soft: "#F3F4F3",
-  accent: "#315C88",
-  accentDark: "#274B70",
-  accentSoft: "#EEF3F8",
-  teal: "#59664A",
-  tealSoft: "#F1F3ED",
-  purple: "#634862",
-  purpleSoft: "#F5F0F5",
-  cream: "#FCFCFB",
+  ink: "#101318",
+  muted: "#626A73",
+  green: "#142C47",
+  dark: "#0D1722",
+  soft: "#F6F7F8",
+  accent: "#264A3B",
+  accentDark: "#193529",
+  accentSoft: "#F3F6F4",
+  teal: "#29465B",
+  tealSoft: "#F3F5F7",
+  purple: "#65243A",
+  purpleSoft: "#F8F4F5",
+  cream: "#FFFFFF",
   white: "#FFFFFF",
-  border: "#DEE1E3",
-  orange: "#9A6437",
-  orangeSoft: "#FAF4EE",
-  red: "#922F45",
-  redSoft: "#FAF0F2",
+  border: "#E0E3E7",
+  orange: "#7A315A",
+  orangeSoft: "#FAF1F6",
+  red: "#65243A",
+  redSoft: "#F8F4F5",
 };
 const SECTION = {
-  sales: { color: "#315C88", soft: "#EEF3F8", border: "#D5E0EA" },
-  orders: { color: "#634862", soft: "#F5F0F5", border: "#E3D8E2" },
-  stock: { color: "#59664A", soft: "#F1F3ED", border: "#DCE1D5" },
-  production: { color: "#713B42", soft: "#F8F0F1", border: "#E8D6D9" },
-  records: { color: "#535675", soft: "#F1F1F7", border: "#DCDDE8" },
-  settings: { color: "#555B63", soft: "#F3F4F3", border: "#DEE1E3" },
-  support: { color: "#813F5C", soft: "#FAF0F4", border: "#EACFD9" },
+  sales: { color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB" },
+  orders: { color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB" },
+  stock: { color: "#264A3B", soft: "#F0F5F2", border: "#D6E3DC" },
+  production: { color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE" },
+  records: { color: "#51456F", soft: "#F4F2F8", border: "#DED9E8" },
+  settings: { color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3" },
+  support: { color: "#5A405F", soft: "#F7F3F8", border: "#E5DCE7" },
 } as const;
 type Icon = keyof typeof Ionicons.glyphMap;
 function categoryIcon(name: string): Icon {
@@ -131,12 +131,12 @@ function categoryIcon(name: string): Icon {
 }
 function categoryTone(name: string) {
   const n = name.toLowerCase();
-  if (n.includes("keyboard") || n.includes("clicker") || n.includes("keycap")) return { color: "#315C88", soft: "#EEF3F8" };
-  if (n.includes("fidget") || n.includes("flexi")) return { color: "#59664A", soft: "#F1F3ED" };
-  if (n.includes("keychain") || n.includes("charm")) return { color: "#813F5C", soft: "#FAF0F4" };
-  if (n.includes("decor") || n.includes("display")) return { color: "#634862", soft: "#F5F0F5" };
-  if (n.includes("home") || n.includes("gift") || n.includes("desk")) return { color: "#713B42", soft: "#F8F0F1" };
-  return { color: "#535675", soft: "#F1F1F7" };
+  if (n.includes("keyboard") || n.includes("clicker") || n.includes("keycap")) return { color: "#102A43", soft: "#F5F8FA" };
+  if (n.includes("fidget") || n.includes("flexi")) return { color: "#29473A", soft: "#F6F8F7" };
+  if (n.includes("keychain") || n.includes("charm")) return { color: "#70263A", soft: "#FAF6F7" };
+  if (n.includes("decor") || n.includes("display")) return { color: "#5A405F", soft: "#F9F6F9" };
+  if (n.includes("home") || n.includes("gift") || n.includes("desk")) return { color: "#49384E", soft: "#F8F6F8" };
+  return { color: "#294B61", soft: "#F6F8F9" };
 }
 function productIcon(name: string, category = ""): Icon {
   const n = `${name} ${category}`.toLowerCase();
@@ -1248,7 +1248,7 @@ function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceU
     <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={22} color={C.accent}/><View style={s.flex}><Text style={s.eventModeNoteStrong}>How Event Sale works</Text><Text style={s.eventModeStep}>1. Add the product and take payment.</Text><Text style={s.eventModeStep}>2. Clickers skip the letter screen.</Text><Text style={s.eventModeStep}>3. After the event, count the A–Z keycaps left.</Text><Text style={s.eventModeTip}>Tip: Take a photo of sold items to help you count later.</Text></View></View>
     <Text style={s.salesRecordHeading}>CORRECT A MISTAKE</Text>
     <Text style={s.salesRecordHelp}>Use this when a sale was entered incorrectly.</Text>
-    <Pressable accessibilityRole="button" accessibilityLabel="Cancel wrong sale. Find a sale entered by mistake and cancel it." style={s.earlierSale} onPress={()=>onOpen("correct")}><Ionicons pointerEvents="none" name="return-up-back-outline" size={21} color={SECTION.records.color}/><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Cancel wrong sale</Text><Text style={s.earlierSaleHelp}>Find a mistaken sale and cancel it</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.muted}/></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Cancel wrong sale. Find a sale entered by mistake and cancel it." style={[s.earlierSale,s.earlierSaleDanger]} onPress={()=>onOpen("correct")}><View pointerEvents="none" style={s.earlierSaleDangerIcon}><Ionicons name="return-up-back-outline" size={20} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Cancel wrong sale</Text><Text style={s.earlierSaleHelp}>Find a mistaken sale and cancel it</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.red}/></Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Add an earlier sale. Choose the date, products and price charged." style={s.missedSaleFeature} onPress={()=>onOpen("missed")}><View pointerEvents="none" style={s.missedSaleFeatureIcon}><Ionicons name="calendar-number-outline" size={20} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.missedSaleFeatureTitle}>Add an earlier sale</Text><Text style={s.missedSaleFeatureHelp}>Choose the date, products and price charged</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={19} color={SECTION.records.color}/></Pressable>
   </ScrollView>;
 }
@@ -1877,8 +1877,8 @@ function SaleScreen({
                           borderColor: `${tone.color}26`,
                           width: "100%",
                           flex: 1,
-                          minHeight: width < 700 ? 108 : 116,
-                          height: width < 700 ? 108 : 116,
+                          minHeight: width < 700 ? 72 : 78,
+                          height: width < 700 ? 72 : 78,
                         },
                       ]}
                       onPress={() => setCategory(c.id)}
@@ -2336,7 +2336,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
         <Text style={s.subtitle}>Everything you need, organised by task.</Text>
       </View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
-        {(!permissions||permissions.includes("sales"))?(()=>{const todaySales=sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0);return <><Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Sales today</Text><Text style={s.overviewMetricValue}>{peso(todaySales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View expenses today" onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses today</Text><Text style={s.overviewMetricValue}>{peso(expenseToday)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>After expenses</Text><Text style={s.overviewMetricValue}>{peso(todaySales-expenseToday)}</Text><Text style={s.overviewMetricHelp}>Sales minus expenses</Text></View></>})():null}
+        {(!permissions||permissions.includes("sales"))?(()=>{const todaySales=sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0);return <><Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Sales today</Text><Text style={s.overviewMetricValue}>{peso(todaySales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View expenses today" onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses today</Text><Text style={s.overviewMetricValue}>{peso(expenseToday)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Money after expenses</Text><Text style={s.overviewMetricValue}>{peso(todaySales-expenseToday)}</Text><Text style={s.overviewMetricHelp}>Sales minus expenses</Text></View></>})():null}
         {(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable>:null}
       </View>
       {eventReminder ? (
@@ -5332,6 +5332,8 @@ const s = StyleSheet.create({
   sellModeTitle:{color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
   sellModeHelp:{marginTop:4,color:C.muted,fontSize:13,lineHeight:19},
   earlierSale:{minHeight:72,marginTop:14,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  earlierSaleDanger:{borderColor:"#E8D8DE",backgroundColor:C.redSoft},
+  earlierSaleDangerIcon:{width:38,height:38,alignItems:"center",justifyContent:"center",borderRadius:10,backgroundColor:C.red},
   missedSaleFeature:{minHeight:76,marginTop:10,marginBottom:24,paddingHorizontal:14,paddingVertical:11,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.records.border,borderRadius:12,backgroundColor:SECTION.records.soft},
   missedSaleFeatureIcon:{width:38,height:38,alignItems:"center",justifyContent:"center",borderRadius:10,backgroundColor:SECTION.records.color},
   missedSaleFeatureTitle:{color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
@@ -5454,21 +5456,24 @@ const s = StyleSheet.create({
     gap: 12,
   },
   categoryCard: {
-    padding: 14,
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    gap: 12,
     borderRadius: 15,
     borderWidth: 1,
   },
   categoryCardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   categoryCardText: {
-    minHeight: 40,
+    flex: 1,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: "700",
