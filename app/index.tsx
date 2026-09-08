@@ -90,33 +90,34 @@ function greetingForNow() {
 }
 
 const C = {
-  ink: "#101318",
-  muted: "#626A73",
-  green: "#142C47",
-  dark: "#0D1722",
-  soft: "#F6F7F8",
-  accent: "#264A3B",
-  accentDark: "#193529",
-  accentSoft: "#F3F6F4",
-  teal: "#29465B",
-  tealSoft: "#F3F5F7",
-  purple: "#65243A",
-  purpleSoft: "#F8F4F5",
-  cream: "#FFFFFF",
+  ink: "#17191C",
+  muted: "#656B72",
+  green: "#17253D",
+  dark: "#17253D",
+  soft: "#F3F4F3",
+  accent: "#315C88",
+  accentDark: "#274B70",
+  accentSoft: "#EEF3F8",
+  teal: "#59664A",
+  tealSoft: "#F1F3ED",
+  purple: "#634862",
+  purpleSoft: "#F5F0F5",
+  cream: "#FCFCFB",
   white: "#FFFFFF",
-  border: "#E0E3E7",
-  orange: "#7A315A",
-  orangeSoft: "#FAF1F6",
-  red: "#65243A",
-  redSoft: "#F8F4F5",
+  border: "#DEE1E3",
+  orange: "#9A6437",
+  orangeSoft: "#FAF4EE",
+  red: "#922F45",
+  redSoft: "#FAF0F2",
 };
 const SECTION = {
-  sales: { color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB" },
-  stock: { color: "#264A3B", soft: "#F0F5F2", border: "#D6E3DC" },
-  production: { color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE" },
-  records: { color: "#51456F", soft: "#F4F2F8", border: "#DED9E8" },
-  settings: { color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3" },
-  support: { color: "#5A405F", soft: "#F7F3F8", border: "#E5DCE7" },
+  sales: { color: "#315C88", soft: "#EEF3F8", border: "#D5E0EA" },
+  orders: { color: "#634862", soft: "#F5F0F5", border: "#E3D8E2" },
+  stock: { color: "#59664A", soft: "#F1F3ED", border: "#DCE1D5" },
+  production: { color: "#713B42", soft: "#F8F0F1", border: "#E8D6D9" },
+  records: { color: "#535675", soft: "#F1F1F7", border: "#DCDDE8" },
+  settings: { color: "#555B63", soft: "#F3F4F3", border: "#DEE1E3" },
+  support: { color: "#813F5C", soft: "#FAF0F4", border: "#EACFD9" },
 } as const;
 type Icon = keyof typeof Ionicons.glyphMap;
 function categoryIcon(name: string): Icon {
@@ -130,12 +131,12 @@ function categoryIcon(name: string): Icon {
 }
 function categoryTone(name: string) {
   const n = name.toLowerCase();
-  if (n.includes("keyboard") || n.includes("clicker") || n.includes("keycap")) return { color: "#102A43", soft: "#F5F8FA" };
-  if (n.includes("fidget") || n.includes("flexi")) return { color: "#29473A", soft: "#F6F8F7" };
-  if (n.includes("keychain") || n.includes("charm")) return { color: "#70263A", soft: "#FAF6F7" };
-  if (n.includes("decor") || n.includes("display")) return { color: "#5A405F", soft: "#F9F6F9" };
-  if (n.includes("home") || n.includes("gift") || n.includes("desk")) return { color: "#49384E", soft: "#F8F6F8" };
-  return { color: "#294B61", soft: "#F6F8F9" };
+  if (n.includes("keyboard") || n.includes("clicker") || n.includes("keycap")) return { color: "#315C88", soft: "#EEF3F8" };
+  if (n.includes("fidget") || n.includes("flexi")) return { color: "#59664A", soft: "#F1F3ED" };
+  if (n.includes("keychain") || n.includes("charm")) return { color: "#813F5C", soft: "#FAF0F4" };
+  if (n.includes("decor") || n.includes("display")) return { color: "#634862", soft: "#F5F0F5" };
+  if (n.includes("home") || n.includes("gift") || n.includes("desk")) return { color: "#713B42", soft: "#F8F0F1" };
+  return { color: "#535675", soft: "#F1F1F7" };
 }
 function productIcon(name: string, category = ""): Icon {
   const n = `${name} ${category}`.toLowerCase();
@@ -208,8 +209,8 @@ const ownerNav: {
     id: "orders",
     label: "Orders",
     icon: "clipboard-outline",
-    color: SECTION.sales.color,
-    soft: SECTION.sales.soft,
+    color: SECTION.orders.color,
+    soft: SECTION.orders.soft,
   },
   {
     id: "stock_start",
@@ -217,13 +218,6 @@ const ownerNav: {
     icon: "cube-outline",
     color: SECTION.stock.color,
     soft: SECTION.stock.soft,
-  },
-  {
-    id: "expenses",
-    label: "Expenses",
-    icon: "wallet-outline",
-    color: SECTION.records.color,
-    soft: SECTION.records.soft,
   },
   {
     id: "more",
@@ -916,9 +910,7 @@ function ShopApp({
     (x.id === "sell_start" && staffPermissions?.includes("sell")) ||
     (x.id === "orders" && staffPermissions?.includes("orders")) ||
     (x.id === "stock_start" && staffPermissions?.includes("stock")) ||
-    (x.id === "print_queue" && staffPermissions?.includes("production")) ||
-    (x.id === "reports" && staffPermissions?.includes("reports")) ||
-    (x.id === "expenses" && staffPermissions?.includes("reports"))
+    x.id === "more"
   );
   const current = locations.find((x) => x.id === locationId);
   const reload = () =>
@@ -1084,18 +1076,12 @@ function ShopApp({
       />
     );
   const selected =
-    screen === "inventory" || screen === "alphabet_inventory" || screen === "products" || screen === "price_list"
+    (["inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)
       ? "stock_start"
-      : screen === "reports" && width>=900 ? "reports"
-      : width>=900 && (["printers","filaments","print_queue","price_calculator"] as Screen[]).includes(screen) ? "print_queue"
-      : screen === "reports" || screen === "shop" || screen === "report_issue" || screen === "staff"
-      ? "more"
-      : screen === "printers" || screen === "filaments" || screen === "calendar" || screen === "print_queue" || screen === "price_calculator"
-        ? "home"
-      : screen === "missed" || screen === "sale" || screen === "event_sale"
+      : (["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)
         ? "sell_start"
-      : screen === "correct"
-          ? "sell_start"
+        : (["reports","expenses","shop","report_issue","staff","printers","filaments","calendar","print_queue","price_calculator"] as Screen[]).includes(screen)
+          ? "more"
           : screen;
   return (
     <SafeAreaView style={s.app}>

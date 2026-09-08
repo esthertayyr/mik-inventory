@@ -24,7 +24,7 @@ type Filament = {
   spool_count: number;
   notes: string | null;
 };
-const PRODUCTION = "#65243A";
+const PRODUCTION = "#713B42";
 const BRANDS = [
   "Bambu Lab",
   "eSUN",
@@ -424,7 +424,7 @@ export function FilamentsScreen({
             entries
           </Text>
         </View>
-        <Ionicons name="color-filter-outline" size={42} color="#65243A" />
+        <Ionicons name="color-filter-outline" size={42} color={PRODUCTION} />
       </View>
       <View style={s.search}>
         <Ionicons name="search" size={20} color="#626A73" />
@@ -436,7 +436,7 @@ export function FilamentsScreen({
         />
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#65243A" />
+        <ActivityIndicator size="large" color={PRODUCTION} />
       ) : filtered.length ? (
         <ToolGrid minCardWidth={260} maxColumns={3}>
           {filtered.map((x) => (
@@ -473,7 +473,7 @@ export function FilamentsScreen({
         </ToolGrid>
       ) : (
         <View style={s.empty}>
-          <Ionicons name="color-filter-outline" size={38} color="#65243A" />
+          <Ionicons name="color-filter-outline" size={38} color={PRODUCTION} />
           <Text style={s.emptyTitle}>
             {search ? "No matching filament" : "Add your first filament"}
           </Text>

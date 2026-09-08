@@ -122,7 +122,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex - 1, 1))}
         >
-          <Ionicons name="chevron-back" size={22} color="#51456F" />
+          <Ionicons name="chevron-back" size={22} color="#535675" />
         </Pressable>
         <Text style={s.calendarTitle}>
           {new Intl.DateTimeFormat("en-PH", {
@@ -135,7 +135,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex + 1, 1))}
         >
-          <Ionicons name="chevron-forward" size={22} color="#51456F" />
+          <Ionicons name="chevron-forward" size={22} color="#535675" />
         </Pressable>
       </View>
       <View style={s.weekRow}>
@@ -489,7 +489,7 @@ export function ReportsScreen({
               setCalendarOpen((v) => !v);
             }}
           >
-            <Ionicons name="calendar-outline" size={21} color="#51456F" />
+            <Ionicons name="calendar-outline" size={21} color="#535675" />
             <Text style={s.chooseDateText}>Choose exact date</Text>
           </Pressable>
           <Pressable
@@ -523,10 +523,10 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v - 1)}
         >
-          <Ionicons name="chevron-back" size={25} color="#51456F" />
+          <Ionicons name="chevron-back" size={25} color="#535675" />
         </Pressable>
         <View style={s.periodCenter}>
-          <Ionicons name="calendar-outline" size={19} color="#51456F" />
+          <Ionicons name="calendar-outline" size={19} color="#535675" />
           <Text style={s.periodTitle}>{title}</Text>
         </View>
         <Pressable
@@ -535,11 +535,11 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v + 1)}
         >
-          <Ionicons name="chevron-forward" size={25} color="#51456F" />
+          <Ionicons name="chevron-forward" size={25} color="#535675" />
         </Pressable>
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#51456F" />
+        <ActivityIndicator size="large" color="#535675" />
       ) : error ? (
         <Text style={s.error}>{error}</Text>
       ) : (
@@ -671,7 +671,7 @@ const s = StyleSheet.create({
   correctionBackText: { color: "#101318", fontSize: 17, fontWeight: "700" },
   page: { paddingBottom: 32 },
   title: { fontSize: 28, fontWeight: "700", color: "#11151A", marginTop: 16 },
-  correctionGuide: { marginTop: 12, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 12, backgroundColor: "#65243A" },
+  correctionGuide: { marginTop: 12, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 12, backgroundColor: "#922F45" },
   correctionGuideText: { flex: 1 },
   correctionGuideTitle: { color: "#FFF", fontSize: 17, fontWeight: "700" },
   correctionGuideHelp: { marginTop: 4, color: "#FFF", fontSize: 13, lineHeight: 18, fontWeight: "600" },
@@ -685,16 +685,16 @@ const s = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F4F5F6",
   },
-  tabOn: { backgroundColor: "#51456F" },
+  tabOn: { backgroundColor: "#535675" },
   tabText: { fontSize: 13, fontWeight: "700", color: "#626A73" },
   tabTextOn: { color: "#FFF" },
-  voidButton: { marginTop: 8, minHeight: 38, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 9, borderWidth: 1, borderColor: "#65243A", backgroundColor: "#FFF" },
-  voidText: { color: "#65243A", fontSize: 12, fontWeight: "700" },
+  voidButton: { marginTop: 8, minHeight: 38, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 9, borderWidth: 1, borderColor: "#922F45", backgroundColor: "#FFF" },
+  voidText: { color: "#922F45", fontSize: 12, fontWeight: "700" },
   modalShade: { flex: 1, padding: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(24,35,52,0.48)" },
   modalCard: { width: "100%", maxWidth: 420, padding: 22, borderWidth: 1, borderColor: "#E0E3E7", borderRadius: 12, backgroundColor: "#FFF" },
   modalTitle: { color: "#11151A", fontSize: 23, fontWeight: "700" },
   modalHelp: { marginTop: 7, color: "#697582", fontSize: 15, lineHeight: 22 },
-  confirmVoid: { minHeight: 54, marginTop: 12, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#65243A" },
+  confirmVoid: { minHeight: 54, marginTop: 12, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#922F45" },
   confirmVoidText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
   cancelVoid: { minHeight: 48, alignItems: "center", justifyContent: "center" },
   cancelVoidText: { color: "#697582", fontSize: 15, fontWeight: "700" },
@@ -720,10 +720,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#51456F",
+    borderColor: "#535675",
     backgroundColor: "#FFF",
   },
-  todayText: { color: "#51456F", fontSize: 14, fontWeight: "700" },
+  todayText: { color: "#535675", fontSize: 14, fontWeight: "700" },
   calendar: {
     marginTop: 10,
     padding: 13,
@@ -762,7 +762,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 13,
   },
-  dayOn: { backgroundColor: "#51456F" },
+  dayOn: { backgroundColor: "#535675" },
   dayText: { color: "#16283A", fontSize: 14, fontWeight: "700" },
   dayTextOn: { color: "#FFF" },
   periodNav: {
@@ -795,7 +795,7 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: "#16283A",
   },
-  hero: { padding: 22, borderRadius: 16, backgroundColor: "#51456F" },
+  hero: { padding: 22, borderRadius: 16, backgroundColor: "#535675" },
   heroLabel: { color: "#DDE8F1", fontWeight: "700" },
   heroValue: { color: "#FFF", fontSize: 34, fontWeight: "700", marginTop: 5 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 9, marginTop: 10 },
@@ -833,10 +833,10 @@ const s = StyleSheet.create({
     borderColor: "#E0E3E7",
     borderRadius: 14,
   },
-  rank: { width: 22, fontWeight: "700", color: "#51456F" },
+  rank: { width: 22, fontWeight: "700", color: "#535675" },
   rowName: { flex: 1, fontSize: 15, fontWeight: "700", color: "#16283A" },
   rowSmall: { fontSize: 12, color: "#697582" },
-  rowValue: { fontWeight: "700", color: "#51456F" },
+  rowValue: { fontWeight: "700", color: "#535675" },
   empty: { padding: 14, color: "#697582", backgroundColor: "#FFF" },
   export: {
     minHeight: 60,
@@ -845,7 +845,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 9,
     borderRadius: 12,
-    backgroundColor: "#51456F",
+    backgroundColor: "#535675",
     alignItems: "center",
   },
   exportText: { color: "#FFF", fontSize: 15, fontWeight: "700" },

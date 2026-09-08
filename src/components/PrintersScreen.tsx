@@ -10,7 +10,7 @@ import { supabase } from "@/src/lib/supabase";
 
 type PrinterStatus = "working" | "needs_attention" | "under_repair" | "retired";
 type Printer = { id:string; name:string; model:string; status:PrinterStatus; notes:string|null; issue_type:string|null; issue_photo_url:string|null; issue_reported_at:string|null; updated_at:string };
-const PRODUCTION="#65243A";
+const PRODUCTION="#713B42";
 
 const STATUSES: Array<{id:PrinterStatus;label:string;short:string;color:string;soft:string;icon:keyof typeof Ionicons.glyphMap}> = [
   {id:"working",label:"Working",short:"Working",color:"#087A38",soft:"#EAF6EF",icon:"checkmark-circle"},
