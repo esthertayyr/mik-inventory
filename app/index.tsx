@@ -1162,7 +1162,12 @@ function ShopApp({
             key={item.id}
             accessibilityRole="button"
             accessibilityLabel={`Open ${item.label}`}
-            style={[s.navItem,width>=900&&s.desktopNavItem,selected===item.id&&s.navItemSelected]}
+            style={[
+              s.navItem,
+              width>=900&&s.desktopNavItem,
+              selected===item.id&&s.navItemSelected,
+              selected===item.id&&{backgroundColor:item.soft,borderColor:item.color},
+            ]}
             onPress={() => {
               const openScreen = () => {
                 setScreen(item.id);
@@ -1261,7 +1266,7 @@ function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceU
           <Text style={s.saleWelcomeDate}>{friendlyLocalDate(today)}</Text>
           <Text style={s.saleWelcomeHelp}>Sales entered now will be recorded under today.</Text>
           <Pressable accessibilityRole="button" style={s.saleWelcomePrimary} onPress={() => void start("sale")}><Ionicons name="storefront" size={22} color={C.white}/><View style={s.flex}><Text style={s.saleWelcomePrimaryText}>Shop Sale</Text><Text style={s.saleWelcomePrimaryHelp}>Normal Checkout</Text></View></Pressable>
-          <Pressable accessibilityRole="button" style={s.saleWelcomeSecondary} onPress={() => void start("event_sale")}><Ionicons name="flash" size={22} color={C.accent}/><View style={s.flex}><Text style={s.saleWelcomeSecondaryText}>Start Event Sale · Fast checkout</Text><Text style={s.saleWelcomeSecondaryHelp}>Skip letter choices now. Count A–Z keycaps after the event.</Text></View></Pressable>
+          <Pressable accessibilityRole="button" style={s.saleWelcomeSecondary} onPress={() => void start("event_sale")}><View style={s.saleWelcomeSecondaryIcon}><Ionicons name="flash" size={22} color={C.white}/></View><View style={s.flex}><Text style={s.saleWelcomeSecondaryText}>Event Sale</Text><Text style={s.saleWelcomeSecondaryMode}>Fast checkout</Text><Text style={s.saleWelcomeSecondaryHelp}>Skip letter choices. Count A–Z keycaps after the event.</Text></View><Ionicons name="arrow-forward" size={20} color={SECTION.production.color}/></Pressable>
           <Pressable accessibilityRole="button" style={s.saleWelcomeLater} onPress={() => void closeWelcome()}><Text style={s.saleWelcomeLaterText}>Choose later</Text></Pressable>
         </View>
       </SafeAreaView>
@@ -2361,8 +2366,8 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
         <Text style={s.subtitle}>Everything you need, organised by task.</Text>
       </View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
-        {(!permissions||permissions.includes("sales"))?(()=>{const todaySales=sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0);return <><Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Sales today</Text><Text style={s.overviewMetricValue}>{peso(todaySales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View expenses today" onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses today</Text><Text style={s.overviewMetricValue}>{peso(expenseToday)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>After expenses</Text><Text style={s.overviewMetricValue}>{peso(todaySales-expenseToday)}</Text><Text style={s.overviewMetricHelp}>Sales minus expenses</Text></View></>})():null}
-        {(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable>:null}
+        {(!permissions||permissions.includes("sales"))?(()=>{const todaySales=sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0);return <><Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={[s.overviewMetric,{backgroundColor:SECTION.sales.soft,borderColor:SECTION.sales.border}]}><Text style={[s.overviewMetricLabel,{color:SECTION.sales.color}]}>Sales today</Text><Text style={s.overviewMetricValue}>{peso(todaySales)}</Text><Text style={[s.overviewMetricHelp,{color:SECTION.sales.color}]}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View expenses today" onPress={()=>onOpen("expenses")} style={[s.overviewMetric,{backgroundColor:SECTION.records.soft,borderColor:SECTION.records.border}]}><Text style={[s.overviewMetricLabel,{color:SECTION.records.color}]}>Expenses today</Text><Text style={s.overviewMetricValue}>{peso(expenseToday)}</Text><Text style={[s.overviewMetricHelp,{color:SECTION.records.color}]}>See breakdown →</Text></Pressable><View style={[s.overviewMetric,{backgroundColor:SECTION.stock.soft,borderColor:SECTION.stock.border}]}><Text style={[s.overviewMetricLabel,{color:SECTION.stock.color}]}>After expenses</Text><Text style={s.overviewMetricValue}>{peso(todaySales-expenseToday)}</Text><Text style={[s.overviewMetricHelp,{color:SECTION.stock.color}]}>Sales minus expenses</Text></View></>})():null}
+        {(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={[s.overviewMetric,{backgroundColor:SECTION.production.soft,borderColor:SECTION.production.border}]}><Text style={[s.overviewMetricLabel,{color:SECTION.production.color}]}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={[s.overviewMetricHelp,{color:SECTION.production.color}]}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable>:null}
       </View>
       {eventReminder ? (
         <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
@@ -4810,18 +4815,18 @@ const s = StyleSheet.create({
   },
   centerHelp: {
     color: C.muted,
-    fontSize: 17,
-    lineHeight: 25,
+    fontSize: 16,
+    lineHeight: 23,
     textAlign: "center",
     marginTop: 5,
     marginBottom: 16,
   },
-  help: { color: C.muted, fontSize: 16, lineHeight: 24 },
+  help: { color: C.muted, fontSize: 14, lineHeight: 21 },
   label: {
     marginTop: 18,
     marginBottom: 7,
     color: C.ink,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
   },
   input: {
@@ -4832,7 +4837,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     color: C.ink,
     backgroundColor: C.white,
-    fontSize: 17,
+    fontSize: 16,
   },
   error: {
     marginTop: 12,
@@ -4840,7 +4845,7 @@ const s = StyleSheet.create({
     borderRadius: 15,
     color: C.red,
     backgroundColor: C.redSoft,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
   },
   setup: {
@@ -4961,7 +4966,7 @@ const s = StyleSheet.create({
     alignSelf: "center",
   },
   desktopNav:{width:"100%",maxWidth:1180,minHeight:70,alignSelf:"center",flexDirection:"row",paddingHorizontal:24,paddingTop:8,paddingBottom:8,borderTopWidth:0,borderBottomWidth:1,gap:6},
-  navItemSelected:{backgroundColor:"#F0F3F6",borderRadius:12},
+  navItemSelected:{borderWidth:1,borderRadius:12},
   floatingFeedback:{position:"absolute",right:14,bottom:84,zIndex:30,minHeight:44,paddingHorizontal:13,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:"rgba(255,255,255,.3)",borderRadius:22,backgroundColor:SECTION.support.color,shadowColor:"#0D1722",shadowOpacity:.2,shadowRadius:10,shadowOffset:{width:0,height:5},elevation:7},
   floatingFeedbackMobile:{width:46,height:46,minHeight:46,paddingHorizontal:0,borderRadius:23},
   floatingFeedbackDesktop:{right:24,bottom:22},
@@ -5127,13 +5132,13 @@ const s = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: -0.5,
   },
-  subtitle: { marginTop: 4, color: C.muted, fontSize: 16, lineHeight: 24 },
+  subtitle: { marginTop: 4, color: C.muted, fontSize: 15, lineHeight: 22 },
   scroll: { paddingBottom: 96 },
   quickScroll: { paddingHorizontal: 0, paddingTop: 12, paddingBottom: 96 },
   homeIntro:{paddingTop:10,paddingBottom:16,borderBottomWidth:1,borderBottomColor:C.border},
   overviewMetric:{flex:1,minWidth:130,padding:16,borderRadius:12,borderWidth:1,borderColor:C.border,backgroundColor:C.soft},
   overviewMetricLabel:{color:C.muted,fontSize:13,fontWeight:"500"},
-  overviewMetricValue:{marginTop:6,color:C.ink,fontSize:26,lineHeight:32,fontWeight:"600"},
+  overviewMetricValue:{marginTop:6,color:C.ink,fontSize:24,lineHeight:30,fontWeight:"700"},
   overviewMetricHelp:{marginTop:6,color:C.green,fontSize:12,lineHeight:17},
   homeEyebrow:{fontSize:11,lineHeight:16,fontWeight:"700",letterSpacing:2,color:C.muted},
   homeDesktopTitle:{fontSize:32,lineHeight:40,fontWeight:"600",letterSpacing:-.8},
@@ -5151,7 +5156,7 @@ const s = StyleSheet.create({
   homeReminder:{marginTop:16,minHeight:88,padding:14,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.records.border,borderRadius:16,backgroundColor:SECTION.records.soft},
   homeReminderIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:SECTION.records.color},
   homeReminderLabel:{color:SECTION.records.color,fontSize:12,fontWeight:"700",letterSpacing:.8},
-  homeReminderTitle:{marginTop:3,color:C.ink,fontSize:17,lineHeight:21,fontWeight:"700"},
+  homeReminderTitle:{marginTop:3,color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
   homeReminderMeta:{marginTop:3,color:C.muted,fontSize:12,fontWeight:"600"},
   saleTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   clearSaleButton: {
@@ -5220,7 +5225,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 14,
   },
-  quickTitle: { marginTop: 14, color: C.ink, fontSize: 17, lineHeight: 22, fontWeight: "700", letterSpacing:-.25 },
+  quickTitle: { marginTop: 14, color: C.ink, fontSize: 16, lineHeight: 21, fontWeight: "700", letterSpacing:-.2 },
   quickHelp: { marginTop: 6, flex: 1, color: C.muted, fontSize: 14, lineHeight: 20, fontWeight: "400" },
   quickGo: {
     minHeight: 26,
@@ -5267,36 +5272,38 @@ const s = StyleSheet.create({
   formStep:{marginTop:24,paddingTop:18,flexDirection:"row",alignItems:"flex-start",gap:11,borderTopWidth:1,borderTopColor:C.border},
   formStepNumber:{width:31,height:31,alignItems:"center",justifyContent:"center",borderRadius:16},
   formStepNumberText:{color:C.white,fontSize:13,fontWeight:"800"},
-  formStepTitle:{color:C.ink,fontSize:17,lineHeight:22,fontWeight:"700"},
+  formStepTitle:{color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
   formStepHelp:{marginTop:3,color:C.muted,fontSize:13,lineHeight:19},
   saleWelcomeOverlay:{flex:1,padding:20,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(13,23,34,.62)"},
   saleWelcomeCard:{width:"100%",maxWidth:430,padding:26,borderRadius:24,backgroundColor:C.white,shadowColor:"#000",shadowOpacity:.18,shadowRadius:24,shadowOffset:{width:0,height:10},elevation:8},
   saleWelcomeIcon:{width:58,height:58,marginBottom:20,alignItems:"center",justifyContent:"center",borderRadius:18,backgroundColor:C.green},
   saleWelcomeTitle:{color:C.ink,fontSize:29,lineHeight:35,fontWeight:"700",letterSpacing:-.7},
-  saleWelcomeDate:{marginTop:7,color:C.accent,fontSize:17,lineHeight:24,fontWeight:"700"},
-  saleWelcomeHelp:{marginTop:8,marginBottom:20,color:C.muted,fontSize:15,lineHeight:22},
+  saleWelcomeDate:{marginTop:7,color:C.accent,fontSize:16,lineHeight:22,fontWeight:"700"},
+  saleWelcomeHelp:{marginTop:8,marginBottom:20,color:C.muted,fontSize:14,lineHeight:21},
   saleWelcomePrimary:{minHeight:58,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderRadius:15,backgroundColor:C.green},
   saleWelcomePrimaryText:{color:C.white,fontSize:16,fontWeight:"700"},
   saleWelcomePrimaryHelp:{marginTop:2,color:"#DDE7F0",fontSize:13,fontWeight:"600"},
-  saleWelcomeSecondary:{minHeight:56,marginTop:10,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderWidth:1,borderColor:C.accent,borderRadius:15,backgroundColor:C.white},
-  saleWelcomeSecondaryText:{color:C.accent,fontSize:16,fontWeight:"700"},
-  saleWelcomeSecondaryHelp:{marginTop:2,color:C.ink,fontSize:12,lineHeight:17},
+  saleWelcomeSecondary:{minHeight:88,marginTop:12,padding:14,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.production.border,borderRadius:15,backgroundColor:SECTION.production.soft},
+  saleWelcomeSecondaryIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:SECTION.production.color},
+  saleWelcomeSecondaryText:{color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
+  saleWelcomeSecondaryMode:{marginTop:1,color:SECTION.production.color,fontSize:13,lineHeight:18,fontWeight:"700"},
+  saleWelcomeSecondaryHelp:{marginTop:3,color:C.muted,fontSize:12,lineHeight:17},
   saleWelcomeLater:{minHeight:44,marginTop:7,alignItems:"center",justifyContent:"center"},
   saleWelcomeLaterText:{color:C.muted,fontSize:14,fontWeight:"600"},
   sellTodayCard:{marginBottom:18,padding:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   sellTodayLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.6},
-  sellTodayDate:{marginTop:3,color:C.ink,fontSize:15,fontWeight:"700"},
+  sellTodayDate:{marginTop:3,color:C.ink,fontSize:14,fontWeight:"700"},
   saleDateBar:{marginBottom:14,paddingVertical:11,paddingHorizontal:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
   saleDateBarLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.45},
   saleDateBarValue:{marginTop:2,color:C.ink,fontSize:14,fontWeight:"700"},
   sellModeCard:{minHeight:88,marginTop:12,padding:16,flexDirection:"row",alignItems:"center",gap:14,borderWidth:1,borderColor:C.border,borderRadius:12},
   sellModeIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:10},
-  sellModeTitle:{color:C.ink,fontSize:17,lineHeight:22,fontWeight:"600"},
+  sellModeTitle:{color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
   sellModeHelp:{marginTop:4,color:C.muted,fontSize:13,lineHeight:19},
   earlierSale:{minHeight:72,marginTop:14,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   missedSaleFeature:{minHeight:112,marginTop:14,marginBottom:24,padding:16,flexDirection:"row",alignItems:"center",gap:13,borderWidth:1.5,borderColor:SECTION.records.border,borderRadius:18,backgroundColor:SECTION.records.soft},
   missedSaleFeatureIcon:{width:52,height:52,alignItems:"center",justifyContent:"center",borderRadius:15,backgroundColor:SECTION.records.color},
-  missedSaleFeatureTitle:{color:C.ink,fontSize:19,lineHeight:24,fontWeight:"700"},
+  missedSaleFeatureTitle:{color:C.ink,fontSize:18,lineHeight:23,fontWeight:"700"},
   missedSaleFeatureHelp:{marginTop:3,color:C.muted,fontSize:14,lineHeight:20},
   missedSaleFeatureAction:{marginTop:8,color:SECTION.records.color,fontSize:12,fontWeight:"800",letterSpacing:.8},
   salesRecordHeading:{marginTop:28,color:SECTION.records.color,fontSize:18,lineHeight:24,fontWeight:"700"},
@@ -5342,7 +5349,7 @@ const s = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: C.white,
   },
-  searchInput: { flex: 1, minHeight: 52, color: C.ink, fontSize: 17 },
+  searchInput: { flex: 1, minHeight: 52, color: C.ink, fontSize: 16 },
   chips: { minHeight: 60, gap: 9, alignItems: "center", paddingVertical: 9 },
   stockFilterLabel: {
     marginTop: 13,
@@ -5521,8 +5528,8 @@ const s = StyleSheet.create({
   },
   miniMissingText: {
     color: C.muted,
-    fontSize: 7,
-    lineHeight: 9,
+    fontSize: 9,
+    lineHeight: 11,
     fontWeight: "700",
     textAlign: "center",
   },
@@ -5548,7 +5555,7 @@ const s = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: C.red,
   },
-  saleBadgeText: { color: C.white, fontSize: 9, fontWeight: "700", letterSpacing: 0.7 },
+  saleBadgeText: { color: C.white, fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
   stockBadge: {
     position: "absolute",
     left: 7,
@@ -5559,7 +5566,7 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(13,31,45,0.88)",
   },
   stockBadgeLow: { backgroundColor: "rgba(121,34,56,0.92)" },
-  stockBadgeText: { color: C.white, fontSize: 10, fontWeight: "700" },
+  stockBadgeText: { color: C.white, fontSize: 11, fontWeight: "700" },
   productName: {
     minHeight: 34,
     color: C.ink,
@@ -5570,8 +5577,8 @@ const s = StyleSheet.create({
   productPrice: {
     marginTop: 1,
     color: C.dark,
-    fontSize: 21,
-    lineHeight: 25,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: "700",
     letterSpacing: -0.4,
   },
@@ -5707,7 +5714,7 @@ const s = StyleSheet.create({
   },
   choiceOn: { borderWidth: 2.5, borderColor: C.green, backgroundColor: C.soft },
   choiceDanger: { borderColor: C.red, backgroundColor: C.redSoft },
-  choiceText: { color: C.muted, fontSize: 15, fontWeight: "700" },
+  choiceText: { color: C.muted, fontSize: 14, fontWeight: "700" },
   bigButton: {
     minHeight: 62,
     marginTop: 18,
@@ -5724,7 +5731,7 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-  bigButtonText: { color: C.white, fontSize: 17, fontWeight: "700" },
+  bigButtonText: { color: C.white, fontSize: 16, fontWeight: "700" },
   safe: { marginTop: 11, color: C.muted, fontSize: 13, textAlign: "center" },
   hero: {
     marginTop: 16,
