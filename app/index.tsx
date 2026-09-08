@@ -1649,11 +1649,11 @@ function SaleScreen({
               </View>
             );
           })}
-          <View style={s.totalBox}>
+          <View style={[s.totalBox,width<600&&s.totalBoxMobile]}>
             <Text style={s.totalLabel}>Amount to collect</Text>
-            <Text style={s.totalValue}>{peso(total)}</Text>
+            <Text style={[s.totalValue,width<600&&s.totalValueMobile]}>{peso(total)}</Text>
           </View>
-          <Text style={s.section}>How did the customer pay?</Text>
+          <Text style={[s.section,width<600&&s.sectionMobile]}>How did the customer pay?</Text>
           <View style={s.choiceRow}>
             <Choice
               label="Cash"
@@ -1688,7 +1688,7 @@ function SaleScreen({
               </View>
               <TextInput
                 accessibilityLabel="Cash received"
-                style={s.cashInput}
+                style={[s.cashInput,width<600&&s.cashInputMobile]}
                 value={cashReceived}
                 onChangeText={setCashReceived}
                 placeholder="₱0"
@@ -1709,7 +1709,7 @@ function SaleScreen({
                       ? "CHANGE TO GIVE"
                       : "MORE CASH NEEDED"}
                 </Text>
-                <Text style={s.changeValue}>
+                <Text style={[s.changeValue,width<600&&s.changeValueMobile]}>
                   {cashReceived.trim() === ""
                     ? "Enter cash"
                     : cashIsEnough
@@ -2002,7 +2002,7 @@ function SaleScreen({
                   </Text>
                 </View>
               </View>
-              <Text style={s.productName} numberOfLines={2}>
+              <Text style={[s.productName,width>=700&&s.productNameDesktop]} numberOfLines={2}>
                 {item.name}
               </Text>
               <Text style={s.productPrice}>
@@ -5558,6 +5558,7 @@ const s = StyleSheet.create({
     lineHeight: 17,
     fontWeight: "700",
   },
+  productNameDesktop: { minHeight: 42, fontSize: 16, lineHeight: 21 },
   productPrice: {
     marginTop: 1,
     color: C.dark,
@@ -5672,8 +5673,10 @@ const s = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: C.dark,
   },
+  totalBoxMobile: { padding: 15 },
   totalLabel: { color: "#DDE4FF", fontSize: 15, fontWeight: "700" },
   totalValue: { marginTop: 5, color: C.white, fontSize: 34, fontWeight: "700" },
+  totalValueMobile: { fontSize: 28, lineHeight: 34 },
   section: {
     marginTop: 24,
     marginBottom: 9,
@@ -5681,6 +5684,7 @@ const s = StyleSheet.create({
     fontSize: 19,
     fontWeight: "700",
   },
+  sectionMobile: { marginTop: 20, fontSize: 18, lineHeight: 23 },
   choiceRow: { flexDirection: "row", gap: 10 },
   stockActionChoices: { gap: 9 },
   choice: {
@@ -6276,6 +6280,7 @@ const s = StyleSheet.create({
     fontSize: 28,
     fontWeight: "700",
   },
+  cashInputMobile: { minHeight: 60, fontSize: 24 },
   quickCashRow: { marginTop: 10, flexDirection: "row", gap: 8 },
   quickCash: {
     minHeight: 46,
@@ -6295,6 +6300,7 @@ const s = StyleSheet.create({
   },
   changeBoxShort: { backgroundColor: C.red },
   changeValue: { marginTop: 4, color: C.white, fontSize: 34, fontWeight: "700" },
+  changeValueMobile: { fontSize: 28, lineHeight: 34 },
   gcashHeading: { flexDirection: "row", alignItems: "center", gap: 11 },
   gcashIcon: {
     width: 48,
