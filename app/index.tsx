@@ -4163,12 +4163,30 @@ function ShopProfile({
 type ActivityLog = {
   id: number;
   business_id: string | null;
+  entity_id: string | null;
   actor_name: string;
   action: string;
   summary: string;
   details: Record<string, any>;
   created_at: string;
   business: { name: string } | null;
+};
+
+type OwnerOrderDetail = {
+  id: string;
+  order_number: number;
+  title: string;
+  customer_name: string | null;
+  source: string;
+  social_platform: string | null;
+  quantity: number;
+  total_price: number;
+  amount_paid: number;
+  payment_channel: string | null;
+  status: string;
+  target_date: string | null;
+  notes: string | null;
+  image_url: string | null;
 };
 
 function activityDetail(item: ActivityLog) {
@@ -4202,11 +4220,13 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
   const [loading, setLoading] = useState(true);
   const [shopId, setShopId] = useState("all");
   const [kind, setKind] = useState("all");
+  const [selectedOrder,setSelectedOrder]=useState<OwnerOrderDetail|null>(null);
+  const [orderLoading,setOrderLoading]=useState(false);
   useEffect(() => {
     setLoading(true);
     supabase
       .from("activity_logs")
-      .select("id,business_id,actor_name,action,summary,details,created_at,business:businesses(name)")
+      .select("id,business_id,entity_id,actor_name,action,summary,details,created_at,business:businesses(name)")
       .order("created_at", { ascending: false })
       .limit(300)
       .then(({ data, error }) => {
@@ -4220,6 +4240,14 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
     const kindOk = kind === "all" || (kind === "sales" ? item.action.startsWith("sale_") : kind === "products" ? item.action.startsWith("product_") || item.action === "stock_changed" : kind === "orders" ? item.action.startsWith("order_") : kind === "security" ? item.action.includes("password") || item.action.includes("passcode") : item.action === "login");
     return shopOk && kindOk;
   });
+  const openOrder=async(item:ActivityLog)=>{
+    if(!item.entity_id||!item.action.startsWith("order_"))return;
+    setOrderLoading(true);
+    const {data,error}=await supabase.from("external_orders").select("id,order_number,title,customer_name,source,social_platform,quantity,total_price,amount_paid,payment_channel,status,target_date,notes,image_url").eq("id",item.entity_id).maybeSingle();
+    setOrderLoading(false);
+    if(error||!data){Alert.alert("Order not available",error?.message??"This order could not be found.");return;}
+    setSelectedOrder(data as OwnerOrderDetail);
+  };
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -4245,7 +4273,7 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
         {loading ? <ActivityIndicator size="large" color={C.green} /> : visible.length ? visible.map((item) => {
           const detail = activityDetail(item);
           return (
-          <View key={item.id} style={s.activityRow}>
+          <Pressable key={item.id} disabled={!item.action.startsWith("order_")} accessibilityRole={item.action.startsWith("order_")?"button":undefined} accessibilityLabel={item.action.startsWith("order_")?`Open ${item.summary}`:undefined} style={s.activityRow} onPress={()=>void openOrder(item)}>
             <View style={s.activityIcon}><Ionicons name={activityIcon(item.action)} size={21} color={C.green} /></View>
             <View style={s.flex}>
               <Text style={s.activitySummary}>{item.summary}</Text>
@@ -4253,9 +4281,24 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
               <Text style={s.activityMeta}>{item.business?.name ?? "MIK owner account"} · {item.actor_name}</Text>
               <Text style={s.activityTime}>{new Date(item.created_at).toLocaleString("en-SG", { dateStyle: "medium", timeStyle: "short" })}</Text>
             </View>
-          </View>
+            {item.action.startsWith("order_")?<View style={s.activityOpen}><Text style={s.activityOpenText}>Open</Text><Ionicons name="chevron-forward" size={17} color={SECTION.orders.color}/></View>:null}
+          </Pressable>
         )}) : <View style={s.empty}><Ionicons name="time-outline" size={32} color={C.green} /><Text style={s.activityEmptyTitle}>No activity found</Text><Text style={s.activityEmptyText}>Try another shop or activity type.</Text></View>}
       </ScrollView>
+      {orderLoading?<View style={s.ownerOrderLoading}><ActivityIndicator color={SECTION.orders.color}/></View>:null}
+      <Modal visible={!!selectedOrder} transparent animationType="fade" onRequestClose={()=>setSelectedOrder(null)}>
+        <View style={s.modalShade}><ScrollView style={s.ownerOrderScroll} contentContainerStyle={s.ownerOrderModal}>
+          <View style={s.ownerOrderTop}><View style={s.flex}><Text style={s.kicker}>ORDER DETAILS</Text><Text style={s.ownerOrderNumber}>ORD-{selectedOrder?.order_number}</Text></View><Pressable accessibilityLabel="Close order" style={s.modalClose} onPress={()=>setSelectedOrder(null)}><Ionicons name="close" size={22} color={C.ink}/></Pressable></View>
+          {selectedOrder?.image_url?<Image source={{uri:selectedOrder.image_url}} style={s.ownerOrderImage}/>:null}
+          <Text style={s.ownerOrderTitle}>{selectedOrder?.title}</Text>
+          <Text style={s.ownerOrderCustomer}>{selectedOrder?.customer_name||"No customer name"} · {selectedOrder?.social_platform||selectedOrder?.source}</Text>
+          <View style={s.ownerOrderFacts}><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>QUANTITY</Text><Text style={s.ownerOrderValue}>{selectedOrder?.quantity}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>TOTAL</Text><Text style={s.ownerOrderValue}>{peso(Number(selectedOrder?.total_price||0))}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>BALANCE</Text><Text style={s.ownerOrderValue}>{peso(Math.max(0,Number(selectedOrder?.total_price||0)-Number(selectedOrder?.amount_paid||0)))}</Text></View></View>
+          <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Status</Text><Text style={s.ownerOrderLineValue}>{selectedOrder?.status.replaceAll("_"," ")}</Text></View>
+          <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Due date</Text><Text style={s.ownerOrderLineValue}>{selectedOrder?.target_date?friendlyLocalDate(selectedOrder.target_date):"Not set"}</Text></View>
+          <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Payment</Text><Text style={s.ownerOrderLineValue}>{selectedOrder?.amount_paid?`${peso(Number(selectedOrder.amount_paid))} · ${selectedOrder.payment_channel||"Method not set"}`:"No payment recorded"}</Text></View>
+          {selectedOrder?.notes?<View style={s.ownerOrderNotes}><Text style={s.ownerOrderLabel}>REMARKS</Text><Text style={s.ownerOrderNotesText}>{selectedOrder.notes}</Text></View>:null}
+        </ScrollView></View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -5026,6 +5069,23 @@ const s = StyleSheet.create({
   activityDetail:{marginTop:4,color:C.ink,fontSize:12,lineHeight:18},
   activityMeta:{marginTop:5,color:C.muted,fontSize:12,fontWeight:"600"},
   activityTime:{marginTop:3,color:C.muted,fontSize:12},
+  activityOpen:{alignSelf:"center",marginLeft:8,flexDirection:"row",alignItems:"center",gap:2},
+  activityOpenText:{color:SECTION.orders.color,fontSize:12,fontWeight:"700"},
+  ownerOrderLoading:{position:"absolute",left:0,right:0,top:0,bottom:0,zIndex:40,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(255,255,255,.6)"},
+  modalShade:{flex:1,padding:18,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(23,25,28,.58)"},
+  ownerOrderScroll:{width:"100%",maxWidth:560,maxHeight:"88%",borderRadius:20,backgroundColor:C.white},
+  ownerOrderModal:{padding:22},
+  ownerOrderTop:{flexDirection:"row",alignItems:"center",gap:12},
+  modalClose:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:21,backgroundColor:C.soft},
+  ownerOrderNumber:{marginTop:3,color:SECTION.orders.color,fontSize:20,fontWeight:"700"},
+  ownerOrderImage:{width:"100%",height:210,marginTop:16,borderRadius:14,resizeMode:"contain",backgroundColor:C.soft},
+  ownerOrderTitle:{marginTop:17,color:C.ink,fontSize:24,lineHeight:30,fontWeight:"700"},
+  ownerOrderCustomer:{marginTop:5,color:C.muted,fontSize:14,lineHeight:20},
+  ownerOrderFacts:{marginTop:16,paddingVertical:13,flexDirection:"row",gap:8,borderTopWidth:1,borderBottomWidth:1,borderColor:C.border},
+  ownerOrderFact:{flex:1,minWidth:0},ownerOrderLabel:{color:C.muted,fontSize:11,fontWeight:"700",letterSpacing:.6},ownerOrderValue:{marginTop:4,color:C.ink,fontSize:16,fontWeight:"700"},
+  ownerOrderLine:{minHeight:44,flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:16,borderBottomWidth:1,borderBottomColor:C.border},
+  ownerOrderLineLabel:{color:C.muted,fontSize:14},ownerOrderLineValue:{flexShrink:1,color:C.ink,fontSize:14,fontWeight:"700",textAlign:"right",textTransform:"capitalize"},
+  ownerOrderNotes:{marginTop:14,padding:13,borderRadius:12,backgroundColor:SECTION.orders.soft},ownerOrderNotesText:{marginTop:5,color:C.ink,fontSize:14,lineHeight:21},
   activityEmptyTitle:{color:C.ink,fontSize:18,fontWeight:"700"},
   activityEmptyText:{color:C.muted,fontSize:13,textAlign:"center"},
   deviceNameButton:{minHeight:70,marginTop:12,paddingHorizontal:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
