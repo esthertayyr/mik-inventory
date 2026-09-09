@@ -611,7 +611,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
                 <View style={s.shopAvatar}><Ionicons name="storefront" size={24} color={C.green} /></View>
                 <View style={s.flex}>
                   <Text style={s.rowTitle}>{shop.name}</Text>
-                  <Text style={s.rowHelp}><Ionicons name="person-circle-outline" size={14} color={C.muted} />{" "}{shop.slug === "sebu3d" ? "pixelbug" : shop.login_username ?? "No username connected"}</Text>
+                  <Text style={s.adminShopUsername}>@{shop.slug === "sebu3d" ? "pixelbug" : shop.login_username ?? "No username connected"}</Text>
                   <Text style={s.adminLastLogin}>{shop.last_login ? `Last login: ${friendlyDateTime(shop.last_login)}` : "No login recorded yet"}</Text>
                 </View>
                 <View style={[s.statusPill, shop.status !== "active" && s.statusPillPaused]}><Text style={[s.statusText, shop.status !== "active" && s.statusTextPaused]}>{shop.status === "active" ? "ACTIVE" : "PAUSED"}</Text></View>
@@ -620,7 +620,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Manage ${shop.name}`}
-                style={[s.adminShopAction,s.adminShopActionHalf]}
+                style={[s.adminShopAction,s.adminShopActionHalf,width<620&&s.adminShopActionMobile]}
                 onPress={() => setActionShop(shop)}
               >
                 <Ionicons name="options-outline" size={21} color={C.green} /><Text style={s.adminShopActionText}>Manage shop</Text>
@@ -628,7 +628,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${shop.name}`}
-                style={[s.adminShopAction,s.adminShopActionHalf,s.adminShopActionPrimary]}
+                style={[s.adminShopAction,s.adminShopActionHalf,s.adminShopActionPrimary,width<620&&s.adminShopActionMobile]}
                 onPress={() => setOpenShop(shop)}
               >
                 <Ionicons name="enter-outline" size={21} color={C.white} /><Text style={[s.adminShopActionText, { color: C.white }]}>Open shop</Text>
@@ -5176,16 +5176,16 @@ const s = StyleSheet.create({
   copyStockTitle:{color:C.ink,fontSize:14,fontWeight:"700"},
   copyStockHelp:{marginTop:3,color:C.muted,fontSize:12},
   adminShop: {
-    minHeight: 76,
-    marginBottom: 9,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
+    marginBottom: 12,
+    padding: 16,
     borderWidth: 1,
-    borderColor: C.border,
-    borderRadius: 15,
+    borderColor: "#DCE1E9",
+    borderRadius: 16,
     backgroundColor: C.white,
+    shadowColor:C.ink,
+    shadowOpacity:.035,
+    shadowRadius:10,
+    shadowOffset:{width:0,height:4},
   },
   shopAvatar: {
     width: 48,
@@ -5260,14 +5260,15 @@ const s = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: C.white,
   },
-  adminShopTop:{flexDirection:"row",alignItems:"center",gap:11},
-  adminShopActions:{paddingTop:12,flexDirection:"row",flexWrap:"wrap",gap:10,borderTopWidth:1,borderTopColor:C.border},
-  adminShopAction:{flexGrow:1,flexShrink:1,flexBasis:150,minWidth:130,minHeight:48,paddingHorizontal:12,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:10,backgroundColor:C.soft},
-  adminShopActionsMobile:{flexWrap:"wrap",gap:9},
-  adminShopActionMobile:{flexGrow:1,flexShrink:1,flexBasis:"46%",minWidth:130,minHeight:50,paddingHorizontal:10},
+  adminShopTop:{flexDirection:"row",alignItems:"center",gap:12,minWidth:0},
+  adminShopActions:{marginTop:14,paddingTop:14,flexDirection:"row",gap:10,borderTopWidth:1,borderTopColor:C.border},
+  adminShopAction:{flex:1,minWidth:0,minHeight:46,paddingHorizontal:12,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},
+  adminShopActionsMobile:{flexDirection:"column",gap:8},
+  adminShopActionMobile:{width:"100%",flexGrow:0,flexBasis:"auto",minHeight:48},
   adminShopActionPrimary:{backgroundColor:C.green},
   adminShopActionHalf:{flexBasis:"48%"},
   adminShopActionText:{color:C.dark,fontSize:12,fontWeight:"700"},
+  adminShopUsername:{marginTop:2,color:C.green,fontSize:13,lineHeight:18,fontWeight:"700"},
   adminLastLogin:{marginTop:3,color:C.muted,fontSize:12},
   staffPermissionGrid:{marginTop:8,gap:8},
   staffPermissionCard:{minHeight:64,padding:12,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.white},
