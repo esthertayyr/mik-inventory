@@ -54,7 +54,7 @@ type Form = {
   past_order_progress:"in_progress"|"completed";
 };
 
-const C = { ink: "#111522", muted: "#626A78", navy: "#29315C", blue: "#365D8C", green: "#1B685C", ruby: "#8A365B", amber: "#8B6332", border: "#E3E5EA", pale: "#F5F6F9", white: "#FFF" };
+const C = { ink: "#111522", muted: "#626A78", navy: "#594C8D", blue: "#365D8C", green: "#1B685C", ruby: "#8A365B", amber: "#8B6332", border: "#E3E5EA", pale: "#F5F4F9", white: "#FFF" };
 const isoDate = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 const displayDate = (value: string | null) => {
   if (!value) return "";

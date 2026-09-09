@@ -8,7 +8,7 @@ import { peso } from "@/src/lib/format";
 import { Text, TextInput } from "./AppTypography";
 
 type Expense={id:string;expense_date:string;description:string;category:string;amount:number;payment_method:string;notes:string|null;created_at:string};
-const C={ink:"#111522",muted:"#626A78",navy:"#365D8C",ruby:"#8A365B",border:"#E3E5EA",soft:"#F5F6F9",white:"#FFF"};
+const C={ink:"#111522",muted:"#626A78",navy:"#8A365B",ruby:"#8A365B",border:"#E7DCE2",soft:"#FAF4F7",white:"#FFF"};
 const categories=["Shop","Product","Personal","Transport","Bills","Other"];
 const payments=[["cash","Cash"],["gcash","GCash"],["bank","Bank"],["other","Other"]] as const;
 const today=()=>new Date().toLocaleDateString("en-CA");

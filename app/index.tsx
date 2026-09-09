@@ -4431,6 +4431,9 @@ const guideSteps: GuideStep[] = [
 
 function WhatsNewModal({visible,onClose,onFeedback}:{visible:boolean;onClose:()=>void;onFeedback:()=>void}){
   const updates=[
+    {icon:"grid-outline" as Icon,title:"Clearer owner dashboard",text:"Money, urgent work, platform tools and shop profiles are now grouped into a responsive control centre."},
+    {icon:"checkmark-done-outline" as Icon,title:"Payment follow-up history",text:"Mark downpayment follow-ups and keep the person and time on the customer order."},
+    {icon:"images-outline" as Icon,title:"Missing-photo reminders",text:"Home now shows when products or orders still need a recognisable photo."},
     {icon:"people-outline" as Icon,title:"Enquiries before confirmed orders",text:"Save interested customers, set a follow-up date, then turn an enquiry into an order when they confirm."},
     {icon:"calendar-outline" as Icon,title:"Today or this month",text:"Switch the Home overview between today’s figures and the current month."},
     {icon:"card-outline" as Icon,title:"Order payments in reports",text:"Downpayments and final payments are recorded by payment date and included in sales reports."},

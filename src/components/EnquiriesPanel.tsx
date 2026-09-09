@@ -7,7 +7,7 @@ import { peso } from "@/src/lib/format";
 
 export type Enquiry={id:string;title:string;customer_name:string|null;customer_contact:string|null;source:string;estimated_value:number|null;follow_up_date:string|null;notes:string|null;status:"open"|"converted"|"lost";created_at:string};
 type Form={title:string;customer_name:string;customer_contact:string;source:string;estimated_value:string;follow_up_date:string;notes:string};
-const C={ink:"#111522",muted:"#626A78",navy:"#29315C",green:"#1B685C",ruby:"#8A365B",border:"#E3E5EA",soft:"#F5F6F9",white:"#FFF"};
+const C={ink:"#111522",muted:"#626A78",navy:"#594C8D",green:"#1B685C",ruby:"#8A365B",border:"#E3E5EA",soft:"#F5F4F9",white:"#FFF"};
 const empty=():Form=>({title:"",customer_name:"",customer_contact:"",source:"Facebook",estimated_value:"",follow_up_date:"",notes:""});
 const display=(value:string|null)=>value?value.slice(0,10).replace(/^(\d{4})-(\d{2})-(\d{2})$/,"$3-$2-$1"):"";
 const parse=(value:string)=>{if(!value.trim())return null;const m=value.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);if(!m)return undefined;const iso=`${m[3]}-${m[2]}-${m[1]}`;return Number.isNaN(new Date(`${iso}T12:00:00`).getTime())?undefined:iso};
