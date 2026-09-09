@@ -29,13 +29,13 @@ type Job = {
 };
 type Printer = { id: string; name: string; status: string };
 const C = {
-  ink: "#101318",
-  muted: "#626A73",
-  production: "#65243A",
-  soft: "#F8F1F3",
-  border: "#E8D8DE",
+  ink: "#111522",
+  muted: "#626A78",
+  production: "#8A365B",
+  soft: "#FAF5F8",
+  border: "#E8DDE3",
   white: "#FFF",
-  green: "#264A3B",
+  green: "#1B685C",
 };
 const steps: Array<{ id: Status; label: string; help: string }> = [
   { id: "to_print", label: "To print", help: "Waiting to be made" },

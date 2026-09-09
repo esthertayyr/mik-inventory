@@ -558,16 +558,23 @@ export function ReportsScreen({
         <>
           {correctionMode ? null : <>
           <View style={s.hero}>
-            <Text style={s.heroLabel}>TOTAL MONEY RECEIVED</Text>
-            <Text style={s.heroValue}>{peso(moneyReceived)}</Text>
+            <Text style={s.heroLabel}>MONEY LEFT AFTER EXPENSES</Text>
+            <Text style={s.heroValue}>{peso(afterExpenses)}</Text>
+            <Text style={s.heroHelp}>{peso(moneyReceived)} received · {peso(expenseTotal)} spent</Text>
           </View>
+          <Text style={s.groupLabel}>MONEY</Text>
           <View style={s.grid}>
             <Stat label="Shop sales" value={peso(total)} />
             <Stat label="Order payments" value={peso(orderPaymentTotal)} />
             <Stat label="Expenses" value={peso(expenseTotal)} />
-            <Stat label="Money after expenses" value={peso(afterExpenses)} />
+          </View>
+          <Text style={s.groupLabel}>PAYMENT METHODS</Text>
+          <View style={s.grid}>
             <Stat label="Cash" value={peso(cash)} />
             <Stat label="GCash" value={peso(gcash)} />
+          </View>
+          <Text style={s.groupLabel}>SALES ACTIVITY</Text>
+          <View style={s.grid}>
             <Stat label="Transactions" value={String(completed.length)} />
             <Stat label="Items sold" value={String(itemsSold)} />
             <Stat label="Damaged" value={String(damaged)} />
@@ -810,9 +817,11 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: "#16283A",
   },
-  hero: { padding: 22, borderRadius: 16, backgroundColor: "#51456F" },
+  hero: { padding: 22, borderRadius: 16, backgroundColor: "#29315C" },
   heroLabel: { color: "#DDE8F1", fontWeight: "700" },
   heroValue: { color: "#FFF", fontSize: 34, fontWeight: "700", marginTop: 5 },
+  heroHelp: { color: "#E3E6F2", fontSize: 13, fontWeight: "600", marginTop: 6 },
+  groupLabel: { marginTop: 18, marginBottom: -2, color: "#626A78", fontSize: 11, fontWeight: "700", letterSpacing: 1.1 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 9, marginTop: 10 },
   stat: {
     width: "48%",

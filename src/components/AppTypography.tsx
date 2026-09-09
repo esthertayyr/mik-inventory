@@ -18,10 +18,8 @@ const nearestSize = (value?: number) => {
 };
 const normalized = (style: TextProps["style"]): TextStyle => {
   const flat = StyleSheet.flatten(style) ?? {};
-  const numericWeight = Number(flat.fontWeight);
   return {
     fontSize: nearestSize(typeof flat.fontSize === "number" ? flat.fontSize : undefined),
-    fontWeight: Number.isFinite(numericWeight) && numericWeight >= 600 ? "700" : flat.fontWeight,
   };
 };
 

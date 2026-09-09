@@ -90,32 +90,32 @@ function greetingForNow() {
 }
 
 const C = {
-  ink: "#101318",
-  muted: "#626A73",
-  green: "#142C47",
-  dark: "#0D1722",
-  soft: "#F6F7F8",
-  accent: "#264A3B",
-  accentDark: "#193529",
-  accentSoft: "#F3F6F4",
-  teal: "#29465B",
-  tealSoft: "#F3F5F7",
-  purple: "#65243A",
-  purpleSoft: "#F8F4F5",
+  ink: "#111522",
+  muted: "#626A78",
+  green: "#29315C",
+  dark: "#11162B",
+  soft: "#F5F6F9",
+  accent: "#1B685C",
+  accentDark: "#124C43",
+  accentSoft: "#EDF6F3",
+  teal: "#365D8C",
+  tealSoft: "#EFF3F8",
+  purple: "#594C8D",
+  purpleSoft: "#F2F0F8",
   cream: "#FFFFFF",
   white: "#FFFFFF",
-  border: "#E0E3E7",
+  border: "#E0E3EA",
   orange: "#7A315A",
   orangeSoft: "#FAF1F6",
   red: "#65243A",
   redSoft: "#F8F4F5",
 };
 const SECTION = {
-  sales: { color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB" },
-  orders: { color: "#142C47", soft: "#EEF3F8", border: "#D6E1EB" },
-  stock: { color: "#264A3B", soft: "#F0F5F2", border: "#D6E3DC" },
-  production: { color: "#65243A", soft: "#F8F1F3", border: "#E8D8DE" },
-  records: { color: "#51456F", soft: "#F4F2F8", border: "#DED9E8" },
+  sales: { color: "#29315C", soft: "#F0F2F8", border: "#D9DDEA" },
+  orders: { color: "#594C8D", soft: "#F3F1F8", border: "#DFDAEB" },
+  stock: { color: "#1B685C", soft: "#EEF6F3", border: "#D3E6DF" },
+  production: { color: "#8A365B", soft: "#F8F0F4", border: "#EACFDA" },
+  records: { color: "#365D8C", soft: "#EFF3F8", border: "#D5E0EB" },
   settings: { color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3" },
   support: { color: "#5A405F", soft: "#F7F3F8", border: "#E5DCE7" },
 } as const;
@@ -1282,6 +1282,8 @@ function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceU
 }
 
 function StockStart({businessId,locationId,onOpen}:{businessId:string;locationId:string;onOpen:(screen:Screen)=>void}) {
+  const {width}=useWindowDimensions();
+  const compact=width<680;
   const [lastCheck,setLastCheck]=useState<string|null>(null);
   useEffect(()=>{supabase.from("stock_checks").select("checked_on").eq("location_id",locationId).order("checked_on",{ascending:false}).limit(1).maybeSingle().then(({data})=>setLastCheck(data?.checked_on??null));},[locationId]);
   const markChecked=async()=>{const {data:{user}}=await supabase.auth.getUser();const {error}=await supabase.from("stock_checks").insert({business_id:businessId,location_id:locationId,checked_by:user?.id});if(error)return Alert.alert("Stock count not saved",error.message);setLastCheck(localDateKey());Alert.alert("Stock count saved","MIK will remind the team again in 14 days.");};
@@ -1294,7 +1296,11 @@ function StockStart({businessId,locationId,onOpen}:{businessId:string;locationId
       <WorkspaceAction title="Manage products" help="Edit products, photos, prices and categories" icon="pricetags-outline" color={SECTION.stock.color} onPress={()=>onOpen("products")}/>
       <WorkspaceAction title="Customer price list" help="View or print your product prices" icon="receipt-outline" color={SECTION.stock.color} onPress={()=>onOpen("price_list")}/>
     </ToolGrid>
-    <View style={s.editCard}><Text style={s.editName}>Regular stock count</Text><Text style={s.rowHelp}>{lastCheck?`Last completed ${friendlyLocalDate(lastCheck)}.`:"No full stock count has been recorded."} Count products and A–Z keycaps, then mark it done.</Text><BigButton label="Mark stock count done" icon="checkmark-circle-outline" color={SECTION.stock.color} onPress={()=>void markChecked()}/></View>
+    <View style={[s.stockCountBar,compact&&s.stockCountBarMobile]}>
+      <View style={s.stockCountIcon}><Ionicons name="calendar-outline" size={22} color={SECTION.stock.color}/></View>
+      <View style={s.flex}><Text style={s.stockCountTitle}>Stock count reminder</Text><Text style={s.stockCountHelp}>{lastCheck?`Last counted ${friendlyLocalDate(lastCheck)}.`:"Not counted yet."} Count everything, then mark it done.</Text></View>
+      <Pressable accessibilityRole="button" style={[s.stockCountButton,compact&&s.stockCountButtonMobile]} onPress={()=>void markChecked()}><Ionicons name="checkmark" size={18} color={C.white}/><Text style={s.stockCountButtonText}>Count completed</Text></Pressable>
+    </View>
   </ScrollView>;
 }
 
@@ -5925,6 +5931,14 @@ const s = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: C.white,
   },
+  stockCountBar:{width:"100%",marginTop:12,padding:14,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:14,backgroundColor:SECTION.stock.soft},
+  stockCountBarMobile:{alignItems:"stretch",flexWrap:"wrap"},
+  stockCountIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.white},
+  stockCountTitle:{color:C.ink,fontSize:15,lineHeight:20,fontWeight:"700"},
+  stockCountHelp:{marginTop:2,color:C.muted,fontSize:13,lineHeight:18},
+  stockCountButton:{minHeight:42,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:6,borderRadius:10,backgroundColor:SECTION.stock.color},
+  stockCountButtonMobile:{width:"100%"},
+  stockCountButtonText:{color:C.white,fontSize:13,fontWeight:"700"},
   requiredNote:{marginBottom:14,padding:13,flexDirection:"row",alignItems:"flex-start",gap:9,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:12,backgroundColor:SECTION.stock.soft},
   requiredNoteText:{flex:1,color:C.muted,fontSize:13,lineHeight:19},
   requiredNoteStrong:{color:C.ink,fontWeight:"700"},

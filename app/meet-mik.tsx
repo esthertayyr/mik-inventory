@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
+  Animated,
   Image,
   Platform,
   Pressable,
@@ -15,16 +16,17 @@ import {
 } from "react-native";
 
 const C = {
-  ink: "#101318",
-  muted: "#626A73",
-  navy: "#142C47",
-  green: "#264A3B",
-  ruby: "#65243A",
-  paleBlue: "#F2F5F7",
-  paleGreen: "#F3F6F4",
+  ink: "#11131A",
+  muted: "#626873",
+  navy: "#202747",
+  green: "#245348",
+  ruby: "#8A365B",
+  violet: "#594C8D",
+  paleBlue: "#F0F2F8",
+  paleGreen: "#EEF5F2",
   paleRuby: "#F8F4F5",
-  soft: "#F6F7F8",
-  border: "#E0E3E7",
+  soft: "#F5F5F7",
+  border: "#E3E4E8",
   white: "#FFFFFF",
 };
 
@@ -40,9 +42,15 @@ const features: { icon: IconName; title: string; body: string }[] = [
   { icon: "storefront-outline", title: "Shop and event sales", body: "Use normal checkout in the shop or faster selling at markets and pop-ups." },
   { icon: "images-outline", title: "Visual product selection", body: "Cashiers match products using clear photographs instead of codes." },
   { icon: "calendar-outline", title: "Missed sales", body: "Choose the original date first, then record the products and payment type." },
-  { icon: "receipt-outline", title: "Customer orders", body: "Track downpayments, order progress, balance and where the order came from." },
+  { icon: "receipt-outline", title: "Customer orders", body: "Track order photos, payment dates, downpayments, balances and collection." },
   { icon: "hardware-chip-outline", title: "Production overview", body: "See printer condition and keep a simple record of filament supplies." },
-  { icon: "download-outline", title: "Excel-ready reports", body: "Export daily, weekly or monthly sales in a familiar format." },
+  { icon: "download-outline", title: "Complete reports", body: "See shop sales, order payments and expenses by day, week or month." },
+];
+
+const flow: { number:string; icon:IconName; title:string; body:string }[] = [
+  {number:"01",icon:"cart-outline",title:"Sell",body:"Choose a product and confirm payment."},
+  {number:"02",icon:"layers-outline",title:"Make",body:"Follow paid orders through the print queue."},
+  {number:"03",icon:"bag-check-outline",title:"Collect",body:"Receive the final payment and hand it over."},
 ];
 
 function WebAppButton({ light = false }: { light?: boolean }) {
@@ -93,12 +101,20 @@ export default function MeetMik() {
   const { width } = useWindowDimensions();
   const compact = width < 760;
   const narrow = width < 480;
+  const reveal = useRef(new Animated.Value(0)).current;
+  const float = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (Platform.OS !== "web") return;
     const previousTitle = document.title;
     document.title = "Meet MIK · Simple Shopkeeping";
     return () => { document.title = previousTitle; };
   }, []);
+  useEffect(()=>{
+    Animated.timing(reveal,{toValue:1,duration:720,useNativeDriver:true}).start();
+    const loop=Animated.loop(Animated.sequence([Animated.timing(float,{toValue:1,duration:2200,useNativeDriver:true}),Animated.timing(float,{toValue:0,duration:2200,useNativeDriver:true})]));
+    loop.start(); return ()=>loop.stop();
+  },[reveal,float]);
+  const revealStyle={opacity:reveal,transform:[{translateY:reveal.interpolate({inputRange:[0,1],outputRange:[22,0]})}]};
   return (
     <SafeAreaView style={s.page}>
       <Stack.Screen options={{ title: "Meet MIK · Simple Shopkeeping" }} />
@@ -114,18 +130,20 @@ export default function MeetMik() {
           </View>
         </View>
 
-        <View style={[s.hero,compact&&s.heroCompact]}>
+        <Animated.View style={[s.hero,compact&&s.heroCompact,revealStyle]}>
           <View style={[s.heroCopy,compact&&s.heroCopyCompact]}>
             <View style={s.eyebrow}><View style={s.eyebrowDot}/><Text style={s.eyebrowText}>SHOPKEEPING MADE CALM</Text></View>
-            <Text style={[s.heroTitle,compact&&s.heroTitleCompact]}>Running a shop should feel simple.</Text>
-            <Text style={s.heroBody}>MIK keeps sales, stock and customer orders clear. Busy sellers always know what happened today and what to prepare next.</Text>
+            <Text style={[s.heroTitle,compact&&s.heroTitleCompact]}>Run your 3D printing shop without the confusion.</Text>
+            <Text style={s.heroBody}>MIK brings sales, customer payments, stock and printing work into one calm, visual workspace.</Text>
             <View style={[s.heroActions,narrow&&s.heroActionsNarrow]}><WebAppButton/><View style={s.comingSoon}><Ionicons name="phone-portrait-outline" size={18} color={C.muted}/><Text style={s.comingSoonText}>iOS & Android coming later</Text></View></View>
             <View style={s.heroChecks}><View style={s.heroCheck}><Ionicons name="checkmark-circle" size={18} color={C.green}/><Text style={s.heroCheckText}>Plain English</Text></View><View style={s.heroCheck}><Ionicons name="checkmark-circle" size={18} color={C.green}/><Text style={s.heroCheckText}>Mobile first</Text></View><View style={s.heroCheck}><Ionicons name="checkmark-circle" size={18} color={C.green}/><Text style={s.heroCheckText}>Excel ready</Text></View></View>
           </View>
-          <View style={[s.heroVisual,compact&&s.heroVisualCompact]}><View style={s.heroCircleOne}/><View style={s.heroCircleTwo}/><PhonePreview/></View>
-        </View>
+          <View style={[s.heroVisual,compact&&s.heroVisualCompact]}><View style={s.heroGrid}/><View style={s.heroCircleOne}/><PhonePreview/><Animated.View style={[s.floatingNote,{transform:[{translateY:float.interpolate({inputRange:[0,1],outputRange:[0,-10]})}]}]}><Text style={s.floatingLabel}>TODAY</Text><Text style={s.floatingValue}>Everything accounted for.</Text></Animated.View></View>
+        </Animated.View>
 
         <View style={s.trustStrip}><View style={s.trustInner}><Text style={s.trustLead}>Made for real selling days.</Text><View style={s.trustItems}><Text style={s.trustItem}>SHOP COUNTERS</Text><Text style={s.trustDivider}>•</Text><Text style={s.trustItem}>POP-UP EVENTS</Text><Text style={s.trustDivider}>•</Text><Text style={s.trustItem}>SMALL TEAMS</Text></View></View></View>
+
+        <View style={s.flowSection}><Text style={s.sectionKicker}>ONE CLEAR WORKFLOW</Text><Text style={[s.sectionTitle,compact&&s.sectionTitleCompact]}>Sell. Make. Collect.</Text><View style={[s.flowGrid,compact&&s.stack]}>{flow.map((item,index)=><View key={item.number} style={[s.flowCard,compact&&s.full]}><View style={s.flowTop}><Text style={s.flowNumber}>{item.number}</Text><Ionicons name={item.icon} size={24} color={index===0?C.navy:index===1?C.violet:C.green}/></View><Text style={s.flowTitle}>{item.title}</Text><Text style={s.flowBody}>{item.body}</Text></View>)}</View></View>
 
         <View style={s.section}>
           <Text style={s.sectionKicker}>LESS GUESSING. MORE CLARITY.</Text>
@@ -157,7 +175,7 @@ export default function MeetMik() {
         <View style={s.closing}>
           <Image source={require("../assets/mik-app-icon.png")} style={s.closingLogo as any}/>
           <Text style={[s.closingTitle,compact&&s.sectionTitleCompact]}>Make every sale count.</Text>
-          <Text style={s.closingBody}>A calmer way to sell, count and understand your shop.</Text>
+          <Text style={s.closingBody}>Sales, orders, stock and production. Clear enough to understand at a glance.</Text>
           <WebAppButton light/>
           <Text style={s.closingNote}>MIK is currently available as a web application.</Text>
         </View>
@@ -170,10 +188,11 @@ export default function MeetMik() {
 
 const s = StyleSheet.create({
   page:{flex:1,backgroundColor:C.white},flex:{flex:1},full:{width:"100%"},stack:{flexDirection:"column"},
-  nav:{borderBottomWidth:1,borderBottomColor:"#EEF0F2",backgroundColor:"rgba(255,255,255,.97)"},navInner:{width:"100%",maxWidth:1180,minHeight:76,marginHorizontal:"auto",paddingHorizontal:24,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},brand:{flexDirection:"row",alignItems:"center",gap:10},brandLogo:{width:37,height:37,resizeMode:"contain"},brandWord:{color:C.ink,fontSize:21,fontWeight:"800",letterSpacing:3},navRight:{flexDirection:"row",alignItems:"center",gap:20},navNote:{color:C.muted,fontSize:13},navLogin:{minHeight:42,paddingHorizontal:19,alignItems:"center",justifyContent:"center",borderRadius:22,backgroundColor:C.ink},navLoginText:{color:C.white,fontSize:14,fontWeight:"700"},
-  hero:{width:"100%",maxWidth:1180,minHeight:700,marginHorizontal:"auto",paddingHorizontal:24,paddingVertical:70,flexDirection:"row",alignItems:"center",gap:40},heroCompact:{minHeight:0,paddingTop:48,paddingBottom:64,flexDirection:"column"},heroCopy:{width:"54%",maxWidth:620},heroCopyCompact:{width:"100%",maxWidth:680,alignItems:"center"},eyebrow:{alignSelf:"flex-start",paddingVertical:8,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:8,borderRadius:20,backgroundColor:C.paleGreen},eyebrowDot:{width:7,height:7,borderRadius:4,backgroundColor:C.green},eyebrowText:{color:C.green,fontSize:11,fontWeight:"800",letterSpacing:1.2},heroTitle:{marginTop:24,color:C.ink,fontSize:67,lineHeight:70,fontWeight:"700",letterSpacing:-3.2},heroTitleCompact:{maxWidth:650,textAlign:"center",fontSize:46,lineHeight:50,letterSpacing:-2},heroBody:{maxWidth:570,marginTop:25,color:C.muted,fontSize:19,lineHeight:30},heroActions:{marginTop:31,flexDirection:"row",alignItems:"center",gap:20},heroActionsNarrow:{width:"100%",flexDirection:"column",alignItems:"stretch"},primaryButton:{minHeight:56,paddingHorizontal:24,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:12,borderRadius:28,backgroundColor:C.navy},primaryButtonText:{color:C.white,fontSize:16,fontWeight:"700"},primaryButtonLight:{backgroundColor:C.white},primaryButtonTextDark:{color:C.navy},comingSoon:{flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7},comingSoonText:{color:C.muted,fontSize:13,fontWeight:"600"},heroChecks:{marginTop:27,flexDirection:"row",flexWrap:"wrap",gap:18},heroCheck:{flexDirection:"row",alignItems:"center",gap:6},heroCheckText:{color:C.ink,fontSize:13,fontWeight:"600"},heroVisual:{width:"42%",minHeight:570,alignItems:"center",justifyContent:"center"},heroVisualCompact:{width:"100%",minHeight:590,marginTop:14},heroCircleOne:{position:"absolute",width:470,height:470,borderRadius:235,backgroundColor:C.paleBlue},heroCircleTwo:{position:"absolute",right:10,bottom:35,width:180,height:180,borderRadius:90,backgroundColor:C.paleGreen},
-  phoneShadow:{padding:10,borderRadius:47,backgroundColor:"rgba(16,19,24,.08)",shadowColor:"#142C47",shadowOpacity:.2,shadowRadius:35,shadowOffset:{width:0,height:20},elevation:10},phone:{width:286,height:565,paddingHorizontal:18,paddingTop:14,borderWidth:7,borderColor:C.ink,borderRadius:39,backgroundColor:C.white,overflow:"hidden"},phoneTop:{height:23,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},phoneTime:{color:C.ink,fontSize:11,fontWeight:"700"},phoneSignals:{flexDirection:"row",alignItems:"center",gap:4},phoneBrand:{marginTop:16,flexDirection:"row",alignItems:"center",gap:9},phoneLogo:{width:34,height:34,borderRadius:11},phoneShop:{color:C.ink,fontSize:13,fontWeight:"700"},phoneLocation:{marginTop:2,color:C.muted,fontSize:9},phoneGreeting:{marginTop:25,color:C.ink,fontSize:28,lineHeight:32,fontWeight:"700",letterSpacing:-1.1},phoneDate:{marginTop:4,color:C.muted,fontSize:11},phoneCards:{marginTop:22,flexDirection:"row",flexWrap:"wrap",gap:8},phoneAction:{width:"48%",height:130,padding:12,borderRadius:17},phoneActionIcon:{width:38,height:38,alignItems:"center",justifyContent:"center",borderRadius:12},phoneActionTitle:{marginTop:13,color:C.ink,fontSize:14,fontWeight:"700"},phoneActionHelp:{marginTop:3,color:C.muted,fontSize:10},phoneNav:{position:"absolute",left:15,right:15,bottom:11,height:46,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"space-between",borderTopWidth:1,borderTopColor:C.border,backgroundColor:C.white},
+  nav:{borderBottomWidth:1,borderBottomColor:C.border,backgroundColor:"rgba(255,255,255,.97)"},navInner:{width:"100%",maxWidth:1180,minHeight:72,marginHorizontal:"auto",paddingHorizontal:24,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},brand:{flexDirection:"row",alignItems:"center",gap:10},brandLogo:{width:35,height:35,resizeMode:"contain"},brandWord:{color:C.ink,fontSize:20,fontWeight:"700",letterSpacing:2.5},navRight:{flexDirection:"row",alignItems:"center",gap:20},navNote:{color:C.muted,fontSize:14},navLogin:{minHeight:42,paddingHorizontal:20,alignItems:"center",justifyContent:"center",borderRadius:21,backgroundColor:C.ink},navLoginText:{color:C.white,fontSize:14,fontWeight:"600"},
+  hero:{width:"100%",maxWidth:1180,minHeight:700,marginHorizontal:"auto",paddingHorizontal:24,paddingVertical:72,flexDirection:"row",alignItems:"center",gap:46},heroCompact:{minHeight:0,paddingTop:48,paddingBottom:64,flexDirection:"column"},heroCopy:{width:"55%",maxWidth:650},heroCopyCompact:{width:"100%",maxWidth:680,alignItems:"center"},eyebrow:{alignSelf:"flex-start",paddingVertical:8,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:8,borderRadius:18,backgroundColor:C.paleGreen},eyebrowDot:{width:7,height:7,borderRadius:4,backgroundColor:C.green},eyebrowText:{color:C.green,fontSize:11,fontWeight:"700",letterSpacing:1.2},heroTitle:{marginTop:24,color:C.ink,fontSize:64,lineHeight:66,fontWeight:"600",letterSpacing:-2.9},heroTitleCompact:{maxWidth:650,textAlign:"center",fontSize:44,lineHeight:48,letterSpacing:-1.8},heroBody:{maxWidth:570,marginTop:25,color:C.muted,fontSize:18,lineHeight:29},heroActions:{marginTop:31,flexDirection:"row",alignItems:"center",gap:20},heroActionsNarrow:{width:"100%",flexDirection:"column",alignItems:"stretch"},primaryButton:{minHeight:54,paddingHorizontal:24,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:12,borderRadius:27,backgroundColor:C.navy},primaryButtonText:{color:C.white,fontSize:16,fontWeight:"600"},primaryButtonLight:{backgroundColor:C.white},primaryButtonTextDark:{color:C.navy},comingSoon:{flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7},comingSoonText:{color:C.muted,fontSize:13,fontWeight:"500"},heroChecks:{marginTop:27,flexDirection:"row",flexWrap:"wrap",gap:18},heroCheck:{flexDirection:"row",alignItems:"center",gap:6},heroCheckText:{color:C.ink,fontSize:13,fontWeight:"500"},heroVisual:{width:"41%",minHeight:570,alignItems:"center",justifyContent:"center",overflow:"visible"},heroVisualCompact:{width:"100%",minHeight:590,marginTop:14},heroGrid:{position:"absolute",width:480,height:480,borderWidth:1,borderColor:C.border,borderRadius:28,backgroundColor:C.soft,transform:[{rotate:"-4deg"}]},heroCircleOne:{position:"absolute",width:350,height:350,borderRadius:175,backgroundColor:C.paleBlue},heroCircleTwo:{position:"absolute",right:10,bottom:35,width:180,height:180,borderRadius:90,backgroundColor:C.paleGreen},floatingNote:{position:"absolute",right:-10,bottom:62,width:178,padding:15,borderWidth:1,borderColor:C.border,borderRadius:18,backgroundColor:C.white,shadowColor:C.ink,shadowOpacity:.08,shadowRadius:18,shadowOffset:{width:0,height:8}},floatingLabel:{color:C.violet,fontSize:10,fontWeight:"700",letterSpacing:1.2},floatingValue:{marginTop:5,color:C.ink,fontSize:14,lineHeight:19,fontWeight:"600"},
+  phoneShadow:{padding:10,borderRadius:47,backgroundColor:"rgba(16,19,24,.08)",shadowColor:"#29315C",shadowOpacity:.2,shadowRadius:35,shadowOffset:{width:0,height:20},elevation:10},phone:{width:286,height:565,paddingHorizontal:18,paddingTop:14,borderWidth:7,borderColor:C.ink,borderRadius:39,backgroundColor:C.white,overflow:"hidden"},phoneTop:{height:23,flexDirection:"row",alignItems:"center",justifyContent:"space-between"},phoneTime:{color:C.ink,fontSize:11,fontWeight:"700"},phoneSignals:{flexDirection:"row",alignItems:"center",gap:4},phoneBrand:{marginTop:16,flexDirection:"row",alignItems:"center",gap:9},phoneLogo:{width:34,height:34,borderRadius:11},phoneShop:{color:C.ink,fontSize:13,fontWeight:"700"},phoneLocation:{marginTop:2,color:C.muted,fontSize:9},phoneGreeting:{marginTop:25,color:C.ink,fontSize:28,lineHeight:32,fontWeight:"700",letterSpacing:-1.1},phoneDate:{marginTop:4,color:C.muted,fontSize:11},phoneCards:{marginTop:22,flexDirection:"row",flexWrap:"wrap",gap:8},phoneAction:{width:"48%",height:130,padding:12,borderRadius:17},phoneActionIcon:{width:38,height:38,alignItems:"center",justifyContent:"center",borderRadius:12},phoneActionTitle:{marginTop:13,color:C.ink,fontSize:14,fontWeight:"700"},phoneActionHelp:{marginTop:3,color:C.muted,fontSize:10},phoneNav:{position:"absolute",left:15,right:15,bottom:11,height:46,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"space-between",borderTopWidth:1,borderTopColor:C.border,backgroundColor:C.white},
   trustStrip:{backgroundColor:C.ink},trustInner:{width:"100%",maxWidth:1180,minHeight:104,marginHorizontal:"auto",paddingHorizontal:24,paddingVertical:25,alignItems:"center",justifyContent:"center"},trustLead:{color:C.white,fontSize:15,fontWeight:"700"},trustItems:{marginTop:12,flexDirection:"row",flexWrap:"wrap",alignItems:"center",justifyContent:"center",gap:12},trustItem:{color:"#CBD1D6",fontSize:11,fontWeight:"800",letterSpacing:1.5},trustDivider:{color:"#6D747B"},
+  flowSection:{width:"100%",maxWidth:1180,marginHorizontal:"auto",paddingHorizontal:24,paddingVertical:96,alignItems:"center"},flowGrid:{width:"100%",marginTop:45,flexDirection:"row",gap:14},flowCard:{width:"32.5%",minHeight:210,padding:22,borderWidth:1,borderColor:C.border,borderRadius:22,backgroundColor:C.white},flowTop:{flexDirection:"row",alignItems:"center",justifyContent:"space-between"},flowNumber:{color:"#A0A4AC",fontSize:12,fontWeight:"600",letterSpacing:1.2},flowTitle:{marginTop:35,color:C.ink,fontSize:24,fontWeight:"600",letterSpacing:-.5},flowBody:{marginTop:9,color:C.muted,fontSize:15,lineHeight:23},
   section:{width:"100%",maxWidth:1180,marginHorizontal:"auto",paddingHorizontal:24,paddingVertical:105,alignItems:"center"},sectionKicker:{color:C.green,fontSize:11,fontWeight:"800",letterSpacing:1.5},sectionTitle:{maxWidth:800,marginTop:15,color:C.ink,textAlign:"center",fontSize:49,lineHeight:55,fontWeight:"700",letterSpacing:-2},sectionTitleCompact:{fontSize:37,lineHeight:42,letterSpacing:-1.4},sectionIntro:{maxWidth:660,marginTop:18,color:C.muted,textAlign:"center",fontSize:17,lineHeight:27},benefitGrid:{width:"100%",marginTop:55,flexDirection:"row",gap:17},benefitCard:{width:"32.4%",minHeight:280,padding:28,borderWidth:1,borderColor:C.border,borderRadius:24,backgroundColor:C.white},benefitIcon:{width:52,height:52,alignItems:"center",justifyContent:"center",borderRadius:16},benefitTitle:{marginTop:25,color:C.ink,fontSize:22,lineHeight:27,fontWeight:"700",letterSpacing:-.5},benefitBody:{marginTop:11,color:C.muted,fontSize:15,lineHeight:23},
   storySection:{paddingVertical:100,backgroundColor:C.soft},storyInner:{width:"100%",maxWidth:1180,marginHorizontal:"auto",paddingHorizontal:24,flexDirection:"row",alignItems:"center",gap:60},storyCopy:{width:"43%"},storyTitle:{marginTop:14,color:C.ink,fontSize:47,lineHeight:52,fontWeight:"700",letterSpacing:-1.8},storyBody:{marginTop:20,color:C.muted,fontSize:17,lineHeight:27},storyPoint:{marginTop:27,flexDirection:"row",alignItems:"flex-start",gap:14},storyPointTitle:{color:C.ink,fontSize:16,fontWeight:"700"},storyPointBody:{marginTop:4,color:C.muted,fontSize:14,lineHeight:21},storyVisual:{width:"52%"},previewPanel:{padding:22,borderWidth:1,borderColor:C.border,borderRadius:25,backgroundColor:C.white,shadowColor:C.navy,shadowOpacity:.1,shadowRadius:28,shadowOffset:{width:0,height:14}},previewTop:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:12},previewKicker:{color:C.muted,fontSize:9,fontWeight:"800",letterSpacing:1.4},previewTitle:{marginTop:4,color:C.ink,fontSize:23,fontWeight:"700"},todayPill:{paddingVertical:7,paddingHorizontal:10,flexDirection:"row",alignItems:"center",gap:6,borderRadius:15,backgroundColor:C.paleGreen},todayDot:{width:7,height:7,borderRadius:4,backgroundColor:C.green},todayPillText:{color:C.green,fontSize:9,fontWeight:"700"},previewCategories:{marginTop:21,flexDirection:"row",gap:8},previewCategory:{flex:1,minHeight:80,padding:11,justifyContent:"space-between",borderRadius:13},previewCategoryText:{color:C.ink,fontSize:11,fontWeight:"700"},previewProducts:{marginTop:14,flexDirection:"row",gap:10},previewProduct:{flex:1,borderWidth:1,borderColor:C.border,borderRadius:15,overflow:"hidden",backgroundColor:C.white},previewImage:{width:"100%",height:145,resizeMode:"contain",backgroundColor:"#FAFAFA"},previewProductBody:{padding:11},previewProductName:{color:C.ink,fontSize:12,fontWeight:"700"},previewProductBottom:{marginTop:8,flexDirection:"row",justifyContent:"space-between"},previewPrice:{color:C.ink,fontSize:15,fontWeight:"800"},previewStock:{color:C.muted,fontSize:10},
   featureGrid:{width:"100%",marginTop:50,flexDirection:"row",flexWrap:"wrap",gap:14},featureGridCompact:{flexDirection:"column"},featureCard:{width:"32.4%",minHeight:155,padding:22,flexDirection:"row",alignItems:"flex-start",gap:14,borderRadius:20,backgroundColor:C.soft},featureCardCompact:{width:"100%"},featureIcon:{width:44,height:44,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:C.white},featureTitle:{color:C.ink,fontSize:16,fontWeight:"700"},featureBody:{marginTop:7,color:C.muted,fontSize:13,lineHeight:20},

@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text as NativeText, TextInput as Nat
 import { Text, TextInput } from "./AppTypography";
 import { Ionicons } from "@expo/vector-icons";
 import { peso } from "@/src/lib/format";
-const C={ink:"#101318",muted:"#626A73",production:"#65243A",soft:"#F8F1F3",border:"#E8D8DE",white:"#FFF",green:"#264A3B"};
+const C={ink:"#111522",muted:"#626A78",production:"#8A365B",soft:"#FAF5F8",border:"#E8DDE3",white:"#FFF",green:"#1B685C"};
 const number=(value:string)=>Math.max(0,Number(value)||0);
 export function PrintPriceCalculator({onBack}:{onBack:()=>void}){
  const [grams,setGrams]=useState("");const [hours,setHours]=useState("");const [spoolPrice,setSpoolPrice]=useState("900");const [spoolWeight,setSpoolWeight]=useState("1000");const [machineHour,setMachineHour]=useState("10");const [labour,setLabour]=useState("");const [extra,setExtra]=useState("");const [profit,setProfit]=useState("40");

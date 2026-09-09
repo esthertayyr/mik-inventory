@@ -19,8 +19,8 @@ import { supabase } from "@/src/lib/supabase";
 const C = {
   ink: "#111820",
   muted: "#68717B",
-  green: "#51456F",
-  navy: "#51456F",
+  green: "#365D8C",
+  navy: "#29315C",
   ruby: "#733342",
   white: "#FFFFFF",
   line: "#E0E4E7",
