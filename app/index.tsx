@@ -916,12 +916,12 @@ function ShopApp({
   };
   useEffect(()=>{
     if(loading||needsSetup||!business)return;
-    const key=`mik-daily-updates-2026-09-08-${business.id}-${localDateKey()}`;
+    const key=`mik-daily-updates-2026-09-09-enquiries-${business.id}-${localDateKey()}`;
     AsyncStorage.getItem(key).then(seen=>{if(seen!=="done")setUpdatesOpen(true);}).catch(()=>setUpdatesOpen(true));
   },[business,loading,needsSetup]);
   const closeUpdates=async()=>{
     setUpdatesOpen(false);
-    if(business)await AsyncStorage.setItem(`mik-daily-updates-2026-09-08-${business.id}-${localDateKey()}`,"done").catch(()=>undefined);
+    if(business)await AsyncStorage.setItem(`mik-daily-updates-2026-09-09-enquiries-${business.id}-${localDateKey()}`,"done").catch(()=>undefined);
   };
   if (loading)
     return (
@@ -1210,7 +1210,7 @@ function ShopApp({
       </View>
       {screen!=="report_issue"?<Pressable accessibilityRole="button" accessibilityLabel="Send an issue, feedback or change request to Esther" style={[s.floatingFeedback,width<520&&s.floatingFeedbackMobile,width>=900&&s.floatingFeedbackDesktop]} onPress={()=>{setReportBackScreen(screen);setScreen("report_issue");}}><Ionicons name="chatbubble-ellipses-outline" size={20} color={C.white}/>{width>=520?<Text style={s.floatingFeedbackText}>Help & feedback</Text>:null}</Pressable>:null}
       <GuideModal visible={guideOpen} onClose={closeGuide} />
-      <WhatsNewModal visible={updatesOpen&&!guideOpen} onClose={closeUpdates}/>
+      <WhatsNewModal visible={updatesOpen&&!guideOpen} onClose={closeUpdates} onFeedback={()=>{void closeUpdates();setReportBackScreen("home");setScreen("report_issue");}}/>
     </SafeAreaView>
   );
 }
@@ -4444,15 +4444,19 @@ const guideSteps: GuideStep[] = [
   },
 ];
 
-function WhatsNewModal({visible,onClose}:{visible:boolean;onClose:()=>void}){
+function WhatsNewModal({visible,onClose,onFeedback}:{visible:boolean;onClose:()=>void;onFeedback:()=>void}){
   const updates=[
-    {icon:"color-palette-outline" as Icon,title:"A clearer look everywhere",text:"Desktop and mobile now share consistent type, spacing, coloured actions and compact cards."},
-    {icon:"wallet-outline" as Icon,title:"Expenses are ready",text:"Record what the shop spent and see sales after expenses in Reports."},
-    {icon:"clipboard-outline" as Icon,title:"Orders are clearer",text:"View all open orders, filter by progress and see the actual due date."},
+    {icon:"people-outline" as Icon,title:"Enquiries before confirmed orders",text:"Save interested customers, set a follow-up date, then turn an enquiry into an order when they confirm."},
+    {icon:"calendar-outline" as Icon,title:"Today or this month",text:"Switch the Home overview between today’s figures and the current month."},
+    {icon:"card-outline" as Icon,title:"Order payments in reports",text:"Downpayments and final payments are recorded by payment date and included in sales reports."},
+    {icon:"wallet-outline" as Icon,title:"Expenses and money left",text:"Record expenses, remove incorrect entries and see money received minus expenses."},
+    {icon:"cube-outline" as Icon,title:"Stock reminders",text:"MIK reminds the team to complete a full product and A–Z keycap stock count every 14 days."},
   ];
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><SafeAreaView style={s.whatsNewOverlay}><View style={s.whatsNewCard}>
-    <View style={s.whatsNewIcon}><Ionicons name="sparkles" size={28} color={C.white}/></View><Text style={s.whatsNewKicker}>WHAT'S NEW IN MIK</Text><Text style={s.whatsNewTitle}>Small improvements, easier days.</Text><Text style={s.whatsNewDate}>{friendlyLocalDate()}</Text>
+    <View style={s.whatsNewIcon}><Ionicons name="sparkles" size={28} color={C.white}/></View><Text style={s.whatsNewKicker}>WHAT'S NEW IN MIK</Text><Text style={s.whatsNewTitle}>Today’s improvements</Text><Text style={s.whatsNewDate}>{friendlyLocalDate()}</Text>
     <View style={s.whatsNewList}>{updates.map(item=><View key={item.title} style={s.whatsNewRow}><View style={s.whatsNewRowIcon}><Ionicons name={item.icon} size={21} color={C.green}/></View><View style={s.flex}><Text style={s.whatsNewRowTitle}>{item.title}</Text><Text style={s.whatsNewRowText}>{item.text}</Text></View></View>)}</View>
+    <Text style={s.whatsNewFeedback}>Have feedback or found an issue? Let Esther know and it can be reviewed.</Text>
+    <Pressable accessibilityRole="button" style={s.whatsNewFeedbackButton} onPress={onFeedback}><Ionicons name="chatbubble-ellipses-outline" size={20} color={C.white}/><Text style={s.whatsNewFeedbackButtonText}>Send feedback</Text></Pressable>
     <BigButton label="Continue to MIK" icon="arrow-forward" onPress={onClose}/>
   </View></SafeAreaView></Modal>;
 }
@@ -6194,6 +6198,9 @@ const s = StyleSheet.create({
   whatsNewRowIcon:{width:37,height:37,alignItems:"center",justifyContent:"center",borderRadius:11,backgroundColor:C.white},
   whatsNewRowTitle:{color:C.ink,fontSize:14,fontWeight:"700"},
   whatsNewRowText:{marginTop:3,color:C.muted,fontSize:13,lineHeight:18},
+  whatsNewFeedback:{marginTop:16,color:C.muted,fontSize:13,lineHeight:19,textAlign:"center"},
+  whatsNewFeedbackButton:{minHeight:48,marginTop:10,paddingHorizontal:16,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,borderRadius:11,backgroundColor:SECTION.support.color},
+  whatsNewFeedbackButtonText:{color:C.white,fontSize:14,fontWeight:"700"},
   guideOverlay: {
     flex: 1,
     padding: 18,
