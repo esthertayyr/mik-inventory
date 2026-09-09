@@ -4453,11 +4453,16 @@ function WhatsNewModal({visible,onClose,onFeedback}:{visible:boolean;onClose:()=
     {icon:"cube-outline" as Icon,title:"Stock reminders",text:"MIK reminds the team to complete a full product and A–Z keycap stock count every 14 days."},
   ];
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><SafeAreaView style={s.whatsNewOverlay}><View style={s.whatsNewCard}>
-    <View style={s.whatsNewIcon}><Ionicons name="sparkles" size={28} color={C.white}/></View><Text style={s.whatsNewKicker}>WHAT'S NEW IN MIK</Text><Text style={s.whatsNewTitle}>Today’s improvements</Text><Text style={s.whatsNewDate}>{friendlyLocalDate()}</Text>
-    <View style={s.whatsNewList}>{updates.map(item=><View key={item.title} style={s.whatsNewRow}><View style={s.whatsNewRowIcon}><Ionicons name={item.icon} size={21} color={C.green}/></View><View style={s.flex}><Text style={s.whatsNewRowTitle}>{item.title}</Text><Text style={s.whatsNewRowText}>{item.text}</Text></View></View>)}</View>
-    <Text style={s.whatsNewFeedback}>Have feedback or found an issue? Let Esther know and it can be reviewed.</Text>
-    <Pressable accessibilityRole="button" style={s.whatsNewFeedbackButton} onPress={onFeedback}><Ionicons name="chatbubble-ellipses-outline" size={20} color={C.white}/><Text style={s.whatsNewFeedbackButtonText}>Send feedback</Text></Pressable>
-    <BigButton label="Continue to MIK" icon="arrow-forward" onPress={onClose}/>
+    <Pressable accessibilityRole="button" accessibilityLabel="Close what's new" style={s.whatsNewClose} onPress={onClose}><Ionicons name="close" size={22} color={C.ink}/></Pressable>
+    <ScrollView style={s.whatsNewScroll} contentContainerStyle={s.whatsNewScrollContent} showsVerticalScrollIndicator>
+      <View style={s.whatsNewIcon}><Ionicons name="sparkles" size={28} color={C.white}/></View><Text style={s.whatsNewKicker}>WHAT'S NEW IN MIK</Text><Text style={s.whatsNewTitle}>Today’s improvements</Text><Text style={s.whatsNewDate}>{friendlyLocalDate()}</Text>
+      <View style={s.whatsNewList}>{updates.map(item=><View key={item.title} style={s.whatsNewRow}><View style={s.whatsNewRowIcon}><Ionicons name={item.icon} size={21} color={C.green}/></View><View style={s.flex}><Text style={s.whatsNewRowTitle}>{item.title}</Text><Text style={s.whatsNewRowText}>{item.text}</Text></View></View>)}</View>
+      <Text style={s.whatsNewFeedback}>Have feedback or found an issue? Let Esther know and it can be reviewed.</Text>
+    </ScrollView>
+    <View style={s.whatsNewActions}>
+      <Pressable accessibilityRole="button" style={s.whatsNewFeedbackButton} onPress={onFeedback}><Ionicons name="chatbubble-ellipses-outline" size={20} color={C.white}/><Text style={s.whatsNewFeedbackButtonText}>Send feedback</Text></Pressable>
+      <BigButton label="Continue to MIK" icon="arrow-forward" onPress={onClose}/>
+    </View>
   </View></SafeAreaView></Modal>;
 }
 
@@ -6188,7 +6193,10 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   whatsNewOverlay:{flex:1,padding:18,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(13,23,34,.58)"},
-  whatsNewCard:{width:"100%",maxWidth:470,maxHeight:"92%",padding:22,borderRadius:19,backgroundColor:C.white,shadowColor:"#0D1722",shadowOpacity:.24,shadowRadius:24,shadowOffset:{width:0,height:12},elevation:10},
+  whatsNewCard:{width:"100%",maxWidth:470,maxHeight:"92%",padding:16,borderRadius:19,backgroundColor:C.white,shadowColor:"#0D1722",shadowOpacity:.24,shadowRadius:24,shadowOffset:{width:0,height:12},elevation:10,overflow:"hidden"},
+  whatsNewClose:{position:"absolute",zIndex:2,top:12,right:12,width:40,height:40,alignItems:"center",justifyContent:"center",borderRadius:20,backgroundColor:C.soft,borderWidth:1,borderColor:C.border},
+  whatsNewScroll:{flexShrink:1},
+  whatsNewScrollContent:{padding:6,paddingTop:4,paddingRight:48,paddingBottom:12},
   whatsNewIcon:{width:54,height:54,alignItems:"center",justifyContent:"center",borderRadius:16,backgroundColor:C.green},
   whatsNewKicker:{marginTop:18,color:C.green,fontSize:11,fontWeight:"800",letterSpacing:1.4},
   whatsNewTitle:{marginTop:5,color:C.ink,fontSize:25,lineHeight:31,fontWeight:"700",letterSpacing:-.4},
@@ -6201,6 +6209,7 @@ const s = StyleSheet.create({
   whatsNewFeedback:{marginTop:16,color:C.muted,fontSize:13,lineHeight:19,textAlign:"center"},
   whatsNewFeedbackButton:{minHeight:48,marginTop:10,paddingHorizontal:16,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,borderRadius:11,backgroundColor:SECTION.support.color},
   whatsNewFeedbackButtonText:{color:C.white,fontSize:14,fontWeight:"700"},
+  whatsNewActions:{flexShrink:0,paddingTop:4},
   guideOverlay: {
     flex: 1,
     padding: 18,
