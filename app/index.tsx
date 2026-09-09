@@ -3987,20 +3987,20 @@ function More({
   canManageStaff:boolean;
 }) {
   const { width } = useWindowDimensions();
-  type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean; color?:string };
+  type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean };
   const groups: Array<{ title: string; color: string; soft: string; border: string; tools: MoreTool[] }> = [
     {
       title: "Reports", ...SECTION.records, tools: [
-        { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports", color:SECTION.records.color },
-        { icon: "wallet-outline", title: "Expenses", help: "Record what the shop spent", screen: "expenses", color:SECTION.production.color },
+        { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports" },
+        { icon: "wallet-outline", title: "Expenses", help: "Record what the shop spent", screen: "expenses" },
       ],
     },
     {
       title: "Shop & help", ...SECTION.settings, tools: [
-        ...(canManageStaff?[{ icon: "people-outline" as Icon, title: "Manage staff", help: "Create accounts and choose their access", screen: "staff" as Screen, color:SECTION.orders.color }]:[]),
-        { icon: "storefront-outline", title: "Shop profile & logo", help: business.logo_url ? "Replace this shop's logo" : "Add this shop's logo", screen: "shop", color:SECTION.stock.color },
-        { icon: "help-circle-outline", title: "How to use Mik", help: "Replay the step-by-step guide", guide: true, color:SECTION.records.color },
-        { icon: "chatbox-ellipses-outline", title: "Report a problem", help: "Tell the MIK owner what went wrong", screen: "report_issue", color:SECTION.support.color },
+        ...(canManageStaff?[{ icon: "people-outline" as Icon, title: "Manage staff", help: "Create accounts and choose their access", screen: "staff" as Screen }]:[]),
+        { icon: "storefront-outline", title: "Shop profile & logo", help: business.logo_url ? "Replace this shop's logo" : "Add this shop's logo", screen: "shop" },
+        { icon: "help-circle-outline", title: "How to use Mik", help: "Replay the step-by-step guide", guide: true },
+        { icon: "chatbox-ellipses-outline", title: "Report a problem", help: "Tell the MIK owner what went wrong", screen: "report_issue" },
       ],
     },
   ];
@@ -4015,7 +4015,7 @@ function More({
             <Text style={s.quickSectionTitle}>{group.title}</Text>
           </View>
           <ToolGrid minCardWidth={320} maxColumns={2}>
-            {group.tools.map(tool=><WorkspaceAction key={tool.title} title={tool.title} help={tool.help} icon={tool.icon} color={tool.color??group.color} onPress={()=>tool.guide?onGuide():tool.screen&&onOpen(tool.screen)}/>)}
+            {group.tools.map(tool=><WorkspaceAction key={tool.title} title={tool.title} help={tool.help} icon={tool.icon} color={group.color} onPress={()=>tool.guide?onGuide():tool.screen&&onOpen(tool.screen)}/>)}
           </ToolGrid>
         </View>
       ))}
