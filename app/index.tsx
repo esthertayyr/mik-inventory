@@ -2361,13 +2361,6 @@ function QuickStart({ businessId, locationId, sales, onOpen, onOpenProductsMissi
     (["reports","expenses"] as Screen[]).includes(screen)?"reports":
     (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
     screen==="calendar"?"calendar":"settings";
-  const actionColor=(screen:Screen)=>
-    (["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?SECTION.sales.color:
-    screen==="orders"?SECTION.orders.color:
-    (["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?SECTION.stock.color:
-    (["print_queue","price_calculator","printers","filaments","expenses"] as Screen[]).includes(screen)?SECTION.production.color:
-    (screen==="reports"||screen==="calendar")?SECTION.records.color:
-    screen==="report_issue"?SECTION.support.color:SECTION.settings.color;
   const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>!permissions||permissions.includes(permissionFor(action.screen)))})).filter(group=>group.actions.length);
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
@@ -2413,7 +2406,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, onOpenProductsMissi
             {width < 760 ? <Ionicons name={openHomeGroups.includes(group.title) ? "chevron-up" : "chevron-down"} size={21} color={group.color} /> : null}
           </Pressable>
           {width >= 760 || openHomeGroups.includes(group.title) ? <ToolGrid minCardWidth={320} maxColumns={2}>
-            {group.actions.map(action=><WorkspaceAction key={action.title} title={action.title} help={action.help} icon={`${action.icon}-outline` as Icon} color={actionColor(action.screen)} onPress={()=>onOpen(action.screen)}/>)}
+            {group.actions.map(action=><WorkspaceAction key={action.title} title={action.title} help={action.help} icon={`${action.icon}-outline` as Icon} color={group.color} onPress={()=>onOpen(action.screen)}/>)}
           </ToolGrid> : null}
         </View>
       ))}
