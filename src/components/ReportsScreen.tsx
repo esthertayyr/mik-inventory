@@ -83,6 +83,7 @@ const dateTimeText = (value: string) => {
   return `${dateText(date)} · ${date.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}`;
 };
 type ExpenseRecord={expense_date:string;description:string;category:string;amount:number;payment_method:string;notes:string|null};
+type OrderPaymentRecord={payment_date:string;amount:number;payment_method:string;payment_kind:string;payment_reference:string|null;order:{order_number:number;title:string}|null};
 const localDateKey=(date:Date)=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 const csvCell = (value: unknown) =>
   `"${String(value ?? "").replace(/"/g, '""')}"`;
@@ -189,6 +190,7 @@ export function ReportsScreen({
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [damage, setDamage] = useState<DamageRecord[]>([]);
   const [expenses,setExpenses]=useState<ExpenseRecord[]>([]);
+  const [orderPayments,setOrderPayments]=useState<OrderPaymentRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [voidTarget, setVoidTarget] = useState<SaleRecord | null>(null);
@@ -207,6 +209,7 @@ export function ReportsScreen({
       { data: saleData, error: saleError },
       { data: damageData, error: damageError },
       { data: expenseData, error: expenseError },
+      { data: orderPaymentData, error: orderPaymentError },
     ] = await Promise.all([
       supabase
         .from("sales")
@@ -226,16 +229,18 @@ export function ReportsScreen({
         .lt("created_at", end)
         .order("created_at", { ascending: false }),
       supabase.from("expenses").select("expense_date,description,category,amount,payment_method,notes").eq("location_id",locationId).gte("expense_date",localDateKey(range.start)).lt("expense_date",localDateKey(range.end)).order("expense_date",{ascending:false}),
+      supabase.from("order_payments").select("payment_date,amount,payment_method,payment_kind,payment_reference,order:external_orders(order_number,title)").eq("location_id",locationId).gte("payment_date",localDateKey(range.start)).lt("payment_date",localDateKey(range.end)).order("payment_date",{ascending:false}),
     ]);
-    if (saleError || damageError || expenseError)
+    if (saleError || damageError || expenseError || orderPaymentError)
       setError(
         saleError?.message ??
-          damageError?.message ?? expenseError?.message ??
+          damageError?.message ?? expenseError?.message ?? orderPaymentError?.message ??
           "Report could not be loaded",
       );
     setSales((saleData ?? []) as unknown as SaleRecord[]);
     setDamage((damageData ?? []) as unknown as DamageRecord[]);
     setExpenses((expenseData??[]) as ExpenseRecord[]);
+    setOrderPayments((orderPaymentData??[]) as unknown as OrderPaymentRecord[]);
     setLoading(false);
   }, [locationId, range.start.getTime(), range.end.getTime()]);
   useEffect(() => {
@@ -260,7 +265,9 @@ export function ReportsScreen({
   const cancelled = sales.filter((s) => s.status === "voided").length;
   const average = completed.length ? total / completed.length : 0;
   const expenseTotal=expenses.reduce((sum,x)=>sum+Number(x.amount),0);
-  const afterExpenses=total-expenseTotal;
+  const orderPaymentTotal=orderPayments.reduce((sum,x)=>sum+Number(x.amount),0);
+  const moneyReceived=total+orderPaymentTotal;
+  const afterExpenses=moneyReceived-expenseTotal;
   const products = useMemo(() => {
     const map = new Map<
       string,
@@ -330,9 +337,11 @@ export function ReportsScreen({
       const summary = [
         ["MIK SALES REPORT"],
         ["Period", title],
-        ["Total Sales", total],
+        ["Shop Sales", total],
+        ["Order Payments Received",orderPaymentTotal],
+        ["Total Money Received",moneyReceived],
         ["Total Expenses",expenseTotal],
-        ["Sales Minus Expenses",afterExpenses],
+        ["Money Received Minus Expenses",afterExpenses],
         ["Cash", cash],
         ["GCash", gcash],
         ["Transactions", completed.length],
@@ -340,6 +349,8 @@ export function ReportsScreen({
         ["Damaged Items", damaged],
         ["Cancelled Sales", cancelled],
         ["Average Transaction", average],
+        [],["ORDER PAYMENTS"],["Payment date","Order","What was ordered","Payment type","Amount","Payment method","Reference"],
+        ...orderPayments.map(x=>[x.payment_date,x.order?`ORD-${x.order.order_number}`:"",x.order?.title??"",x.payment_kind,x.amount,x.payment_method.toUpperCase(),x.payment_reference??""]),
         [],["EXPENSES"],["Date","What was spent on","Category","Amount","Payment method","Notes"],
         ...expenses.map(x=>[x.expense_date,x.description,x.category,x.amount,x.payment_method.toUpperCase(),x.notes??""]),
         [],
@@ -547,10 +558,12 @@ export function ReportsScreen({
         <>
           {correctionMode ? null : <>
           <View style={s.hero}>
-            <Text style={s.heroLabel}>TOTAL SALES</Text>
-            <Text style={s.heroValue}>{peso(total)}</Text>
+            <Text style={s.heroLabel}>TOTAL MONEY RECEIVED</Text>
+            <Text style={s.heroValue}>{peso(moneyReceived)}</Text>
           </View>
           <View style={s.grid}>
+            <Stat label="Shop sales" value={peso(total)} />
+            <Stat label="Order payments" value={peso(orderPaymentTotal)} />
             <Stat label="Expenses" value={peso(expenseTotal)} />
             <Stat label="Money after expenses" value={peso(afterExpenses)} />
             <Stat label="Cash" value={peso(cash)} />
@@ -561,6 +574,7 @@ export function ReportsScreen({
             <Stat label="Cancelled" value={String(cancelled)} />
             <Stat label="Average sale" value={peso(average)} />
           </View>
+          {orderPayments.length?<><Text style={s.section}>Order payments received</Text>{orderPayments.map((payment,index)=><View key={`${payment.payment_date}-${payment.order?.order_number}-${index}`} style={s.row}><Text style={s.rowName}>{payment.order?`ORD-${payment.order.order_number} · ${payment.order.title}`:"Customer order"}</Text><Text style={s.rowSmall}>{dateText(new Date(`${payment.payment_date}T12:00:00`))} · {payment.payment_method.toUpperCase()}</Text><Text style={s.rowValue}>{peso(Number(payment.amount))}</Text></View>)}</>:null}
           {expenses.length?<><Text style={s.section}>Expense breakdown</Text>{expenses.map((expense,index)=><View key={`${expense.expense_date}-${expense.description}-${index}`} style={s.row}><Text style={s.rowName}>{expense.description}</Text><Text style={s.rowSmall}>{expense.category} · {expense.payment_method.toUpperCase()}</Text><Text style={s.rowValue}>{peso(Number(expense.amount))}</Text></View>)}</>:null}
           {period === "weekly" ? (
             <>

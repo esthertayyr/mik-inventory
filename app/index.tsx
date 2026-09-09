@@ -269,6 +269,10 @@ function Login() {
       email: `${clean}@login.mik.app`,
       password,
     });
+    if(e&&clean==="esther"){
+      ({error:e}=await supabase.auth.signInWithPassword({email:"owner@login.mik.app",password}));
+      if(!e) await supabase.functions.invoke("admin-manage-platform-team",{body:{action:"rename_owner",username:"esther"}});
+    }
     // The first Pixelbug profile originally used a hidden legacy login. Keep a
     // safe fallback until the Owner saves its username through the new portal.
     if (e && clean === "pixelbug") {
@@ -335,14 +339,16 @@ function Login() {
 function SignedIn({ session,deviceUserName,onChangeDeviceUser }: { session: Session;deviceUserName:string;onChangeDeviceUser?:()=>void }) {
   const [checking, setChecking] = useState(true);
   const [platformAdmin, setPlatformAdmin] = useState(false);
+  const [platformTeam, setPlatformTeam] = useState<{display_name:string;permissions:string[]}|null>(null);
   useEffect(() => {
     supabase
       .from("platform_admins")
       .select("user_id")
       .eq("user_id", session.user.id)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         setPlatformAdmin(Boolean(data));
+        if(!data){const {data:team}=await supabase.from("platform_team_members").select("display_name,permissions").eq("user_id",session.user.id).eq("active",true).maybeSingle();setPlatformTeam(team);}
         setChecking(false);
       });
   }, [session.user.id]);
@@ -353,7 +359,13 @@ function SignedIn({ session,deviceUserName,onChangeDeviceUser }: { session: Sess
         <Text style={s.help}>Opening your account…</Text>
       </SafeAreaView>
     );
-  return platformAdmin ? <PlatformAdmin deviceUserName="Owner" /> : <ShopApp session={session} deviceUserName={deviceUserName} onChangeDeviceUser={onChangeDeviceUser} />;
+  return platformAdmin ? <PlatformAdmin deviceUserName="Esther" /> : platformTeam ? <PlatformViewer name={platformTeam.display_name}/> : <ShopApp session={session} deviceUserName={deviceUserName} onChangeDeviceUser={onChangeDeviceUser} />;
+}
+
+function PlatformViewer({name}:{name:string}){
+  const [shops,setShops]=useState<AdminShop[]>([]); const [stats,setStats]=useState({sales:0,orders:0,payments:0});
+  useEffect(()=>{void (async()=>{const {data:shopData}=await supabase.from("businesses").select("id,name,logo_url,slug,login_username,status,created_at").order("name");setShops((shopData??[]) as AdminShop[]);const ids=(shopData??[]).map(x=>x.id);if(!ids.length)return;const today=localDateKey();const [{data:sales},{data:orders},{data:payments}]=await Promise.all([supabase.from("sales").select("total").in("business_id",ids).eq("status","completed").gte("created_at",`${today}T00:00:00`),supabase.from("external_orders").select("id").in("business_id",ids).not("status","in","(completed,cancelled)"),supabase.from("order_payments").select("amount").in("business_id",ids).eq("payment_date",today)]);setStats({sales:(sales??[]).reduce((n,x)=>n+Number(x.total),0),orders:orders?.length??0,payments:(payments??[]).reduce((n,x)=>n+Number(x.amount),0)});})();},[]);
+  return <SafeAreaView style={s.app}><StatusBar style="dark"/><View style={s.adminTop}><View><Text style={s.kicker}>MIK VIEWER · {name}</Text><Text style={s.shopName}>Assigned shops</Text></View><Pressable style={s.adminSignout} onPress={()=>supabase.auth.signOut()}><Ionicons name="log-out-outline" size={22} color={C.red}/></Pressable></View><ScrollView contentContainerStyle={s.adminPage}><View style={s.ownerStatsRow}><View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>SHOP SALES TODAY</Text><Text style={s.ownerStatValue}>{peso(stats.sales)}</Text></View><View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>ORDER PAYMENTS TODAY</Text><Text style={s.ownerStatValue}>{peso(stats.payments)}</Text></View><View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>OPEN ORDERS</Text><Text style={s.ownerStatValue}>{stats.orders}</Text></View></View>{shops.map(shop=><View key={shop.id} style={s.editCard}><Text style={s.editName}>{shop.name}</Text><Text style={s.rowHelp}>View-only access · {shop.status}</Text></View>)}</ScrollView></SafeAreaView>;
 }
 
 type AdminShop = {
@@ -379,21 +391,24 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const [showActivity, setShowActivity] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
+  const [showTeam,setShowTeam]=useState(false);
   const [staffShop, setStaffShop] = useState<AdminShop | null>(null);
   const [actionShop,setActionShop]=useState<AdminShop|null>(null);
   const [manageShop, setManageShop] = useState<{ shop: AdminShop; mode: "edit" | "duplicate" } | null>(null);
-  const [ownerStats, setOwnerStats] = useState({ salesToday: 0, activeOrders: 0, lowStock: 0 });
+  const [ownerStats, setOwnerStats] = useState({ salesToday: 0, orderPaymentsToday:0, expensesToday:0, activeOrders: 0, lowStock: 0 });
   const [exporting, setExporting] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const [{ data, error }, { data: loginRows }, { data: todaySales }, { data: activeOrders }, { data: stockRows }] = await Promise.all([
+    const [{ data, error }, { data: loginRows }, { data: todaySales }, { data: activeOrders }, { data: stockRows },{data:orderPayments},{data:expenses}] = await Promise.all([
       supabase.from("businesses").select("id,name,logo_url,slug,login_username,status,created_at").order("created_at"),
       supabase.from("activity_logs").select("business_id,created_at").eq("action", "login").order("created_at", { ascending: false }).limit(1000),
       supabase.from("sales").select("total,status").eq("status", "completed").gte("created_at", today.toISOString()),
       supabase.from("external_orders").select("id,status").not("status", "in", "(completed,cancelled)"),
       supabase.from("inventory_levels").select("quantity_on_hand,product:products!inner(low_stock_threshold,active)").eq("product.active", true),
+      supabase.from("order_payments").select("amount").eq("payment_date",localDateKey()),
+      supabase.from("expenses").select("amount").eq("expense_date",localDateKey()),
     ]);
     if (error) Alert.alert("Shops not loaded", error.message);
     const lastLogin = new Map<string, string>();
@@ -401,6 +416,8 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     setShops(((data ?? []) as AdminShop[]).map((shop) => ({ ...shop, last_login: lastLogin.get(shop.id) ?? null })));
     setOwnerStats({
       salesToday: (todaySales ?? []).reduce((sum, sale) => sum + Number(sale.total), 0),
+      orderPaymentsToday:(orderPayments??[]).reduce((sum,row)=>sum+Number(row.amount),0),
+      expensesToday:(expenses??[]).reduce((sum,row)=>sum+Number(row.amount),0),
       activeOrders: activeOrders?.length ?? 0,
       lowStock: (stockRows ?? []).filter((row: any) => row.quantity_on_hand <= Number(row.product?.low_stock_threshold ?? 0)).length,
     });
@@ -482,6 +499,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     return <OwnerIssueReports onBack={() => setShowIssues(false)} />;
   if (showAccounts)
     return <OwnerAccounts onBack={() => setShowAccounts(false)} onManage={(account)=>{const shop=shops.find(item=>item.id===account.shop_id);if(!shop)return;setShowAccounts(false);if(account.role==="staff")setStaffShop(shop);else setActionShop(shop);}} />;
+  if(showTeam) return <PlatformTeamManager shops={shops} onBack={()=>setShowTeam(false)}/>;
   if (staffShop)
     return <AdminStaffManager shop={staffShop} onBack={() => setStaffShop(null)} />;
   if(actionShop)
@@ -513,6 +531,8 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
         </View>
         <View style={s.ownerStatsRow}>
           <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>SALES TODAY</Text><Text style={s.ownerStatValue}>{peso(ownerStats.salesToday)}</Text></View>
+          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>ORDER PAYMENTS</Text><Text style={s.ownerStatValue}>{peso(ownerStats.orderPaymentsToday)}</Text></View>
+          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>EXPENSES TODAY</Text><Text style={s.ownerStatValue}>{peso(ownerStats.expensesToday)}</Text></View>
           <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>ACTIVE ORDERS</Text><Text style={s.ownerStatValue}>{ownerStats.activeOrders}</Text></View>
           <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>LOW STOCK</Text><Text style={s.ownerStatValue}>{ownerStats.lowStock}</Text></View>
         </View>
@@ -531,6 +551,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
           <View style={s.flex}><Text style={s.activityButtonTitle}>All accounts</Text><Text style={s.activityButtonHelp}>Shop owners, shop logins and staff</Text></View>
           <Ionicons name="chevron-forward" size={21} color={SECTION.support.color} />
         </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Manage dashboard viewers" style={s.activityButton} onPress={()=>setShowTeam(true)}><View style={[s.activityButtonIcon,{backgroundColor:SECTION.records.color}]}><Ionicons name="shield-checkmark-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={s.activityButtonTitle}>Dashboard viewers</Text><Text style={s.activityButtonHelp}>Create view-only accounts and choose their shops</Text></View><Ionicons name="chevron-forward" size={21} color={SECTION.records.color}/></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Export all shop sales" style={s.ownerExportButton} onPress={() => void exportOwnerSales()} disabled={exporting}>
           <Ionicons name="download-outline" size={22} color={C.accent} />
           <View style={s.flex}><Text style={s.ownerExportTitle}>{exporting ? "Preparing export…" : "Export all shop sales"}</Text><Text style={s.rowHelp}>One Excel-ready CSV for every shop</Text></View>
@@ -622,6 +643,12 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
 
 type StaffPermission = "sell"|"sales"|"orders"|"stock"|"products"|"reports"|"production"|"calendar"|"settings";
 type OwnerAccount = {user_id:string;shop_id:string|null;shop_name:string;display_name:string;login_username:string;role:"platform_owner"|"shop_owner"|"staff";permissions:StaffPermission[];active:boolean;created_at:string|null;last_login:string|null};
+function PlatformTeamManager({shops,onBack}:{shops:AdminShop[];onBack:()=>void}){
+  const [members,setMembers]=useState<any[]>([]),[name,setName]=useState(""),[username,setUsername]=useState(""),[password,setPassword]=useState(""),[shopIds,setShopIds]=useState<string[]>([]),[busy,setBusy]=useState(false);
+  const load=useCallback(async()=>{const {data,error}=await supabase.functions.invoke("admin-manage-platform-team",{body:{action:"list"}});if(error)return Alert.alert("Accounts not loaded",error.message);setMembers(data?.members??[]);},[]);useEffect(()=>{void load();},[load]);
+  const create=async()=>{if(!name.trim()||!username.trim()||password.length<6||!shopIds.length)return Alert.alert("Complete the account","Enter a name, username, password and choose at least one shop.");setBusy(true);const {error}=await supabase.functions.invoke("admin-manage-platform-team",{body:{action:"create",displayName:name.trim(),username:username.trim().toLowerCase(),password,shopIds,permissions:["view_dashboard","view_sales","view_orders"]}});setBusy(false);if(error)return Alert.alert("Viewer not created",error.message);setName("");setUsername("");setPassword("");setShopIds([]);await load();Alert.alert("Viewer created","This account can see only the assigned shops and cannot change shop data.");};
+  return <SafeAreaView style={s.app}><ScrollView contentContainerStyle={s.adminPage}><Back title="Owner dashboard" onPress={onBack}/><Text style={s.pageTitle}>Dashboard viewers</Text><Text style={s.subtitle}>Create a private view-only account and choose which shops it can see.</Text><View style={s.editCard}><Label>Name</Label><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Example: Business partner"/><Label>Username</Label><TextInput style={s.input} value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="Login username"/><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 6 characters"/><Label>Shops this person can view</Label><View style={s.chips}>{shops.map(shop=><Chip key={shop.id} label={shop.name} selected={shopIds.includes(shop.id)} onPress={()=>setShopIds(v=>v.includes(shop.id)?v.filter(id=>id!==shop.id):[...v,shop.id])}/>)}</View><BigButton label={busy?"Creating…":"Create viewer account"} icon="person-add-outline" onPress={()=>void create()} disabled={busy}/></View><Text style={[s.rowTitle,{marginTop:20}]}>Current viewers</Text>{members.length?members.map(member=><View key={member.user_id} style={s.editCard}><Text style={s.editName}>{member.display_name}</Text><Text style={s.rowHelp}>{member.username} · {(member.platform_team_shops??[]).length} shop{(member.platform_team_shops??[]).length===1?"":"s"} · View only</Text></View>):<Text style={s.help}>No viewer accounts yet.</Text>}</ScrollView></SafeAreaView>;
+}
 function OwnerAccounts({onBack,onManage}:{onBack:()=>void;onManage:(account:OwnerAccount)=>void}){
   const [accounts,setAccounts]=useState<OwnerAccount[]>([]);
   const [loading,setLoading]=useState(true);
@@ -965,7 +992,7 @@ function ShopApp({
       />
     );
   else if (screen === "stock_start")
-    body = <StockStart onOpen={(next) => {
+    body = <StockStart businessId={business!.id} locationId={locationId} onOpen={(next) => {
       if (next === "products") {
         setEditProductId(null);
         setProductsBackScreen("stock_start");
@@ -1253,7 +1280,10 @@ function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceU
   </ScrollView>;
 }
 
-function StockStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
+function StockStart({businessId,locationId,onOpen}:{businessId:string;locationId:string;onOpen:(screen:Screen)=>void}) {
+  const [lastCheck,setLastCheck]=useState<string|null>(null);
+  useEffect(()=>{supabase.from("stock_checks").select("checked_on").eq("location_id",locationId).order("checked_on",{ascending:false}).limit(1).maybeSingle().then(({data})=>setLastCheck(data?.checked_on??null));},[locationId]);
+  const markChecked=async()=>{const {data:{user}}=await supabase.auth.getUser();const {error}=await supabase.from("stock_checks").insert({business_id:businessId,location_id:locationId,checked_by:user?.id});if(error)return Alert.alert("Stock count not saved",error.message);setLastCheck(localDateKey());Alert.alert("Stock count saved","MIK will remind the team again in 14 days.");};
   return <ScrollView contentContainerStyle={s.sellStartPage}>
     <Text style={s.pageTitle}>Stock</Text>
     <Text style={s.subtitle}>Products, quantities and keycap letters.</Text>
@@ -1263,6 +1293,7 @@ function StockStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
       <WorkspaceAction title="Manage products" help="Edit products, photos, prices and categories" icon="pricetags-outline" color={SECTION.stock.color} onPress={()=>onOpen("products")}/>
       <WorkspaceAction title="Customer price list" help="View or print your product prices" icon="receipt-outline" color={SECTION.stock.color} onPress={()=>onOpen("price_list")}/>
     </ToolGrid>
+    <View style={s.editCard}><Text style={s.editName}>Regular stock count</Text><Text style={s.rowHelp}>{lastCheck?`Last completed ${friendlyLocalDate(lastCheck)}.`:"No full stock count has been recorded."} Count products and A–Z keycaps, then mark it done.</Text><BigButton label="Mark stock count done" icon="checkmark-circle-outline" color={SECTION.stock.color} onPress={()=>void markChecked()}/></View>
   </ScrollView>;
 }
 
@@ -2227,11 +2258,15 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
   const [expenseToday,setExpenseToday]=useState(0);
+  const [orderPaymentsToday,setOrderPaymentsToday]=useState(0);
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
+  const [stockCheckDue,setStockCheckDue]=useState(false);
   const [openHomeGroups, setOpenHomeGroups] = useState<string[]>(["Start here"]);
   useEffect(() => {
     setEventReminder(null);
+    supabase.from("stock_checks").select("checked_on").eq("location_id",locationId).order("checked_on",{ascending:false}).limit(1).maybeSingle().then(({data})=>{if(!data?.checked_on)return setStockCheckDue(true);const age=(new Date(`${localDateKey()}T12:00:00`).getTime()-new Date(`${data.checked_on}T12:00:00`).getTime())/86400000;setStockCheckDue(age>=14);});
     supabase.from("expenses").select("amount").eq("location_id",locationId).eq("expense_date",localDateKey()).then(({data})=>setExpenseToday((data??[]).reduce((sum,row)=>sum+Number(row.amount),0)));
+    supabase.from("order_payments").select("amount").eq("location_id",locationId).eq("payment_date",localDateKey()).then(({data})=>setOrderPaymentsToday((data??[]).reduce((sum,row)=>sum+Number(row.amount),0)));
     supabase
       .from("external_orders")
       .select("status,target_date")
@@ -2336,7 +2371,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
         <Text style={s.subtitle}>Everything you need, organised by task.</Text>
       </View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
-        {(!permissions||permissions.includes("sales"))?(()=>{const todaySales=sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0);return <><Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Sales today</Text><Text style={s.overviewMetricValue}>{peso(todaySales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View expenses today" onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses today</Text><Text style={s.overviewMetricValue}>{peso(expenseToday)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Money after expenses</Text><Text style={s.overviewMetricValue}>{peso(todaySales-expenseToday)}</Text><Text style={s.overviewMetricHelp}>Sales minus expenses</Text></View></>})():null}
+        {(!permissions||permissions.includes("sales"))?(()=>{const todaySales=sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0);const received=todaySales+orderPaymentsToday;return <><Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Shop sales today</Text><Text style={s.overviewMetricValue}>{peso(todaySales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View order payments" onPress={()=>onOpen("reports")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Order payments today</Text><Text style={s.overviewMetricValue}>{peso(orderPaymentsToday)}</Text><Text style={s.overviewMetricHelp}>Downpayments and final payments</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View expenses today" onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses today</Text><Text style={s.overviewMetricValue}>{peso(expenseToday)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Money after expenses</Text><Text style={s.overviewMetricValue}>{peso(received-expenseToday)}</Text><Text style={s.overviewMetricHelp}>All money received minus expenses</Text></View></>})():null}
         {(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable>:null}
       </View>
       {eventReminder ? (
@@ -2350,6 +2385,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
           <Ionicons name="chevron-forward" size={22} color={SECTION.records.color} />
         </Pressable>
       ) : null}
+      {stockCheckDue?<Pressable style={s.homeReminder} onPress={()=>onOpen("stock_start")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="clipboard-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={s.homeReminderLabel}>STOCK COUNT DUE</Text><Text style={s.homeReminderTitle}>Please count stock this week</Text><Text style={s.homeReminderMeta}>Count products and A–Z keycaps, then mark it done.</Text></View><Ionicons name="chevron-forward" size={22} color={SECTION.stock.color}/></Pressable>:null}
       {visibleGroups.map((group) => (
         <View key={group.title} style={s.quickSection}>
           <Pressable
