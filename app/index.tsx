@@ -742,8 +742,10 @@ function ShopApp({
   const [updatesOpen,setUpdatesOpen]=useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [productsBackScreen, setProductsBackScreen] = useState<Screen>("more");
+  const [missingPhotosFirst,setMissingPhotosFirst]=useState(false);
   const [priceListBackScreen, setPriceListBackScreen] = useState<Screen>("home");
   const [reportBackScreen,setReportBackScreen]=useState<Screen>("home");
+  const [openOrderId,setOpenOrderId]=useState<string|null>(null);
   const loadData = useCallback(
     async (businessId: string, selectedLocationId: string) => {
       const start = new Date();
@@ -940,10 +942,12 @@ function ShopApp({
         locationId={locationId}
         sales={sales}
         permissions={staffPermissions}
+        onOpenProductsMissing={()=>{setEditProductId(null);setProductsBackScreen("home");setMissingPhotosFirst(true);setScreen("products");}}
         onOpen={(next) => {
           if (next === "products") {
             setEditProductId(null);
             setProductsBackScreen("home");
+            setMissingPhotosFirst(false);
           }
           if (next === "price_list") setPriceListBackScreen("home");
           if (next === "report_issue") setReportBackScreen("home");
@@ -1008,9 +1012,11 @@ function ShopApp({
         products={products}
         categories={categories}
         initialProductId={editProductId}
+        missingPhotosFirst={missingPhotosFirst}
         onSaved={reload}
         onBack={() => {
           setEditProductId(null);
+          setMissingPhotosFirst(false);
           setScreen(productsBackScreen);
         }}
       />
@@ -1029,7 +1035,7 @@ function ShopApp({
   else if (screen === "sell_start")
     body = <SellStart businessId={business!.id} deviceUserName={deviceUserName} onOpen={setScreen} />;
   else if (screen === "print_queue")
-    body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} onOpenOrders={() => setScreen("orders")} />;
+    body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} onOpenOrder={(orderId) => { setOpenOrderId(orderId); setScreen("orders"); }} />;
   else if (screen === "price_calculator")
     body = <PrintPriceCalculator onBack={() => setScreen("home")} />;
   else if (screen === "correct")
@@ -1043,7 +1049,7 @@ function ShopApp({
       />
     );
   else if (screen === "orders")
-    body = <OrdersScreen businessId={business!.id} locationId={locationId} actorName={deviceUserName||profile?.display_name||"Shop team"} />;
+    body = <OrdersScreen businessId={business!.id} locationId={locationId} actorName={deviceUserName||profile?.display_name||"Shop team"} initialOrderId={openOrderId} onOrderOpened={()=>setOpenOrderId(null)} />;
   else if (screen === "printers")
     body = <PrintersScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
   else if (screen === "filaments")
@@ -2244,7 +2250,7 @@ function SaleScreen({
   );
 }
 
-function QuickStart({ businessId, locationId, sales, onOpen, permissions }: { businessId:string; locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null }) {
+function QuickStart({ businessId, locationId, sales, onOpen, onOpenProductsMissing, permissions }: { businessId:string; locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; onOpenProductsMissing:()=>void; permissions:StaffPermission[]|null }) {
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0, pendingMoney:0, toPrint:0, printing:0 });
   const [overviewPeriod,setOverviewPeriod]=useState<"today"|"month">("today");
@@ -2355,6 +2361,13 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions }: { bu
     (["reports","expenses"] as Screen[]).includes(screen)?"reports":
     (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
     screen==="calendar"?"calendar":"settings";
+  const actionColor=(screen:Screen)=>
+    (["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?SECTION.sales.color:
+    screen==="orders"?SECTION.orders.color:
+    (["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?SECTION.stock.color:
+    (["print_queue","price_calculator","printers","filaments","expenses"] as Screen[]).includes(screen)?SECTION.production.color:
+    (screen==="reports"||screen==="calendar")?SECTION.records.color:
+    screen==="report_issue"?SECTION.support.color:SECTION.settings.color;
   const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>!permissions||permissions.includes(permissionFor(action.screen)))})).filter(group=>group.actions.length);
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
@@ -2365,11 +2378,12 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions }: { bu
       </View>
       <View style={s.homePeriodSwitch}><Pressable style={[s.homePeriodButton,overviewPeriod==="today"&&s.homePeriodButtonOn]} onPress={()=>setOverviewPeriod("today")}><Text style={[s.homePeriodText,overviewPeriod==="today"&&s.homePeriodTextOn]}>Today</Text></Pressable><Pressable style={[s.homePeriodButton,overviewPeriod==="month"&&s.homePeriodButtonOn]} onPress={()=>setOverviewPeriod("month")}><Text style={[s.homePeriodText,overviewPeriod==="month"&&s.homePeriodTextOn]}>This month</Text></Pressable></View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
-        {(!permissions||permissions.includes("sales"))?(()=>{const label=overviewPeriod==="today"?"today":"this month";const received=overview.sales+overview.payments;return <><Pressable accessibilityRole="button" accessibilityLabel={`View shop sales ${label}`} onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Shop sales {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.sales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`View order payments ${label}`} onPress={()=>onOpen("reports")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Order payments {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.payments)}</Text><Text style={s.overviewMetricHelp}>Customer payments received</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`View expenses ${label}`} onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.expenses)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Money left {label}</Text><Text style={s.overviewMetricValue}>{peso(received-overview.expenses)}</Text><Text style={s.overviewMetricHelp}>Money received minus expenses</Text></View></>})():null}
+        {(!permissions||permissions.includes("sales"))?(()=>{const label=overviewPeriod==="today"?"today":"this month";const received=overview.sales+overview.payments;return <><Pressable accessibilityRole="button" accessibilityLabel={`View shop sales ${label}`} onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Shop sales {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.sales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`View order money ${label}`} onPress={()=>onOpen("reports")} style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Order money {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.payments)}</Text><Text style={s.overviewMetricHelp}>Paid by order customers</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`View expenses ${label}`} onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Expenses {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.expenses)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Money left {label}</Text><Text style={s.overviewMetricValue}>{peso(received-overview.expenses)}</Text><Text style={s.overviewMetricHelp}>Money received minus expenses</Text></View></>})():null}
         {(!permissions||permissions.includes("orders"))?<><Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View money still to collect from orders" onPress={()=>onOpen("orders")} style={[s.overviewMetric,s.overviewAlertMetric]}><Text style={[s.overviewMetricLabel,{color:C.red}]}>Still to collect</Text><Text style={s.overviewMetricValue}>{peso(orderSummary.pendingMoney)}</Text><Text style={[s.overviewMetricHelp,{color:C.red}]}>Unpaid order balances →</Text></Pressable></>:null}
       </View>
       {orderSummary.toPrint>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.production.border,backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("print_queue")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="layers-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.production.color}]}>PRINTING ACTION NEEDED</Text><Text style={s.homeReminderTitle}>{orderSummary.toPrint} paid job{orderSummary.toPrint===1?" is":"s are"} waiting to print</Text><Text style={s.homeReminderMeta}>Open Print Queue and start the next job.</Text></View><View style={s.reminderCount}><Text style={s.reminderCountText}>{orderSummary.toPrint}</Text></View></Pressable>:null}
-      {photoSummary.products+photoSummary.orders>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.support.border,backgroundColor:SECTION.support.soft}]} onPress={()=>onOpen(photoSummary.orders?"orders":"products")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.support.color}]}><Ionicons name="images-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.support.color}]}>PHOTOS NEEDED</Text><Text style={s.homeReminderTitle}>{photoSummary.products+photoSummary.orders} item{photoSummary.products+photoSummary.orders===1?" needs":"s need"} a photo</Text><Text style={s.homeReminderMeta}>{photoSummary.products?`${photoSummary.products} product${photoSummary.products===1?"":"s"}`:""}{photoSummary.products&&photoSummary.orders?" · ":""}{photoSummary.orders?`${photoSummary.orders} order${photoSummary.orders===1?"":"s"}`:""}</Text></View><Ionicons name="chevron-forward" size={21} color={SECTION.support.color}/></Pressable>:null}
+      {photoSummary.products>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.stock.border,backgroundColor:SECTION.stock.soft}]} onPress={onOpenProductsMissing}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.stock.color}]}><Ionicons name="images-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.stock.color}]}>PRODUCT PHOTOS NEEDED</Text><Text style={s.homeReminderTitle}>{photoSummary.products} product{photoSummary.products===1?" needs":"s need"} a photo</Text><Text style={s.homeReminderMeta}>Open products missing photos first.</Text></View><View style={s.reminderCount}><Text style={s.reminderCountText}>{photoSummary.products}</Text></View></Pressable>:null}
+      {photoSummary.orders>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.orders.border,backgroundColor:SECTION.orders.soft}]} onPress={()=>onOpen("orders")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.orders.color}]}><Ionicons name="camera-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.orders.color}]}>ORDER PHOTO NEEDED</Text><Text style={s.homeReminderTitle}>{photoSummary.orders} order{photoSummary.orders===1?" needs":"s need"} a photo</Text><Text style={s.homeReminderMeta}>Open the order and add its photo.</Text></View><View style={s.reminderCount}><Text style={s.reminderCountText}>{photoSummary.orders}</Text></View></Pressable>:null}
       {eventReminder ? (
         <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
           <View style={s.homeReminderIcon}><Ionicons name="notifications" size={23} color={C.white} /></View>
@@ -2399,7 +2413,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions }: { bu
             {width < 760 ? <Ionicons name={openHomeGroups.includes(group.title) ? "chevron-up" : "chevron-down"} size={21} color={group.color} /> : null}
           </Pressable>
           {width >= 760 || openHomeGroups.includes(group.title) ? <ToolGrid minCardWidth={320} maxColumns={2}>
-            {group.actions.map(action=><WorkspaceAction key={action.title} title={action.title} help={action.help} icon={`${action.icon}-outline` as Icon} color={group.color} onPress={()=>onOpen(action.screen)}/>)}
+            {group.actions.map(action=><WorkspaceAction key={action.title} title={action.title} help={action.help} icon={`${action.icon}-outline` as Icon} color={actionColor(action.screen)} onPress={()=>onOpen(action.screen)}/>)}
           </ToolGrid> : null}
         </View>
       ))}
@@ -2656,6 +2670,7 @@ function Products({
   products,
   categories,
   initialProductId,
+  missingPhotosFirst=false,
   onSaved,
   onBack,
 }: {
@@ -2664,6 +2679,7 @@ function Products({
   products: Product[];
   categories: Category[];
   initialProductId?: string | null;
+  missingPhotosFirst?: boolean;
   onSaved: () => void;
   onBack: () => void;
 }) {
@@ -3519,7 +3535,7 @@ function Products({
       <FlatList
         data={products.filter((p) =>
           p.name.toLowerCase().includes(search.toLowerCase()),
-        )}
+        ).sort((a,b)=>missingPhotosFirst ? Number(Boolean(a.image_url))-Number(Boolean(b.image_url)) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name))}
         keyExtractor={(p) => p.id}
         contentContainerStyle={s.list}
         renderItem={({ item }) => (
@@ -3753,7 +3769,7 @@ function Inventory({
             else setSelected(null);
           }}
         />
-        <View style={s.editCard}>
+        <View style={[s.editCard,s.stockEditCard]}>
           <View style={s.editHeading}>
             <View style={s.productMiniIcon}>
               <Ionicons
@@ -3854,6 +3870,10 @@ function Inventory({
                 <Text style={s.clickerLogicText}>Universal and Character are shared A–Z stock pools. Every clicker sale removes its selected letters from the matching pool automatically.</Text>
               </View>
             ) : null}
+            <View style={s.clickerLogicNote}>
+              <Ionicons name="information-circle-outline" size={21} color={SECTION.stock.color}/>
+              <Text style={s.clickerLogicText}>The large number on each product is how many you have now. Tap a product to change it.</Text>
+            </View>
             <Search value={search} onChange={setSearch} />
             <View style={[s.stockFilters, width >= 900 && s.stockFiltersDesktop]}>
               {!alphabetOnly ? <View style={s.stockFilterGroup}>
@@ -3877,7 +3897,7 @@ function Inventory({
                   <Chip label="All" icon="list" selected={stockView === "all"} onPress={() => setStockView("all")} />
                   <Chip label="Low first" icon="arrow-down" selected={stockView === "lowest"} onPress={() => setStockView("lowest")} />
                   <Chip label="Zero" icon="alert-circle" selected={stockView === "out"} onPress={() => setStockView("out")} />
-                  <Chip label="Not counted" icon="checkbox-outline" selected={stockView === "count"} onPress={() => setStockView("count")} />
+                  <Chip label="Needs counting" icon="checkbox-outline" selected={stockView === "count"} onPress={() => setStockView("count")} />
                 </View>
               </View>
             </View>
@@ -3917,7 +3937,7 @@ function Inventory({
                         : "In stock"}
                 </Text>
               </View>
-              <View style={[s.stockNum, low && s.stockNumLow]}><Text style={[s.stockNumText, low && s.low]}>{quantityShown} {alphabetOnly ? "total" : "in stock"}</Text></View>
+              <View style={[s.stockNum, low && s.stockNumLow]}><Text style={[s.stockNumText, low && s.low]}>{quantityShown}</Text></View>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Edit ${item.name}`}
@@ -3974,20 +3994,20 @@ function More({
   canManageStaff:boolean;
 }) {
   const { width } = useWindowDimensions();
-  type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean };
+  type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean; color?:string };
   const groups: Array<{ title: string; color: string; soft: string; border: string; tools: MoreTool[] }> = [
     {
       title: "Reports", ...SECTION.records, tools: [
-        { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports" },
-        { icon: "wallet-outline", title: "Expenses", help: "Record what the shop spent", screen: "expenses" },
+        { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports", color:SECTION.records.color },
+        { icon: "wallet-outline", title: "Expenses", help: "Record what the shop spent", screen: "expenses", color:SECTION.production.color },
       ],
     },
     {
       title: "Shop & help", ...SECTION.settings, tools: [
-        ...(canManageStaff?[{ icon: "people-outline" as Icon, title: "Manage staff", help: "Create accounts and choose their access", screen: "staff" as Screen }]:[]),
-        { icon: "storefront-outline", title: "Shop profile & logo", help: business.logo_url ? "Replace this shop's logo" : "Add this shop's logo", screen: "shop" },
-        { icon: "help-circle-outline", title: "How to use Mik", help: "Replay the step-by-step guide", guide: true },
-        { icon: "chatbox-ellipses-outline", title: "Report a problem", help: "Tell the MIK owner what went wrong", screen: "report_issue" },
+        ...(canManageStaff?[{ icon: "people-outline" as Icon, title: "Manage staff", help: "Create accounts and choose their access", screen: "staff" as Screen, color:SECTION.orders.color }]:[]),
+        { icon: "storefront-outline", title: "Shop profile & logo", help: business.logo_url ? "Replace this shop's logo" : "Add this shop's logo", screen: "shop", color:SECTION.stock.color },
+        { icon: "help-circle-outline", title: "How to use Mik", help: "Replay the step-by-step guide", guide: true, color:SECTION.records.color },
+        { icon: "chatbox-ellipses-outline", title: "Report a problem", help: "Tell the MIK owner what went wrong", screen: "report_issue", color:SECTION.support.color },
       ],
     },
   ];
@@ -4002,7 +4022,7 @@ function More({
             <Text style={s.quickSectionTitle}>{group.title}</Text>
           </View>
           <ToolGrid minCardWidth={320} maxColumns={2}>
-            {group.tools.map(tool=><WorkspaceAction key={tool.title} title={tool.title} help={tool.help} icon={tool.icon} color={group.color} onPress={()=>tool.guide?onGuide():tool.screen&&onOpen(tool.screen)}/>)}
+            {group.tools.map(tool=><WorkspaceAction key={tool.title} title={tool.title} help={tool.help} icon={tool.icon} color={tool.color??group.color} onPress={()=>tool.guide?onGuide():tool.screen&&onOpen(tool.screen)}/>)}
           </ToolGrid>
         </View>
       ))}
@@ -5817,7 +5837,7 @@ const s = StyleSheet.create({
   },
   sectionMobile: { marginTop: 20, fontSize: 18, lineHeight: 23 },
   choiceRow: { flexDirection: "row", gap: 10 },
-  stockActionChoices: { gap: 9 },
+  stockActionChoices: { gap: 7 },
   choice: {
     flex: 1,
     minHeight: 84,
@@ -5966,6 +5986,7 @@ const s = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: C.white,
   },
+  stockEditCard:{maxWidth:620,padding:16},
   stockCountBar:{width:"100%",marginTop:12,padding:14,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:14,backgroundColor:SECTION.stock.soft},
   stockCountBarMobile:{alignItems:"stretch",flexWrap:"wrap"},
   stockCountIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.white},
@@ -6073,22 +6094,22 @@ const s = StyleSheet.create({
   },
   rowPrice: { color: C.dark, fontSize: 16, fontWeight: "700" },
   stockBig: {
-    marginTop: 22,
+    marginTop: 10,
     color: C.dark,
-    fontSize: 48,
+    fontSize: 36,
     fontWeight: "700",
     textAlign: "center",
   },
   stockLabel: { color: C.muted, fontSize: 14, textAlign: "center" },
   qtyInput: {
-    minHeight: 76,
+    minHeight: 58,
     paddingHorizontal: 16,
     borderWidth: 1.5,
     borderColor: C.border,
     borderRadius: 14,
     color: C.ink,
     backgroundColor: C.cream,
-    fontSize: 36,
+    fontSize: 28,
     fontWeight: "700",
     textAlign: "center",
   },
@@ -6126,7 +6147,7 @@ const s = StyleSheet.create({
   priceSaleTag:{marginBottom:1,color:C.red,fontSize:12,fontWeight:"700",letterSpacing:.5},
   priceMissing:{color:C.orange,fontSize:12},
   menu: {
-    minHeight: 84,
+    minHeight: 64,
     marginTop: 10,
     padding: 15,
     flexDirection: "row",

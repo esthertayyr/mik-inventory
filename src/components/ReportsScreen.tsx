@@ -23,7 +23,7 @@ const APP_FONT = Platform.select({ web: "-apple-system, BlinkMacSystemFont, 'SF 
 const publicShopName = (value: string | null | undefined) =>
   value?.toLowerCase().includes("sebu") ? "Pixelbug" : value ?? "";
 
-type Period = "daily" | "weekly" | "monthly";
+type Period = "daily" | "weekly" | "monthly" | "custom";
 type SaleItem = {
   product_name: string;
   variant_name: string | null;
@@ -52,11 +52,14 @@ type DamageRecord = {
   products: { name: string } | null;
 };
 
-function bounds(period: Period, offset: number, exactDate: Date | null) {
+function bounds(period: Period, offset: number, exactDate: Date | null, customStart:Date, customEnd:Date) {
   const now = period === "daily" && exactDate ? exactDate : new Date();
   let start: Date;
   let end: Date;
-  if (period === "daily") {
+  if(period==="custom") {
+    start=new Date(customStart.getFullYear(),customStart.getMonth(),customStart.getDate());
+    end=new Date(customEnd.getFullYear(),customEnd.getMonth(),customEnd.getDate()+1);
+  } else if (period === "daily") {
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     end = new Date(start);
     end.setDate(end.getDate() + 1);
@@ -184,6 +187,9 @@ export function ReportsScreen({
   const [offset, setOffset] = useState(0);
   const [exactDate, setExactDate] = useState<Date | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [customStart,setCustomStart]=useState(()=>new Date());
+  const [customEnd,setCustomEnd]=useState(()=>new Date());
+  const [rangePicking,setRangePicking]=useState<"start"|"end">("start");
   const [calendarMonth, setCalendarMonth] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   );
@@ -196,8 +202,8 @@ export function ReportsScreen({
   const [voidTarget, setVoidTarget] = useState<SaleRecord | null>(null);
   const [voiding, setVoiding] = useState(false);
   const range = useMemo(
-    () => bounds(period, offset, exactDate),
-    [period, offset, exactDate],
+    () => bounds(period, offset, exactDate,customStart,customEnd),
+    [period, offset, exactDate,customStart,customEnd],
   );
   const load = useCallback(async () => {
     if (!locationId) return;
@@ -327,7 +333,9 @@ export function ReportsScreen({
       ? dateText(range.start)
       : period === "weekly"
         ? `${dateText(range.start)} – ${dateText(new Date(range.end.getTime() - 1))}`
-        : new Intl.DateTimeFormat("en-PH", {
+        : period === "custom"
+          ? `${dateText(range.start)} – ${dateText(new Date(range.end.getTime()-1))}`
+          : new Intl.DateTimeFormat("en-PH", {
             month: "long",
             year: "numeric",
           }).format(range.start);
@@ -474,7 +482,7 @@ export function ReportsScreen({
         </>
       ) : hideTitle ? null : <Text style={s.title}>Sales Reports</Text>}
       {correctionMode ? null : <View style={s.tabs}>
-        {(["daily", "weekly", "monthly"] as Period[]).map((p) => (
+        {(["daily", "weekly", "monthly", "custom"] as Period[]).map((p) => (
           <Pressable
             key={p}
             style={[s.tab, period === p && s.tabOn]}
@@ -485,7 +493,7 @@ export function ReportsScreen({
             }}
           >
             <Text style={[s.tabText, period === p && s.tabTextOn]}>
-              {p.toUpperCase()}
+              {p==="custom"?"DATE RANGE":p.toUpperCase()}
             </Text>
           </Pressable>
         ))}
@@ -528,27 +536,34 @@ export function ReportsScreen({
           }}
         />
       ) : null}
+      {period === "custom" ? <>
+        <View style={s.dateTools}>
+          <Pressable style={s.chooseDate} onPress={()=>{setRangePicking("start");setCalendarMonth(new Date(customStart.getFullYear(),customStart.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#51456F"/><Text style={s.chooseDateText}>From {dateText(customStart)}</Text></Pressable>
+          <Pressable style={s.chooseDate} onPress={()=>{setRangePicking("end");setCalendarMonth(new Date(customEnd.getFullYear(),customEnd.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#51456F"/><Text style={s.chooseDateText}>To {dateText(customEnd)}</Text></Pressable>
+        </View>
+        {calendarOpen?<CalendarPicker month={calendarMonth} selected={rangePicking==="start"?customStart:customEnd} onMonth={setCalendarMonth} onSelect={(date)=>{if(rangePicking==="start"){setCustomStart(date);if(date>customEnd)setCustomEnd(date);}else if(date<customStart){Alert.alert("Check date range","The To date must be on or after the From date.");return;}else setCustomEnd(date);setCalendarOpen(false);}}/>:null}
+      </> : null}
       <View style={s.periodNav}>
-        <Pressable
+        {period!=="custom"?<Pressable
           accessibilityRole="button"
           accessibilityLabel={`Previous ${period} report`}
           style={s.arrow}
           onPress={() => setOffset((v) => v - 1)}
         >
           <Ionicons name="chevron-back" size={25} color="#51456F" />
-        </Pressable>
+        </Pressable>:<View style={s.arrow}/>} 
         <View style={s.periodCenter}>
           <Ionicons name="calendar-outline" size={19} color="#51456F" />
           <Text style={s.periodTitle}>{title}</Text>
         </View>
-        <Pressable
+        {period!=="custom"?<Pressable
           accessibilityRole="button"
           accessibilityLabel={`Next ${period} report`}
           style={s.arrow}
           onPress={() => setOffset((v) => v + 1)}
         >
           <Ionicons name="chevron-forward" size={25} color="#51456F" />
-        </Pressable>
+        </Pressable>:<View style={s.arrow}/>} 
       </View>
       {loading ? (
         <ActivityIndicator size="large" color="#51456F" />
@@ -692,7 +707,7 @@ const s = StyleSheet.create({
   correctionBack: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8 },
   correctionBackText: { color: "#101318", fontSize: 17, fontWeight: "700" },
   page: { paddingBottom: 32 },
-  title: { fontSize: 28, fontWeight: "700", color: "#11151A", marginTop: 16 },
+  title: { fontSize: 24, lineHeight:30, fontWeight: "700", color: "#11151A", marginTop: 12 },
   correctionGuide: { marginTop: 12, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 12, backgroundColor: "#65243A" },
   correctionGuideText: { flex: 1 },
   correctionGuideTitle: { color: "#FFF", fontSize: 17, fontWeight: "700" },
@@ -701,7 +716,7 @@ const s = StyleSheet.create({
   tab: {
     flex: 1,
     minWidth: 88,
-    minHeight: 50,
+    minHeight: 44,
     justifyContent: "center",
     borderRadius: 12,
     alignItems: "center",
@@ -792,11 +807,11 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    marginVertical: 14,
+    marginVertical: 11,
   },
   arrow: {
-    width: 50,
-    height: 50,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     backgroundColor: "#FFF",
     borderWidth: 1,
@@ -817,36 +832,36 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: "#16283A",
   },
-  hero: { padding: 22, borderRadius: 16, backgroundColor: "#29315C" },
-  heroLabel: { color: "#DDE8F1", fontWeight: "700" },
-  heroValue: { color: "#FFF", fontSize: 34, fontWeight: "700", marginTop: 5 },
+  hero: { padding: 17, borderRadius: 14, backgroundColor: "#29315C" },
+  heroLabel: { color: "#DDE8F1", fontSize:11, letterSpacing:.7, fontWeight: "700" },
+  heroValue: { color: "#FFF", fontSize: 28, lineHeight:34, fontWeight: "700", marginTop: 3 },
   heroHelp: { color: "#E3E6F2", fontSize: 13, fontWeight: "600", marginTop: 6 },
-  groupLabel: { marginTop: 18, marginBottom: -2, color: "#626A78", fontSize: 11, fontWeight: "700", letterSpacing: 1.1 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 9, marginTop: 10 },
+  groupLabel: { marginTop: 15, marginBottom: -2, color: "#626A78", fontSize: 10, fontWeight: "700", letterSpacing: 1 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   stat: {
     width: "48%",
-    padding: 15,
+    padding: 12,
     borderRadius: 12,
     backgroundColor: "#F6F7F8",
     borderWidth: 1,
     borderColor: "#DDE2E5",
   },
-  statLabel: { fontSize: 13, color: "#697582", fontWeight: "700" },
+  statLabel: { fontSize: 12, color: "#697582", fontWeight: "700" },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     color: "#16283A",
     fontWeight: "700",
     marginTop: 5,
   },
   section: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
     color: "#16283A",
-    marginTop: 22,
+    marginTop: 18,
     marginBottom: 7,
   },
   row: {
-    minHeight: 60,
+    minHeight: 54,
     marginBottom: 8,
     flexDirection: "row",
     alignItems: "center",

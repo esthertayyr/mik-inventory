@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -26,6 +27,7 @@ type Job = {
   status: Status;
   printer_id: string | null;
   external_order_id: string | null;
+  image_url: string | null;
 };
 type Printer = { id: string; name: string; status: string };
 const C = {
@@ -67,12 +69,12 @@ export function PrintQueueScreen({
   businessId,
   locationId,
   onBack,
-  onOpenOrders,
+  onOpenOrder,
 }: {
   businessId: string;
   locationId: string;
   onBack: () => void;
-  onOpenOrders: () => void;
+  onOpenOrder: (orderId: string) => void;
 }) {
   const { width } = useWindowDimensions();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -104,7 +106,20 @@ export function PrintQueueScreen({
         .order("name"),
     ]);
     if (error) Alert.alert("Print Queue not loaded", error.message);
-    setJobs((j ?? []) as Job[]);
+    const jobRows = (j ?? []) as Omit<Job, "image_url">[];
+    const orderIds = jobRows.map((job) => job.external_order_id).filter(Boolean) as string[];
+    let orderImages = new Map<string, string | null>();
+    if (orderIds.length) {
+      const { data: linkedOrders } = await supabase
+        .from("external_orders")
+        .select("id,image_url")
+        .in("id", orderIds);
+      orderImages = new Map((linkedOrders ?? []).map((order) => [order.id, order.image_url]));
+    }
+    setJobs(jobRows.map((job) => ({
+      ...job,
+      image_url: job.external_order_id ? orderImages.get(job.external_order_id) ?? null : null,
+    })));
     setPrinters((p ?? []) as Printer[]);
     setLoading(false);
   }, [businessId, locationId]);
@@ -327,6 +342,16 @@ export function PrintQueueScreen({
             const printer = printers.find((p) => p.id === job.printer_id);
             return (
               <View key={job.id} style={s.card}>
+                <View style={s.jobImageFrame}>
+                  {job.image_url ? (
+                    <Image source={{ uri: job.image_url }} style={s.jobImage} resizeMode="contain" />
+                  ) : (
+                    <View style={s.jobImageMissing}>
+                      <Ionicons name="image-outline" size={28} color={C.production} />
+                      <Text style={s.jobImageMissingText}>No order photo</Text>
+                    </View>
+                  )}
+                </View>
                 <View style={s.cardTop}>
                   <View style={s.status}>
                     <Text style={s.statusText}>
@@ -349,7 +374,7 @@ export function PrintQueueScreen({
                 {next ? (
                   <Pressable
                     style={s.move}
-                    onPress={next === "done" && job.external_order_id ? onOpenOrders : () => void move(job)}
+                    onPress={next === "done" && job.external_order_id ? () => onOpenOrder(job.external_order_id!) : () => void move(job)}
                   >
                     <Text style={s.moveText}>
                       {next === "printing"
@@ -465,6 +490,19 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   cardTop: { flexDirection: "row", justifyContent: "space-between" },
+  jobImageFrame: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    marginBottom: 12,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: C.soft,
+  },
+  jobImage: { width: "100%", height: "100%" },
+  jobImageMissing: { alignItems: "center", gap: 6 },
+  jobImageMissingText: { color: C.muted, fontSize: 12, fontWeight: "600" },
   status: {
     minHeight:34,
     paddingHorizontal: 11,
