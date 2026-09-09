@@ -2264,16 +2264,14 @@ function SaleScreen({
 function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null }) {
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
-  const [expenseToday,setExpenseToday]=useState(0);
-  const [orderPaymentsToday,setOrderPaymentsToday]=useState(0);
+  const [overviewPeriod,setOverviewPeriod]=useState<"today"|"month">("today");
+  const [overview,setOverview]=useState({sales:0,payments:0,expenses:0});
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
   const [stockCheckDue,setStockCheckDue]=useState(false);
   const [openHomeGroups, setOpenHomeGroups] = useState<string[]>(["Start here"]);
   useEffect(() => {
     setEventReminder(null);
     supabase.from("stock_checks").select("checked_on").eq("location_id",locationId).order("checked_on",{ascending:false}).limit(1).maybeSingle().then(({data})=>{if(!data?.checked_on)return setStockCheckDue(true);const age=(new Date(`${localDateKey()}T12:00:00`).getTime()-new Date(`${data.checked_on}T12:00:00`).getTime())/86400000;setStockCheckDue(age>=14);});
-    supabase.from("expenses").select("amount").eq("location_id",locationId).eq("expense_date",localDateKey()).then(({data})=>setExpenseToday((data??[]).reduce((sum,row)=>sum+Number(row.amount),0)));
-    supabase.from("order_payments").select("amount").eq("location_id",locationId).eq("payment_date",localDateKey()).then(({data})=>setOrderPaymentsToday((data??[]).reduce((sum,row)=>sum+Number(row.amount),0)));
     supabase
       .from("external_orders")
       .select("status,target_date")
@@ -2306,6 +2304,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
         setEventReminder(due ?? null);
       });
   }, [locationId]);
+  useEffect(()=>{void(async()=>{const now=new Date(),today=localDateKey(now);const start=overviewPeriod==="today"?today:`${today.slice(0,7)}-01`;const endDate=overviewPeriod==="today"?new Date(now.getFullYear(),now.getMonth(),now.getDate()+1):new Date(now.getFullYear(),now.getMonth()+1,1);const end=localDateKey(endDate);const [{data:saleRows},{data:paymentRows},{data:expenseRows}]=await Promise.all([supabase.from("sales").select("total").eq("location_id",locationId).eq("status","completed").gte("created_at",`${start}T00:00:00`).lt("created_at",`${end}T00:00:00`),supabase.from("order_payments").select("amount").eq("location_id",locationId).gte("payment_date",start).lt("payment_date",end),supabase.from("expenses").select("amount").eq("location_id",locationId).gte("expense_date",start).lt("expense_date",end)]);setOverview({sales:(saleRows??[]).reduce((n,x)=>n+Number(x.total),0),payments:(paymentRows??[]).reduce((n,x)=>n+Number(x.amount),0),expenses:(expenseRows??[]).reduce((n,x)=>n+Number(x.amount),0)});})()},[locationId,overviewPeriod]);
   type HomeAction = {
     title: string;
     help: string;
@@ -2377,8 +2376,9 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
         <Text style={[s.pageTitle,width>=900&&s.homeDesktopTitle]}>Shop overview</Text>
         <Text style={s.subtitle}>Everything you need, organised by task.</Text>
       </View>
+      <View style={s.homePeriodSwitch}><Pressable style={[s.homePeriodButton,overviewPeriod==="today"&&s.homePeriodButtonOn]} onPress={()=>setOverviewPeriod("today")}><Text style={[s.homePeriodText,overviewPeriod==="today"&&s.homePeriodTextOn]}>Today</Text></Pressable><Pressable style={[s.homePeriodButton,overviewPeriod==="month"&&s.homePeriodButtonOn]} onPress={()=>setOverviewPeriod("month")}><Text style={[s.homePeriodText,overviewPeriod==="month"&&s.homePeriodTextOn]}>This month</Text></Pressable></View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
-        {(!permissions||permissions.includes("sales"))?(()=>{const todaySales=sales.filter(x=>x.status==="completed").reduce((sum,x)=>sum+Number(x.total),0);const received=todaySales+orderPaymentsToday;return <><Pressable accessibilityRole="button" accessibilityLabel="View sales today" onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Shop sales today</Text><Text style={s.overviewMetricValue}>{peso(todaySales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View order payments" onPress={()=>onOpen("reports")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Order payments today</Text><Text style={s.overviewMetricValue}>{peso(orderPaymentsToday)}</Text><Text style={s.overviewMetricHelp}>Downpayments and final payments</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View expenses today" onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses today</Text><Text style={s.overviewMetricValue}>{peso(expenseToday)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Money after expenses</Text><Text style={s.overviewMetricValue}>{peso(received-expenseToday)}</Text><Text style={s.overviewMetricHelp}>All money received minus expenses</Text></View></>})():null}
+        {(!permissions||permissions.includes("sales"))?(()=>{const label=overviewPeriod==="today"?"today":"this month";const received=overview.sales+overview.payments;return <><Pressable accessibilityRole="button" accessibilityLabel={`View shop sales ${label}`} onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Shop sales {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.sales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`View order payments ${label}`} onPress={()=>onOpen("reports")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Order payments {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.payments)}</Text><Text style={s.overviewMetricHelp}>Customer payments received</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`View expenses ${label}`} onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.expenses)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Money left {label}</Text><Text style={s.overviewMetricValue}>{peso(received-overview.expenses)}</Text><Text style={s.overviewMetricHelp}>Money received minus expenses</Text></View></>})():null}
         {(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable>:null}
       </View>
       {eventReminder ? (
@@ -5209,6 +5209,11 @@ const s = StyleSheet.create({
   scroll: { paddingBottom: 96 },
   quickScroll: { paddingHorizontal: 0, paddingTop: 12, paddingBottom: 96 },
   homeIntro:{paddingTop:10,paddingBottom:16,borderBottomWidth:1,borderBottomColor:C.border},
+  homePeriodSwitch:{alignSelf:"flex-start",marginTop:14,padding:4,flexDirection:"row",gap:4,borderRadius:11,backgroundColor:C.soft},
+  homePeriodButton:{minHeight:36,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderRadius:8},
+  homePeriodButtonOn:{backgroundColor:C.white,shadowColor:C.ink,shadowOpacity:.08,shadowRadius:5,shadowOffset:{width:0,height:2}},
+  homePeriodText:{color:C.muted,fontSize:13,fontWeight:"600"},
+  homePeriodTextOn:{color:C.ink,fontWeight:"700"},
   overviewMetric:{flex:1,minWidth:130,padding:14,borderRadius:12,borderWidth:1,borderColor:SECTION.sales.border,backgroundColor:SECTION.sales.soft},
   overviewMetricLabel:{color:SECTION.sales.color,fontSize:13,fontWeight:"600"},
   overviewMetricValue:{marginTop:6,color:C.ink,fontSize:24,lineHeight:30,fontWeight:"700"},

@@ -25,6 +25,7 @@ import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { supabase } from "@/src/lib/supabase";
 import { peso } from "@/src/lib/format";
+import { EnquiriesPanel, type Enquiry } from "./EnquiriesPanel";
 
 const FONT = Platform.select({ web: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif", ios: "System", android: "sans-serif" });
 
@@ -115,6 +116,8 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
   const [editing,setEditing] = useState<Order | "new" | null>(null);
   const [form,setForm] = useState<Form>(emptyForm);
   const [saving,setSaving] = useState(false);
+  const [section,setSection]=useState<"orders"|"enquiries">("orders");
+  const [convertingLeadId,setConvertingLeadId]=useState<string|null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,7 +151,13 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
     return { paid, outstanding };
   },[orders]);
 
-  const startNew = () => { setForm(emptyForm()); setEditing("new"); };
+  const startNew = () => { setConvertingLeadId(null); setForm(emptyForm()); setEditing("new"); };
+  const convertEnquiry=(lead:Enquiry)=>{
+    const grouped=sourceGroup(lead.source);
+    setConvertingLeadId(lead.id);
+    setForm({...emptyForm(),title:lead.title,customer_name:lead.customer_name??"",customer_contact:lead.customer_contact??"",source:grouped,social_platform:SOCIAL_PLATFORMS.includes(lead.source)?lead.source:"Facebook",custom_source:grouped==="Other"?lead.source:"",total_price:lead.estimated_value?String(lead.estimated_value):"",target_date:displayDate(lead.follow_up_date),notes:lead.notes??""});
+    setEditing("new");
+  };
   const startEdit = (o: Order) => {
     const isSocial = SOCIAL_PLATFORMS.includes(o.source);
     setForm({ title:o.title,customer_name:o.customer_name??"",customer_contact:o.customer_contact??"",source:isSocial?"Social media":ORDER_SOURCES.includes(o.source)?o.source:"Other",social_platform:isSocial?o.source:"Facebook",custom_source:!isSocial&&!ORDER_SOURCES.includes(o.source)?o.source:"",quantity:String(o.quantity),order_date:displayDate(o.order_date),target_date:displayDate(o.target_date),total_price:String(o.total_price),amount_paid:String(o.amount_paid),payment_channel:o.payment_channel??"",payment_date:displayDate(isoDate()),payment_reference:o.payment_reference??"",notes:o.notes??"",image_uri:o.image_url??"",fulfilment_method:o.fulfilment_method??"collection",is_past_order:o.is_past_order??false,past_order_progress:o.status==="completed"?"completed":"in_progress" });
@@ -222,7 +231,8 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
       }
     }
     if((form.source==="Other"||form.social_platform==="Other")&&!source.startsWith("Other")) await supabase.from("order_sources").upsert({business_id:businessId,name:source},{onConflict:"business_id,name"});
-    setSaving(false); setEditing(null); await load();
+    if(editing==="new"&&convertingLeadId&&id) await supabase.from("order_enquiries").update({status:"converted",converted_order_id:id}).eq("id",convertingLeadId);
+    setConvertingLeadId(null); setSaving(false); setEditing(null); await load();
     Alert.alert("Order saved",pastCompleted?"The past order and full payment are recorded in Completed orders.":form.is_past_order?"The past order is active and will follow the normal order flow.":paid>=total?"Full payment is recorded.":paid>=total*.5?"The downpayment is recorded. The order is pending for printing.":`Waiting for downpayment. Printing cannot start until at least ${peso(total*.5)} is paid.`);
   };
   const setStatus = async (o:Order,status:OrderStatus) => {
@@ -244,9 +254,11 @@ export function OrdersScreen({ businessId, locationId }: { businessId: string; l
     const file=new File(Paths.cache,filename);file.create();file.write(csv);await Sharing.shareAsync(file.uri);
   };
 
-  if(editing) return <OrderForm form={form} setForm={setForm} saving={saving} editing={editing!=="new"} onBack={()=>setEditing(null)} onSave={save} onPhoto={choosePhoto}/>;
+  if(editing) return <OrderForm form={form} setForm={setForm} saving={saving} editing={editing!=="new"} onBack={()=>{setEditing(null);setConvertingLeadId(null)}} onSave={save} onPhoto={choosePhoto}/>;
+  if(section==="enquiries") return <ScrollView contentContainerStyle={s.page}><View style={s.headingRow}><View style={s.headingCopy}><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Enquiries before orders are confirmed</Text></View></View><View style={s.sectionSwitch}><Pressable style={s.sectionSwitchOff} onPress={()=>setSection("orders")}><Text style={s.sectionSwitchOffText}>Confirmed orders</Text></Pressable><View style={s.sectionSwitchOn}><Text style={s.sectionSwitchOnText}>Enquiries</Text></View></View><EnquiriesPanel businessId={businessId} locationId={locationId} onConvert={convertEnquiry}/></ScrollView>;
   return <ScrollView contentContainerStyle={s.page}>
     <View style={[s.headingRow,width<520&&s.headingRowMobile]}><View style={s.headingCopy}><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Payments, printing and collection</Text></View><Pressable style={[s.add,width<520&&s.addMobile]} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
+    <View style={s.sectionSwitch}><View style={s.sectionSwitchOn}><Text style={s.sectionSwitchOnText}>Confirmed orders</Text></View><Pressable style={s.sectionSwitchOff} onPress={()=>setSection("enquiries")}><Text style={s.sectionSwitchOffText}>Enquiries</Text></Pressable></View>
     <View style={[s.hero,{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:16,padding:18}]}><View><Text style={s.heroKicker}>OPEN ORDERS</Text><Text style={[s.heroValue,{fontSize:28}]}>{counts.open}</Text></View><Text style={[s.heroHelp,{flexShrink:1,textAlign:"right",maxWidth:180}]}>{urgent?`${urgent} need attention today`:"Orders are up to date"}</Text></View>
     {missingPrices>0?<Pressable style={s.priceWarning} onPress={()=>setView("all")}><Ionicons name="alert-circle" size={22} color={C.ruby}/><View style={{flex:1}}><Text style={s.priceWarningTitle}>{missingPrices} order{missingPrices===1?" needs":"s need"} a price</Text><Text style={s.priceWarningText}>Open each order and enter the full customer price. A ₱0 order cannot continue.</Text></View></Pressable>:null}
     {missingPhotos>0?<Pressable style={s.priceWarning} onPress={()=>setView("all")}><Ionicons name="camera-outline" size={22} color={C.ruby}/><View style={{flex:1}}><Text style={s.priceWarningTitle}>{missingPhotos} order{missingPhotos===1?" needs":"s need"} a photo</Text><Text style={s.priceWarningText}>Open the order and add a photo so the team knows exactly what to make.</Text></View></Pressable>:null}
@@ -328,6 +340,7 @@ function Field(props:TextInputProps&{label:string}) { return <View><Text style={
 
 const s=StyleSheet.create({
   page:{paddingTop:18,paddingBottom:96},headingRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:12},headingRowMobile:{flexWrap:"wrap",alignItems:"center"},headingCopy:{flex:1},title:{fontSize:28,lineHeight:34,fontWeight:"700",color:C.ink,letterSpacing:-.6},subtitle:{marginTop:3,fontSize:15,lineHeight:22,color:C.muted},add:{minHeight:48,paddingHorizontal:16,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:12,backgroundColor:C.navy},addMobile:{alignSelf:"flex-start"},addText:{color:C.white,fontSize:14,fontWeight:"700"},
+  sectionSwitch:{alignSelf:"flex-start",marginTop:14,padding:4,flexDirection:"row",gap:4,borderRadius:11,backgroundColor:C.pale},sectionSwitchOn:{minHeight:38,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderRadius:8,backgroundColor:C.white,shadowColor:C.ink,shadowOpacity:.08,shadowRadius:5,shadowOffset:{width:0,height:2}},sectionSwitchOnText:{color:C.ink,fontSize:13,fontWeight:"700"},sectionSwitchOff:{minHeight:38,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderRadius:8},sectionSwitchOffText:{color:C.muted,fontSize:13,fontWeight:"600"},
   hero:{marginTop:18,padding:18,borderWidth:1,borderColor:"#DCE5EB",borderRadius:14,backgroundColor:"#EEF3F7"},heroKicker:{color:C.navy,fontSize:13,fontWeight:"700",letterSpacing:1.2},heroValue:{marginTop:5,color:C.ink,fontSize:34,fontWeight:"700"},heroHelp:{marginTop:5,color:C.ink,fontSize:15,lineHeight:21,fontWeight:"600"},tabs:{gap:8,paddingVertical:14},tab:{minHeight:44,paddingHorizontal:15,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},tabOn:{backgroundColor:C.ink,borderColor:C.ink},tabText:{color:C.ink,fontSize:13,fontWeight:"700"},tabTextOn:{color:C.white},
   priceWarning:{marginTop:12,padding:15,flexDirection:"row",alignItems:"flex-start",gap:10,borderWidth:1,borderColor:"#E8C9D2",borderRadius:14,backgroundColor:"#FCF4F6"},priceWarningTitle:{color:C.ruby,fontSize:15,fontWeight:"700"},priceWarningText:{marginTop:3,color:C.ink,fontSize:14,lineHeight:20},
   summaryRow:{marginTop:10,flexDirection:"row",gap:8},summaryItem:{minWidth:0,flex:1,padding:14,borderRadius:11,backgroundColor:C.pale},summaryValue:{marginTop:5,color:C.ink,fontSize:18,lineHeight:23,fontWeight:"700"},followUpGrid:{marginTop:10,flexDirection:"row",flexWrap:"wrap",gap:8},followUpCard:{minWidth:150,flexGrow:1,flexBasis:0,padding:12,borderWidth:1,borderColor:C.border,borderRadius:11,backgroundColor:C.white},followUpValue:{color:C.navy,fontSize:22,fontWeight:"700"},followUpLabel:{marginTop:3,color:C.ink,fontSize:13,lineHeight:18,fontWeight:"600"},
