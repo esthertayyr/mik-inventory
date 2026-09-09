@@ -271,6 +271,7 @@ function Login() {
     });
     if(e&&clean==="esther"){
       ({error:e}=await supabase.auth.signInWithPassword({email:"owner@login.mik.app",password}));
+      if(e) ({error:e}=await supabase.auth.signInWithPassword({email:"{username}@login.mik.app",password}));
       if(!e) await supabase.functions.invoke("admin-manage-platform-team",{body:{action:"rename_owner",username:"esther"}});
     }
     // The first Pixelbug profile originally used a hidden legacy login. Keep a
