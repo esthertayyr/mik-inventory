@@ -526,37 +526,19 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={s.adminPage}>
-        <View style={s.adminHero}>
-          <Text style={s.heroLabel}>ACTIVE SHOP PROFILES</Text>
-          <Text style={s.heroValue}>{shops.filter((shop) => shop.status === "active").length}</Text>
+        <View style={s.ownerDashboardIntro}><View style={s.flex}><Text style={s.ownerDashboardEyebrow}>MIK PLATFORM</Text><Text style={s.ownerDashboardTitle}>Owner dashboard</Text><Text style={s.ownerDashboardSubtitle}>A clear view of every shop today.</Text></View><View style={s.ownerLivePill}><View style={s.ownerLiveDot}/><Text style={s.ownerLiveText}>{shops.filter(shop=>shop.status==="active").length} active shop{shops.filter(shop=>shop.status==="active").length===1?"":"s"}</Text></View></View>
+        <Text style={s.ownerZoneTitle}>Money today</Text>
+        <View style={s.ownerMoneyGrid}>
+          <View style={[s.ownerMoneyCard,s.ownerMoneyPrimary]}><Text style={[s.ownerMoneyLabel,{color:"#D8DCE7"}]}>MONEY RECEIVED</Text><Text style={s.ownerMoneyValue}>{peso(ownerStats.salesToday+ownerStats.orderPaymentsToday)}</Text><Text style={s.ownerMoneyHelp}>Shop sales and order payments</Text></View>
+          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>SHOP SALES</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.salesToday)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.sales.color}]}/></View>
+          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>ORDER PAYMENTS</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.orderPaymentsToday)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.orders.color}]}/></View>
+          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>EXPENSES</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.expensesToday)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.production.color}]}/></View>
+          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>MONEY LEFT</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.salesToday+ownerStats.orderPaymentsToday-ownerStats.expensesToday)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.stock.color}]}/></View>
         </View>
-        <View style={s.ownerStatsRow}>
-          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>SALES TODAY</Text><Text style={s.ownerStatValue}>{peso(ownerStats.salesToday)}</Text></View>
-          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>ORDER PAYMENTS</Text><Text style={s.ownerStatValue}>{peso(ownerStats.orderPaymentsToday)}</Text></View>
-          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>EXPENSES TODAY</Text><Text style={s.ownerStatValue}>{peso(ownerStats.expensesToday)}</Text></View>
-          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>ACTIVE ORDERS</Text><Text style={s.ownerStatValue}>{ownerStats.activeOrders}</Text></View>
-          <View style={s.ownerStatCard}><Text style={s.ownerStatLabel}>LOW STOCK</Text><Text style={s.ownerStatValue}>{ownerStats.lowStock}</Text></View>
+        <View style={[s.ownerDashboardColumns,width<720&&s.ownerDashboardColumnsMobile]}>
+          <View style={s.ownerDashboardPanel}><Text style={s.ownerZoneTitle}>Needs attention</Text><Pressable style={s.ownerAttentionRow} onPress={()=>shops[0]&&setOpenShop(shops[0])}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.orders.soft}]}><Ionicons name="clipboard-outline" size={20} color={SECTION.orders.color}/></View><View style={s.flex}><Text style={s.ownerAttentionValue}>{ownerStats.activeOrders}</Text><Text style={s.ownerAttentionLabel}>Open customer orders</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable><Pressable style={s.ownerAttentionRow} onPress={()=>shops[0]&&setOpenShop(shops[0])}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.stock.soft}]}><Ionicons name="alert-circle-outline" size={20} color={SECTION.stock.color}/></View><View style={s.flex}><Text style={s.ownerAttentionValue}>{ownerStats.lowStock}</Text><Text style={s.ownerAttentionLabel}>Low-stock products</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable><Pressable style={s.ownerAttentionRow} onPress={()=>setShowIssues(true)}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.support.soft}]}><Ionicons name="chatbox-ellipses-outline" size={20} color={SECTION.support.color}/></View><View style={s.flex}><Text style={s.ownerAttentionLabelStrong}>Problem reports</Text><Text style={s.ownerAttentionLabel}>Review messages from shops</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable></View>
+          <View style={s.ownerDashboardPanel}><Text style={s.ownerZoneTitle}>Platform tools</Text><View style={s.ownerToolGrid}><Pressable style={s.ownerTool} onPress={()=>setShowActivity(true)}><Ionicons name="time-outline" size={21} color={SECTION.records.color}/><Text style={s.ownerToolTitle}>Activity</Text><Text style={s.ownerToolHelp}>See every change</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>setShowAccounts(true)}><Ionicons name="people-outline" size={21} color={SECTION.support.color}/><Text style={s.ownerToolTitle}>Accounts</Text><Text style={s.ownerToolHelp}>Owners and staff</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>setShowTeam(true)}><Ionicons name="shield-checkmark-outline" size={21} color={SECTION.records.color}/><Text style={s.ownerToolTitle}>Viewers</Text><Text style={s.ownerToolHelp}>Dashboard access</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>void exportOwnerSales()} disabled={exporting}><Ionicons name="download-outline" size={21} color={C.accent}/><Text style={s.ownerToolTitle}>{exporting?"Preparing…":"Export"}</Text><Text style={s.ownerToolHelp}>All shop sales</Text></Pressable></View></View>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open shop activity log" style={s.activityButton} onPress={() => setShowActivity(true)}>
-          <View style={s.activityButtonIcon}><Ionicons name="time-outline" size={23} color={C.white} /></View>
-          <View style={s.flex}><Text style={s.activityButtonTitle}>Shop activity</Text><Text style={s.activityButtonHelp}>Sales, products, stock, orders and logins</Text></View>
-          <Ionicons name="chevron-forward" size={21} color={C.green} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Open problem reports" style={s.activityButton} onPress={() => setShowIssues(true)}>
-          <View style={[s.activityButtonIcon,{backgroundColor:C.accent}]}><Ionicons name="chatbox-ellipses-outline" size={23} color={C.white} /></View>
-          <View style={s.flex}><Text style={s.activityButtonTitle}>Problem reports</Text><Text style={s.activityButtonHelp}>Messages sent by shop users</Text></View>
-          <Ionicons name="chevron-forward" size={21} color={C.accent} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="View all accounts" style={s.activityButton} onPress={() => setShowAccounts(true)}>
-          <View style={[s.activityButtonIcon,{backgroundColor:SECTION.support.color}]}><Ionicons name="people-outline" size={23} color={C.white} /></View>
-          <View style={s.flex}><Text style={s.activityButtonTitle}>All accounts</Text><Text style={s.activityButtonHelp}>Shop owners, shop logins and staff</Text></View>
-          <Ionicons name="chevron-forward" size={21} color={SECTION.support.color} />
-        </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Manage dashboard viewers" style={s.activityButton} onPress={()=>setShowTeam(true)}><View style={[s.activityButtonIcon,{backgroundColor:SECTION.records.color}]}><Ionicons name="shield-checkmark-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={s.activityButtonTitle}>Dashboard viewers</Text><Text style={s.activityButtonHelp}>Create view-only accounts and choose their shops</Text></View><Ionicons name="chevron-forward" size={21} color={SECTION.records.color}/></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Export all shop sales" style={s.ownerExportButton} onPress={() => void exportOwnerSales()} disabled={exporting}>
-          <Ionicons name="download-outline" size={22} color={C.accent} />
-          <View style={s.flex}><Text style={s.ownerExportTitle}>{exporting ? "Preparing export…" : "Export all shop sales"}</Text><Text style={s.rowHelp}>One Excel-ready CSV for every shop</Text></View>
-        </Pressable>
         {showForm ? (
           <View style={s.editCard}>
             <Text style={s.editName}>Create a shop profile</Text>
@@ -5093,6 +5075,34 @@ const s = StyleSheet.create({
     paddingBottom: 38,
   },
   adminHero: { padding: 20, borderRadius: 20, backgroundColor: C.dark },
+  ownerDashboardIntro:{paddingTop:8,paddingBottom:20,flexDirection:"row",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:16,borderBottomWidth:1,borderBottomColor:C.border},
+  ownerDashboardEyebrow:{color:C.green,fontSize:11,lineHeight:16,fontWeight:"700",letterSpacing:2},
+  ownerDashboardTitle:{marginTop:5,color:C.ink,fontSize:30,lineHeight:36,fontWeight:"700",letterSpacing:-.7},
+  ownerDashboardSubtitle:{marginTop:3,color:C.muted,fontSize:14,lineHeight:20},
+  ownerLivePill:{minHeight:36,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:7,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:18,backgroundColor:SECTION.stock.soft},
+  ownerLiveDot:{width:7,height:7,borderRadius:4,backgroundColor:SECTION.stock.color},
+  ownerLiveText:{color:SECTION.stock.color,fontSize:12,fontWeight:"700"},
+  ownerZoneTitle:{marginTop:20,marginBottom:10,color:C.ink,fontSize:15,lineHeight:20,fontWeight:"700"},
+  ownerMoneyGrid:{flexDirection:"row",flexWrap:"wrap",gap:10},
+  ownerMoneyCard:{position:"relative",overflow:"hidden",minWidth:145,flexGrow:1,flexBasis:145,minHeight:104,padding:14,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  ownerMoneyPrimary:{minWidth:250,flexBasis:250,backgroundColor:C.dark,borderColor:C.dark},
+  ownerMoneyLabel:{color:C.muted,fontSize:10,lineHeight:15,fontWeight:"700",letterSpacing:.8},
+  ownerMoneyValue:{marginTop:7,color:C.white,fontSize:28,lineHeight:33,fontWeight:"700",letterSpacing:-.5},
+  ownerMoneyValueSmall:{marginTop:9,color:C.ink,fontSize:20,lineHeight:25,fontWeight:"700"},
+  ownerMoneyHelp:{marginTop:4,color:"#C9CEDC",fontSize:11,lineHeight:16},
+  ownerMoneyMark:{position:"absolute",left:14,right:14,bottom:0,height:3,borderTopLeftRadius:3,borderTopRightRadius:3},
+  ownerDashboardColumns:{marginTop:6,flexDirection:"row",alignItems:"flex-start",gap:14},
+  ownerDashboardColumnsMobile:{flexDirection:"column"},
+  ownerDashboardPanel:{minWidth:0,flex:1,width:"100%"},
+  ownerAttentionRow:{minHeight:65,marginBottom:8,padding:11,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.white},
+  ownerAttentionIcon:{width:39,height:39,alignItems:"center",justifyContent:"center",borderRadius:11},
+  ownerAttentionValue:{color:C.ink,fontSize:18,lineHeight:22,fontWeight:"700"},
+  ownerAttentionLabel:{marginTop:1,color:C.muted,fontSize:12,lineHeight:17},
+  ownerAttentionLabelStrong:{color:C.ink,fontSize:14,lineHeight:18,fontWeight:"700"},
+  ownerToolGrid:{flexDirection:"row",flexWrap:"wrap",gap:8},
+  ownerTool:{minWidth:125,flexGrow:1,flexBasis:"45%",minHeight:91,padding:12,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.soft},
+  ownerToolTitle:{marginTop:7,color:C.ink,fontSize:14,lineHeight:18,fontWeight:"700"},
+  ownerToolHelp:{marginTop:2,color:C.muted,fontSize:11,lineHeight:16},
   ownerStatsRow:{marginVertical:12,flexDirection:"row",gap:8},
   ownerStatCard:{flex:1,minWidth:0,padding:12,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.white},
   ownerStatLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.4},
