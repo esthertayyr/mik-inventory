@@ -936,6 +936,7 @@ function ShopApp({
   if (screen === "home")
     body = (
       <QuickStart
+        businessId={business!.id}
         locationId={locationId}
         sales={sales}
         permissions={staffPermissions}
@@ -1042,7 +1043,7 @@ function ShopApp({
       />
     );
   else if (screen === "orders")
-    body = <OrdersScreen businessId={business!.id} locationId={locationId} />;
+    body = <OrdersScreen businessId={business!.id} locationId={locationId} actorName={deviceUserName||profile?.display_name||"Shop team"} />;
   else if (screen === "printers")
     body = <PrintersScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
   else if (screen === "filaments")
@@ -2243,27 +2244,30 @@ function SaleScreen({
   );
 }
 
-function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null }) {
+function QuickStart({ businessId, locationId, sales, onOpen, permissions }: { businessId:string; locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null }) {
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0, pendingMoney:0, toPrint:0, printing:0 });
   const [overviewPeriod,setOverviewPeriod]=useState<"today"|"month">("today");
   const [overview,setOverview]=useState({sales:0,payments:0,expenses:0});
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
   const [stockCheckDue,setStockCheckDue]=useState(false);
+  const [photoSummary,setPhotoSummary]=useState({products:0,orders:0});
   const [openHomeGroups, setOpenHomeGroups] = useState<string[]>(["Start here"]);
   useEffect(() => {
     setEventReminder(null);
     supabase.from("stock_checks").select("checked_on").eq("location_id",locationId).order("checked_on",{ascending:false}).limit(1).maybeSingle().then(({data})=>{if(!data?.checked_on)return setStockCheckDue(true);const age=(new Date(`${localDateKey()}T12:00:00`).getTime()-new Date(`${data.checked_on}T12:00:00`).getTime())/86400000;setStockCheckDue(age>=14);});
     Promise.all([
-      supabase.from("external_orders").select("status,target_date,total_price,amount_paid").eq("location_id", locationId),
+      supabase.from("external_orders").select("status,target_date,total_price,amount_paid,image_url").eq("location_id", locationId),
       supabase.from("print_jobs").select("status").eq("location_id",locationId).in("status",["to_print","printing"]),
-    ]).then(([{data},{data:printJobs}]) => {
+      supabase.from("products").select("image_url").eq("business_id",businessId).eq("active",true),
+    ]).then(([{data},{data:printJobs},{data:productRows}]) => {
         const activeRows=(data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status));
         const active = activeRows.length;
         const todayValue = localDateKey();
         const urgent = activeRows.filter((o) => o.target_date && o.target_date <= todayValue).length;
         const pendingMoney=activeRows.reduce((sum,o)=>sum+Math.max(0,Number(o.total_price)-Number(o.amount_paid)),0);
         setOrderSummary({ active, urgent, pendingMoney, toPrint:(printJobs??[]).filter(j=>j.status==="to_print").length, printing:(printJobs??[]).filter(j=>j.status==="printing").length });
+        setPhotoSummary({products:(productRows??[]).filter(p=>!p.image_url).length,orders:(data??[]).filter(o=>!o.image_url).length});
       });
     const today = localDateKey();
     const end = new Date();
@@ -2286,7 +2290,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
         });
         setEventReminder(due ?? null);
       });
-  }, [locationId]);
+  }, [businessId,locationId]);
   useEffect(()=>{void(async()=>{const now=new Date(),today=localDateKey(now);const start=overviewPeriod==="today"?today:`${today.slice(0,7)}-01`;const endDate=overviewPeriod==="today"?new Date(now.getFullYear(),now.getMonth(),now.getDate()+1):new Date(now.getFullYear(),now.getMonth()+1,1);const end=localDateKey(endDate);const [{data:saleRows},{data:paymentRows},{data:expenseRows}]=await Promise.all([supabase.from("sales").select("total").eq("location_id",locationId).eq("status","completed").gte("created_at",`${start}T00:00:00`).lt("created_at",`${end}T00:00:00`),supabase.from("order_payments").select("amount").eq("location_id",locationId).gte("payment_date",start).lt("payment_date",end),supabase.from("expenses").select("amount").eq("location_id",locationId).gte("expense_date",start).lt("expense_date",end)]);setOverview({sales:(saleRows??[]).reduce((n,x)=>n+Number(x.total),0),payments:(paymentRows??[]).reduce((n,x)=>n+Number(x.amount),0),expenses:(expenseRows??[]).reduce((n,x)=>n+Number(x.amount),0)});})()},[locationId,overviewPeriod]);
   type HomeAction = {
     title: string;
@@ -2365,6 +2369,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
         {(!permissions||permissions.includes("orders"))?<><Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View money still to collect from orders" onPress={()=>onOpen("orders")} style={[s.overviewMetric,s.overviewAlertMetric]}><Text style={[s.overviewMetricLabel,{color:C.red}]}>Still to collect</Text><Text style={s.overviewMetricValue}>{peso(orderSummary.pendingMoney)}</Text><Text style={[s.overviewMetricHelp,{color:C.red}]}>Unpaid order balances →</Text></Pressable></>:null}
       </View>
       {orderSummary.toPrint>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.production.border,backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("print_queue")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="layers-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.production.color}]}>PRINTING ACTION NEEDED</Text><Text style={s.homeReminderTitle}>{orderSummary.toPrint} paid job{orderSummary.toPrint===1?" is":"s are"} waiting to print</Text><Text style={s.homeReminderMeta}>Open Print Queue and start the next job.</Text></View><View style={s.reminderCount}><Text style={s.reminderCountText}>{orderSummary.toPrint}</Text></View></Pressable>:null}
+      {photoSummary.products+photoSummary.orders>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.support.border,backgroundColor:SECTION.support.soft}]} onPress={()=>onOpen(photoSummary.orders?"orders":"products")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.support.color}]}><Ionicons name="images-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.support.color}]}>PHOTOS NEEDED</Text><Text style={s.homeReminderTitle}>{photoSummary.products+photoSummary.orders} item{photoSummary.products+photoSummary.orders===1?" needs":"s need"} a photo</Text><Text style={s.homeReminderMeta}>{photoSummary.products?`${photoSummary.products} product${photoSummary.products===1?"":"s"}`:""}{photoSummary.products&&photoSummary.orders?" · ":""}{photoSummary.orders?`${photoSummary.orders} order${photoSummary.orders===1?"":"s"}`:""}</Text></View><Ionicons name="chevron-forward" size={21} color={SECTION.support.color}/></Pressable>:null}
       {eventReminder ? (
         <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
           <View style={s.homeReminderIcon}><Ionicons name="notifications" size={23} color={C.white} /></View>
@@ -3022,6 +3027,7 @@ function Products({
   const save = async () => {
     const cleanName = name.trim();
     const prices = numbers();
+    if (!pickedUri && !selected?.image_url) return Alert.alert("Product photo needed", "Add a clear product photo so the cashier can recognise it.");
     if (!cleanName) return Alert.alert("Product name needed", "Enter a short name that the cashier will recognise.");
     if (!categoryId) return Alert.alert("Category needed", "Choose where this product should appear on the Sell screen.");
     if (!prices)
@@ -3274,7 +3280,7 @@ function Products({
             )}
           </View>
           <BigButton
-            label={image ? "Change product photo · Optional" : "Add product photo · Optional"}
+            label={image ? "Change product photo" : "Add product photo · Required"}
             icon="camera-outline"
             color={SECTION.stock.color}
             onPress={chooseImage}
@@ -4834,8 +4840,8 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "center",
-    backgroundColor: C.green,
-    shadowColor: C.green,
+    backgroundColor: C.dark,
+    shadowColor: C.dark,
     shadowOpacity: 0.24,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -5603,7 +5609,7 @@ const s = StyleSheet.create({
     marginBottom: 7,
     borderWidth:1,
     borderColor:"#EEF0F2",
-    backgroundColor: C.white,
+    backgroundColor: C.soft,
   },
   productCardImage: { width: "100%", height: "100%", resizeMode: "contain", objectFit:"contain" },
   missingPhoto: {
@@ -5834,8 +5840,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 9,
     borderRadius: 12,
-    backgroundColor: C.green,
-    shadowColor: C.green,
+    backgroundColor: C.dark,
+    shadowColor: C.dark,
     shadowOpacity: 0.1,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 4 },
@@ -5989,7 +5995,7 @@ const s = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: "#EEF2F7",
   },
-  productPhotoImage: { width: "100%", height: "100%", resizeMode: "contain" },
+  productPhotoImage: { width: "100%", height: "100%", resizeMode: "contain",backgroundColor:C.soft },
   priceInput: {
     minHeight: 60,
     paddingHorizontal: 16,
@@ -6032,7 +6038,7 @@ const s = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: C.accentSoft,
   },
-  stockListImage:{width:52,height:52,borderWidth:1,borderColor:C.border,borderRadius:12,resizeMode:"contain",backgroundColor:C.white},
+  stockListImage:{width:52,height:52,borderWidth:1,borderColor:C.border,borderRadius:12,resizeMode:"contain",backgroundColor:C.soft},
   stockListImageDesktop:{width:68,height:68,borderRadius:14},
   listImage: { width: 58, height: 58, borderRadius: 16, resizeMode: "cover" },
   manageCategoryButton: { minHeight: 48, marginTop: 10, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 16, backgroundColor: C.soft },
