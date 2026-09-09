@@ -2245,7 +2245,7 @@ function SaleScreen({
 
 function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null }) {
   const { width } = useWindowDimensions();
-  const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0 });
+  const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0, pendingMoney:0, toPrint:0, printing:0 });
   const [overviewPeriod,setOverviewPeriod]=useState<"today"|"month">("today");
   const [overview,setOverview]=useState({sales:0,payments:0,expenses:0});
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
@@ -2254,15 +2254,16 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
   useEffect(() => {
     setEventReminder(null);
     supabase.from("stock_checks").select("checked_on").eq("location_id",locationId).order("checked_on",{ascending:false}).limit(1).maybeSingle().then(({data})=>{if(!data?.checked_on)return setStockCheckDue(true);const age=(new Date(`${localDateKey()}T12:00:00`).getTime()-new Date(`${data.checked_on}T12:00:00`).getTime())/86400000;setStockCheckDue(age>=14);});
-    supabase
-      .from("external_orders")
-      .select("status,target_date")
-      .eq("location_id", locationId)
-      .then(({ data }) => {
-        const active = (data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status)).length;
+    Promise.all([
+      supabase.from("external_orders").select("status,target_date,total_price,amount_paid").eq("location_id", locationId),
+      supabase.from("print_jobs").select("status").eq("location_id",locationId).in("status",["to_print","printing"]),
+    ]).then(([{data},{data:printJobs}]) => {
+        const activeRows=(data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status));
+        const active = activeRows.length;
         const todayValue = localDateKey();
-        const urgent = (data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status) && o.target_date && o.target_date <= todayValue).length;
-        setOrderSummary({ active, urgent });
+        const urgent = activeRows.filter((o) => o.target_date && o.target_date <= todayValue).length;
+        const pendingMoney=activeRows.reduce((sum,o)=>sum+Math.max(0,Number(o.total_price)-Number(o.amount_paid)),0);
+        setOrderSummary({ active, urgent, pendingMoney, toPrint:(printJobs??[]).filter(j=>j.status==="to_print").length, printing:(printJobs??[]).filter(j=>j.status==="printing").length });
       });
     const today = localDateKey();
     const end = new Date();
@@ -2307,7 +2308,7 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
         { title: "Make a sale", help: "Choose normal or fast event checkout", icon: "cart", screen: "sell_start" },
         { title: "Sales today", help: "See what you sold today", icon: "today", screen: "dashboard" },
         { title: "Customer orders", help: orderSummary.active ? `${orderSummary.active} active · ${orderSummary.urgent} need attention` : "Add or update customer orders", icon: "clipboard", screen: "orders" },
-        { title: "What to print", help: "Start or update a printing job", icon: "layers", screen: "print_queue" },
+        { title: "What to print", help: orderSummary.toPrint?`${orderSummary.toPrint} waiting to start${orderSummary.printing?` · ${orderSummary.printing} printing`:""}`:orderSummary.printing?`${orderSummary.printing} printing now`:"Start or update a printing job", icon: "layers", screen: "print_queue" },
       ],
     },
     {
@@ -2361,8 +2362,9 @@ function QuickStart({ locationId, sales, onOpen, permissions }: { locationId: st
       <View style={s.homePeriodSwitch}><Pressable style={[s.homePeriodButton,overviewPeriod==="today"&&s.homePeriodButtonOn]} onPress={()=>setOverviewPeriod("today")}><Text style={[s.homePeriodText,overviewPeriod==="today"&&s.homePeriodTextOn]}>Today</Text></Pressable><Pressable style={[s.homePeriodButton,overviewPeriod==="month"&&s.homePeriodButtonOn]} onPress={()=>setOverviewPeriod("month")}><Text style={[s.homePeriodText,overviewPeriod==="month"&&s.homePeriodTextOn]}>This month</Text></Pressable></View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
         {(!permissions||permissions.includes("sales"))?(()=>{const label=overviewPeriod==="today"?"today":"this month";const received=overview.sales+overview.payments;return <><Pressable accessibilityRole="button" accessibilityLabel={`View shop sales ${label}`} onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Shop sales {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.sales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`View order payments ${label}`} onPress={()=>onOpen("reports")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Order payments {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.payments)}</Text><Text style={s.overviewMetricHelp}>Customer payments received</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`View expenses ${label}`} onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Expenses {label}</Text><Text style={s.overviewMetricValue}>{peso(overview.expenses)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Money left {label}</Text><Text style={s.overviewMetricValue}>{peso(received-overview.expenses)}</Text><Text style={s.overviewMetricHelp}>Money received minus expenses</Text></View></>})():null}
-        {(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable>:null}
+        {(!permissions||permissions.includes("orders"))?<><Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View money still to collect from orders" onPress={()=>onOpen("orders")} style={[s.overviewMetric,s.overviewAlertMetric]}><Text style={[s.overviewMetricLabel,{color:C.red}]}>Still to collect</Text><Text style={s.overviewMetricValue}>{peso(orderSummary.pendingMoney)}</Text><Text style={[s.overviewMetricHelp,{color:C.red}]}>Unpaid order balances →</Text></Pressable></>:null}
       </View>
+      {orderSummary.toPrint>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.production.border,backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("print_queue")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="layers-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.production.color}]}>PRINTING ACTION NEEDED</Text><Text style={s.homeReminderTitle}>{orderSummary.toPrint} paid job{orderSummary.toPrint===1?" is":"s are"} waiting to print</Text><Text style={s.homeReminderMeta}>Open Print Queue and start the next job.</Text></View><View style={s.reminderCount}><Text style={s.reminderCountText}>{orderSummary.toPrint}</Text></View></Pressable>:null}
       {eventReminder ? (
         <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
           <View style={s.homeReminderIcon}><Ionicons name="notifications" size={23} color={C.white} /></View>
@@ -3909,12 +3911,7 @@ function Inventory({
                         : "In stock"}
                 </Text>
               </View>
-              <View style={[s.stockNum, low && s.stockNumLow]}>
-                <Text style={[s.stockNumText, low && s.low]}>
-                  {quantityShown}
-                </Text>
-                <Text style={[s.stockNumLabel, low && s.low]}>{alphabetOnly ? "total" : "left"}</Text>
-              </View>
+              <View style={[s.stockNum, low && s.stockNumLow]}><Text style={[s.stockNumText, low && s.low]}>{quantityShown} {alphabetOnly ? "total" : "in stock"}</Text></View>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Edit ${item.name}`}
@@ -5235,6 +5232,7 @@ const s = StyleSheet.create({
   homePeriodText:{color:C.muted,fontSize:13,fontWeight:"600"},
   homePeriodTextOn:{color:C.ink,fontWeight:"700"},
   overviewMetric:{flex:1,minWidth:130,padding:14,borderRadius:12,borderWidth:1,borderColor:SECTION.sales.border,backgroundColor:SECTION.sales.soft},
+  overviewAlertMetric:{borderColor:"#E7D4DB",backgroundColor:"#FBF5F7"},
   overviewMetricLabel:{color:SECTION.sales.color,fontSize:13,fontWeight:"600"},
   overviewMetricValue:{marginTop:6,color:C.ink,fontSize:24,lineHeight:30,fontWeight:"700"},
   overviewMetricHelp:{marginTop:5,color:SECTION.sales.color,fontSize:12,lineHeight:17},
@@ -5256,6 +5254,8 @@ const s = StyleSheet.create({
   homeReminderLabel:{color:SECTION.records.color,fontSize:12,fontWeight:"700",letterSpacing:.8},
   homeReminderTitle:{marginTop:3,color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
   homeReminderMeta:{marginTop:3,color:C.muted,fontSize:12,fontWeight:"600"},
+  reminderCount:{minWidth:38,height:38,paddingHorizontal:9,alignItems:"center",justifyContent:"center",borderRadius:19,backgroundColor:C.white},
+  reminderCountText:{color:SECTION.production.color,fontSize:16,fontWeight:"800"},
   saleTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   clearSaleButton: {
     minHeight: 42,
@@ -6093,7 +6093,7 @@ const s = StyleSheet.create({
     backgroundColor: C.soft,
   },
   stockNumLow: { backgroundColor: C.orangeSoft },
-  stockNumText: { color: C.dark, fontSize: 20, fontWeight: "700" },
+  stockNumText: { color: C.dark, fontSize: 15, lineHeight:20,fontWeight: "700" },
   stockNumLabel:{marginTop:-2,color:C.muted,fontSize:12,fontWeight:"600",textTransform:"uppercase",letterSpacing:.3},
   priceListHero:{marginTop:14,padding:20,flexDirection:"row",alignItems:"center",gap:16,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:"#F5F7F8"},
   priceListKicker:{color:C.accent,fontSize:12,fontWeight:"700",letterSpacing:1.1},
