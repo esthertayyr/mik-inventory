@@ -1270,8 +1270,10 @@ function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceU
     <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={22} color={C.accent}/><View style={s.flex}><Text style={s.eventModeNoteStrong}>How Event Sale works</Text><Text style={s.eventModeStep}>1. Add the product and take payment.</Text><Text style={s.eventModeStep}>2. Clickers skip the letter screen.</Text><Text style={s.eventModeStep}>3. After the event, count the A–Z keycaps left.</Text><Text style={s.eventModeTip}>Tip: Take a photo of sold items to help you count later.</Text></View></View>
     <Text style={s.salesRecordHeading}>CORRECT A MISTAKE</Text>
     <Text style={s.salesRecordHelp}>Use this when a sale was entered incorrectly.</Text>
-    <Pressable accessibilityRole="button" accessibilityLabel="Cancel wrong sale. Find a sale entered by mistake and cancel it." style={[s.earlierSale,s.earlierSaleDanger]} onPress={()=>onOpen("correct")}><View pointerEvents="none" style={s.earlierSaleDangerIcon}><Ionicons name="return-up-back-outline" size={20} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Cancel wrong sale</Text><Text style={s.earlierSaleHelp}>Find a mistaken sale and cancel it</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.red}/></Pressable>
-    <Pressable accessibilityRole="button" accessibilityLabel="Add an earlier sale. Choose the date, products and price charged." style={s.missedSaleFeature} onPress={()=>onOpen("missed")}><View pointerEvents="none" style={s.missedSaleFeatureIcon}><Ionicons name="calendar-number-outline" size={20} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.missedSaleFeatureTitle}>Add an earlier sale</Text><Text style={s.missedSaleFeatureHelp}>Choose the date, products and price charged</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={19} color={SECTION.records.color}/></Pressable>
+    <View style={[s.saleCorrectionGrid,width>=760&&s.saleCorrectionGridDesktop]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Cancel wrong sale. Find a sale entered by mistake and cancel it." style={[s.earlierSale,s.earlierSaleDanger,width>=760&&s.saleCorrectionCardDesktop]} onPress={()=>onOpen("correct")}><View pointerEvents="none" style={s.earlierSaleDangerIcon}><Ionicons name="return-up-back-outline" size={20} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.earlierSaleTitle}>Cancel wrong sale</Text><Text style={s.earlierSaleHelp}>Find a mistaken sale and cancel it</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={20} color={C.red}/></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Add an earlier sale. Choose the date, products and price charged." style={[s.missedSaleFeature,width>=760&&s.saleCorrectionCardDesktop]} onPress={()=>onOpen("missed")}><View pointerEvents="none" style={s.missedSaleFeatureIcon}><Ionicons name="calendar-number-outline" size={20} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.missedSaleFeatureTitle}>Add an earlier sale</Text><Text style={s.missedSaleFeatureHelp}>Choose the date, products and price charged</Text></View><Ionicons pointerEvents="none" name="chevron-forward" size={19} color={SECTION.records.color}/></Pressable>
+    </View>
   </ScrollView>;
 }
 
@@ -5430,6 +5432,9 @@ const s = StyleSheet.create({
   sellModeTitle:{color:C.ink,fontSize:16,lineHeight:21,fontWeight:"700"},
   sellModeHelp:{marginTop:4,color:C.muted,fontSize:13,lineHeight:19},
   earlierSale:{minHeight:72,marginTop:14,paddingHorizontal:16,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  saleCorrectionGrid:{width:"100%"},
+  saleCorrectionGridDesktop:{flexDirection:"row",gap:12},
+  saleCorrectionCardDesktop:{flex:1,minWidth:0,minHeight:76,marginTop:10,marginBottom:24},
   earlierSaleDanger:{borderColor:"#E8D8DE",backgroundColor:C.redSoft},
   earlierSaleDangerIcon:{width:38,height:38,alignItems:"center",justifyContent:"center",borderRadius:10,backgroundColor:C.red},
   missedSaleFeature:{minHeight:76,marginTop:10,marginBottom:24,paddingHorizontal:14,paddingVertical:11,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.records.border,borderRadius:12,backgroundColor:SECTION.records.soft},
