@@ -1287,7 +1287,6 @@ function StockStart({businessId,locationId,onOpen}:{businessId:string;locationId
       <WorkspaceAction title="Update stock" help="Add stock or correct the quantity on hand" icon="cube-outline" color={SECTION.stock.color} onPress={()=>onOpen("inventory")}/>
       <WorkspaceAction title="A–Z keycap stock" help="Choose a design, then update its letters" icon="text-outline" color={SECTION.stock.color} onPress={()=>onOpen("alphabet_inventory")}/>
       <WorkspaceAction title="Manage products" help="Edit products, photos, prices and categories" icon="pricetags-outline" color={SECTION.stock.color} onPress={()=>onOpen("products")}/>
-      <WorkspaceAction title="Customer price list" help="View or print your product prices" icon="receipt-outline" color={SECTION.stock.color} onPress={()=>onOpen("price_list")}/>
     </ToolGrid>
     {photosMissing>0?<Text style={s.stockPhotoNote}>{photosMissing} product{photosMissing===1?" needs":"s need"} a photo. You can add photos under Manage products.</Text>:null}
   </ScrollView>;
@@ -2320,7 +2319,6 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
       title: "Stock & products", help: "Check stock, products and prices.", ...SECTION.stock, actions: [
         { title: "Update stock", help: "Add stock or change the number", icon: "cube", screen: "stock_start" },
         { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products" },
-        { title: "Customer price list", help: "View or print product prices", icon: "receipt", screen: "price_list" },
       ],
     },
     {
@@ -3928,17 +3926,6 @@ function Inventory({
                 </Text>
               </View>
               <View style={[s.stockNum, low && s.stockNumLow]}><Text style={[s.stockNumText, low && s.low]}>{quantityShown}</Text></View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Edit ${item.name}`}
-                style={s.stockEditButton}
-                onPress={(event) => {
-                  event.stopPropagation();
-                  onManageProducts(item.id);
-                }}
-              >
-                <Ionicons name="pencil-outline" size={19} color={C.accent} />
-              </Pressable>
               {stockColumns === 1 ? <Ionicons name="chevron-forward" size={19} color={C.muted} /> : null}
             </Pressable>
           );
@@ -5505,7 +5492,6 @@ const s = StyleSheet.create({
   stockPageHero:{marginTop:10,marginBottom:12,padding:16,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:16,backgroundColor:SECTION.stock.soft},
   stockManageButton:{minHeight:46,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:12,backgroundColor:SECTION.stock.color},
   stockManageButtonText:{color:C.white,fontSize:14,fontWeight:"700"},
-  stockEditButton:{width:42,height:42,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
   stockFilters:{marginTop:12,padding:14,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:"#F8F9FA"},
   stockFiltersDesktop:{flexDirection:"row",alignItems:"flex-start",gap:14,paddingVertical:10},
   stockFilterGroup:{flex:1,minWidth:0},

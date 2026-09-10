@@ -140,8 +140,6 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
     return statusOk && progressOk && (!q || `${o.title} ${o.customer_name ?? ""} ${o.customer_contact ?? ""} ${o.order_number}`.toLowerCase().includes(q));
   });
   const missingPrices = orders.filter(o=>Number(o.total_price)<=0).length;
-  const missingPhotos = orders.filter(o=>!o.image_url).length;
-  const followUp = useMemo(()=>({collect:orders.filter(o=>o.status==="ready").length,payment:orders.filter(o=>!["completed","cancelled"].includes(o.status)&&Number(o.amount_paid)<Number(o.total_price)*.5).length,print:orders.filter(o=>o.status==="new"&&Number(o.amount_paid)>=Number(o.total_price)*.5).length}),[orders]);
 
   const startNew = () => { setConvertingLeadId(null); setForm(emptyForm()); setEditing("new"); };
   const convertEnquiry=(lead:Enquiry)=>{
@@ -259,9 +257,7 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
   return <ScrollView contentContainerStyle={s.page}>
     <View style={[s.headingRow,width<520&&s.headingRowMobile]}><View style={s.headingCopy}><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Payments, printing and collection</Text></View><Pressable style={[s.add,width<520&&s.addMobile]} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
     <View style={s.sectionSwitch}><View style={s.sectionSwitchOn}><Text style={s.sectionSwitchOnText}>Orders</Text></View><Pressable style={s.sectionSwitchOff} onPress={()=>setSection("enquiries")}><Text style={s.sectionSwitchOffText}>Interested customers</Text></Pressable></View>
-    <View style={s.orderAtGlance}><Text style={s.orderAtGlanceStrong}>{counts.open} open</Text><Text style={s.orderAtGlanceText}>{followUp.payment} need payment</Text><Text style={s.orderAtGlanceText}>{followUp.print} to print</Text><Text style={s.orderAtGlanceText}>{followUp.collect} to collect</Text></View>
     {missingPrices>0?<Pressable style={s.priceWarning} onPress={()=>setView("all")}><Ionicons name="alert-circle" size={22} color={C.ruby}/><View style={{flex:1}}><Text style={s.priceWarningTitle}>{missingPrices} order{missingPrices===1?" needs":"s need"} a price</Text><Text style={s.priceWarningText}>Open each order and enter the full customer price. A ₱0 order cannot continue.</Text></View></Pressable>:null}
-    {missingPhotos>0?<Pressable style={s.priceWarning} onPress={()=>setView("all")}><Ionicons name="camera-outline" size={22} color={C.ruby}/><View style={{flex:1}}><Text style={s.priceWarningTitle}>{missingPhotos} order{missingPhotos===1?" needs":"s need"} a photo</Text><Text style={s.priceWarningText}>Open the order and add a photo so the team knows exactly what to make.</Text></View></Pressable>:null}
     <View style={[s.tabs,{flexDirection:"row",flexWrap:"wrap"}]}>
       {([['open',`Open ${counts.open}`],['completed','Completed'],['all','All']] as const).map(([id,label])=><Pressable accessibilityRole="button" key={id} style={[s.tab,width<620&&{flexGrow:1,flexBasis:0,paddingHorizontal:7},view===id&&s.tabOn]} onPress={()=>setView(id)}><Text pointerEvents="none" style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
     </View>

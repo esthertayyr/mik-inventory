@@ -7,8 +7,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text as NativeText,
-  type TextProps,
   View,
 } from "react-native";
 import { Text } from "./AppTypography";
@@ -17,8 +15,6 @@ import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { supabase } from "@/src/lib/supabase";
 import { peso } from "@/src/lib/format";
-
-const APP_FONT = Platform.select({ web: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif", ios: "System", android: "sans-serif", default: "System" });
 
 const publicShopName = (value: string | null | undefined) =>
   value?.toLowerCase().includes("sebu") ? "Pixelbug" : value ?? "";
@@ -127,7 +123,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex - 1, 1))}
         >
-          <Ionicons name="chevron-back" size={22} color="#51456F" />
+          <Ionicons name="chevron-back" size={22} color="#365D8C" />
         </Pressable>
         <Text style={s.calendarTitle}>
           {new Intl.DateTimeFormat("en-PH", {
@@ -140,7 +136,7 @@ function CalendarPicker({
           style={s.calendarArrow}
           onPress={() => onMonth(new Date(year, monthIndex + 1, 1))}
         >
-          <Ionicons name="chevron-forward" size={22} color="#51456F" />
+          <Ionicons name="chevron-forward" size={22} color="#365D8C" />
         </Pressable>
       </View>
       <View style={s.weekRow}>
@@ -509,7 +505,7 @@ export function ReportsScreen({
               setCalendarOpen((v) => !v);
             }}
           >
-            <Ionicons name="calendar-outline" size={21} color="#51456F" />
+            <Ionicons name="calendar-outline" size={21} color="#365D8C" />
             <Text style={s.chooseDateText}>Choose exact date</Text>
           </Pressable>
           <Pressable
@@ -538,8 +534,8 @@ export function ReportsScreen({
       ) : null}
       {period === "custom" ? <>
         <View style={s.dateTools}>
-          <Pressable style={s.chooseDate} onPress={()=>{setRangePicking("start");setCalendarMonth(new Date(customStart.getFullYear(),customStart.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#51456F"/><Text style={s.chooseDateText}>From {dateText(customStart)}</Text></Pressable>
-          <Pressable style={s.chooseDate} onPress={()=>{setRangePicking("end");setCalendarMonth(new Date(customEnd.getFullYear(),customEnd.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#51456F"/><Text style={s.chooseDateText}>To {dateText(customEnd)}</Text></Pressable>
+          <Pressable style={s.chooseDate} onPress={()=>{setRangePicking("start");setCalendarMonth(new Date(customStart.getFullYear(),customStart.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#365D8C"/><Text style={s.chooseDateText}>From {dateText(customStart)}</Text></Pressable>
+          <Pressable style={s.chooseDate} onPress={()=>{setRangePicking("end");setCalendarMonth(new Date(customEnd.getFullYear(),customEnd.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#365D8C"/><Text style={s.chooseDateText}>To {dateText(customEnd)}</Text></Pressable>
         </View>
         {calendarOpen?<CalendarPicker month={calendarMonth} selected={rangePicking==="start"?customStart:customEnd} onMonth={setCalendarMonth} onSelect={(date)=>{if(rangePicking==="start"){setCustomStart(date);if(date>customEnd)setCustomEnd(date);}else if(date<customStart){Alert.alert("Check date range","The To date must be on or after the From date.");return;}else setCustomEnd(date);setCalendarOpen(false);}}/>:null}
       </> : null}
@@ -550,10 +546,10 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v - 1)}
         >
-          <Ionicons name="chevron-back" size={25} color="#51456F" />
+          <Ionicons name="chevron-back" size={25} color="#365D8C" />
         </Pressable>:<View style={s.arrow}/>} 
         <View style={s.periodCenter}>
-          <Ionicons name="calendar-outline" size={19} color="#51456F" />
+          <Ionicons name="calendar-outline" size={19} color="#365D8C" />
           <Text style={s.periodTitle}>{title}</Text>
         </View>
         {period!=="custom"?<Pressable
@@ -562,11 +558,11 @@ export function ReportsScreen({
           style={s.arrow}
           onPress={() => setOffset((v) => v + 1)}
         >
-          <Ionicons name="chevron-forward" size={25} color="#51456F" />
+          <Ionicons name="chevron-forward" size={25} color="#365D8C" />
         </Pressable>:<View style={s.arrow}/>} 
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#51456F" />
+        <ActivityIndicator size="large" color="#365D8C" />
       ) : error ? (
         <Text style={s.error}>{error}</Text>
       ) : (
@@ -707,7 +703,7 @@ const s = StyleSheet.create({
   correctionBack: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8 },
   correctionBackText: { color: "#101318", fontSize: 17, fontWeight: "700" },
   page: { paddingBottom: 32 },
-  title: { fontSize: 24, lineHeight:30, fontWeight: "700", color: "#11151A", marginTop: 12 },
+  title: { fontSize: 28, lineHeight:35, fontWeight: "700", color: "#11151A", marginTop: 12 },
   correctionGuide: { marginTop: 12, padding: 16, flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 12, backgroundColor: "#65243A" },
   correctionGuideText: { flex: 1 },
   correctionGuideTitle: { color: "#FFF", fontSize: 17, fontWeight: "700" },
@@ -720,10 +716,12 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     alignItems: "center",
-    backgroundColor: "#F4F5F6",
+    borderWidth: 1,
+    borderColor: "#D5E0EB",
+    backgroundColor: "#EFF3F8",
   },
   tabOn: { backgroundColor: "#365D8C" },
-  tabText: { fontSize: 13, fontWeight: "700", color: "#626A73" },
+  tabText: { fontSize: 14, fontWeight: "700", color: "#365D8C" },
   tabTextOn: { color: "#FFF" },
   voidButton: { marginTop: 8, minHeight: 38, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 9, borderWidth: 1, borderColor: "#65243A", backgroundColor: "#FFF" },
   voidText: { color: "#65243A", fontSize: 12, fontWeight: "700" },
@@ -780,7 +778,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
-    backgroundColor: "#F4F5F6",
+    backgroundColor: "#EFF3F8",
   },
   calendarTitle: { color: "#16283A", fontSize: 16, fontWeight: "700" },
   weekRow: { marginTop: 9, flexDirection: "row" },
@@ -832,11 +830,11 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: "#16283A",
   },
-  hero: { padding: 17, borderRadius: 14, backgroundColor: "#29315C" },
-  heroLabel: { color: "#DDE8F1", fontSize:11, letterSpacing:.7, fontWeight: "700" },
-  heroValue: { color: "#FFF", fontSize: 28, lineHeight:34, fontWeight: "700", marginTop: 3 },
-  heroHelp: { color: "#E3E6F2", fontSize: 13, fontWeight: "600", marginTop: 6 },
-  groupLabel: { marginTop: 20, marginBottom: 5, color: "#29315C", fontSize: 13, lineHeight: 18, fontWeight: "800", letterSpacing: .7 },
+  hero: { padding: 18, borderRadius: 14, backgroundColor: "#365D8C" },
+  heroLabel: { color: "#E7EEF6", fontSize:13, letterSpacing:.6, fontWeight: "700" },
+  heroValue: { color: "#FFF", fontSize: 30, lineHeight:36, fontWeight: "700", marginTop: 4 },
+  heroHelp: { color: "#EDF3F8", fontSize: 14, lineHeight:20, fontWeight: "600", marginTop: 5 },
+  groupLabel: { marginTop: 20, marginBottom: 6, color: "#365D8C", fontSize: 14, lineHeight: 19, fontWeight: "800", letterSpacing: .6 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   stat: {
     minWidth: 210,
@@ -844,13 +842,14 @@ const s = StyleSheet.create({
     flexBasis: 210,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: "#F6F7F8",
+    backgroundColor: "#F4F7FA",
     borderWidth: 1,
-    borderColor: "#DDE2E5",
+    borderColor: "#D5E0EB",
   },
-  statLabel: { fontSize: 12, color: "#697582", fontWeight: "700" },
+  statLabel: { fontSize: 13, lineHeight:18, color: "#5F6F80", fontWeight: "700" },
   statValue: {
-    fontSize: 18,
+    fontSize: 20,
+    lineHeight: 26,
     color: "#16283A",
     fontWeight: "700",
     marginTop: 5,
@@ -874,10 +873,10 @@ const s = StyleSheet.create({
     borderColor: "#E0E3E7",
     borderRadius: 14,
   },
-  rank: { width: 22, fontWeight: "700", color: "#51456F" },
+  rank: { width: 22, fontWeight: "700", color: "#365D8C" },
   rowName: { flex: 1, fontSize: 15, fontWeight: "700", color: "#16283A" },
   rowSmall: { fontSize: 12, color: "#697582" },
-  rowValue: { fontWeight: "700", color: "#51456F" },
+  rowValue: { fontWeight: "700", color: "#365D8C" },
   empty: { padding: 14, color: "#697582", backgroundColor: "#FFF" },
   export: {
     minHeight: 60,
@@ -886,7 +885,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 9,
     borderRadius: 12,
-    backgroundColor: "#51456F",
+    backgroundColor: "#365D8C",
     alignItems: "center",
   },
   exportText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
