@@ -85,7 +85,7 @@ function paymentStage(order: Pick<Order,"total_price"|"amount_paid"|"status">): 
   if(order.status==="ready"||order.status==="completed") return "pending_final";
   return "deposit_paid";
 }
-const paymentStageLabel:Record<PaymentStage,string>={pending_deposit:"Pending downpayment",deposit_paid:"Downpayment paid",pending_final:"Pending final payment",full:"Full payment"};
+const paymentStageLabel:Record<PaymentStage,string>={pending_deposit:"Pending payment",deposit_paid:"Downpayment paid",pending_final:"Final payment due",full:"Paid in full"};
 type OpenStage = "All" | "Awaiting payment" | "To print" | "Printing" | "Ready";
 const OPEN_STAGES:OpenStage[]=["All","Awaiting payment","To print","Printing","Ready"];
 function openStage(order:Order):OpenStage {
@@ -294,7 +294,7 @@ function OrderCard({order,onEdit,onDuplicate,onStatus}:{order:Order;onEdit:()=>v
     {priceMissing?<Pressable style={s.priceNeededTag} onPress={onEdit}><Ionicons name="alert-circle" size={17} color={C.ruby}/><Text style={s.priceNeededText}>Price needed · Tap to fix</Text></Pressable>:null}
     <View style={s.glanceRow}>
       <View style={[s.infoPill,due&&(due.color===C.ruby||due.color===C.amber)&&s.infoPillAlert]}><Ionicons name="calendar-outline" size={16} color={due?.color??C.muted}/><Text numberOfLines={1} style={[s.infoPillText,due&&{color:due.color}]}>{order.target_date?`Ready by: ${displayDate(order.target_date)}`:"No ready-by date"}</Text></View>
-      <View style={s.infoPill}><Ionicons name={stage==="full"?"checkmark-circle-outline":"card-outline"} size={16} color={stageColor}/><Text numberOfLines={1} style={[s.infoPillText,{color:stageColor}]}>{priceMissing?"Price needed":balance>0?`${peso(Math.max(0,balance))} left`:"Paid"}</Text></View>
+      <View style={s.infoPill}><Ionicons name={stage==="full"?"checkmark-circle-outline":"card-outline"} size={16} color={stageColor}/><Text numberOfLines={1} style={[s.infoPillText,{color:stageColor}]}>{priceMissing?"Price needed":`${paymentStageLabel[stage]}${balance>0?` · ${peso(Math.max(0,balance))} left`:""}`}</Text></View>
     </View>
     {detailsVisible?<View style={s.detailsPanel}><View style={s.paymentSummaryTop}><View style={[s.paymentSummaryIcon,{backgroundColor:stage==="full"?"#EAF4EF":"#FAF0F2"}]}><Ionicons name={stage==="full"?"checkmark":"wallet-outline"} size={20} color={stageColor}/></View><View style={{flex:1}}><Text style={s.paymentSummaryTitle}>{stage==="full"?"Paid in full":paymentStageLabel[stage]}</Text><Text style={s.paymentSummaryAmount}>{peso(Number(order.amount_paid))} of {peso(Number(order.total_price))}</Text></View>{balance>0?<View style={s.balanceBadge}><Text style={s.balanceBadgeLabel}>LEFT</Text><Text style={s.balanceBadgeValue}>{peso(balance)}</Text></View>:null}</View>{stage!=="full"?<View style={s.paymentProgress}><View style={[s.paymentProgressFill,{width:`${Math.min(100,Number(order.amount_paid)/Math.max(1,Number(order.total_price))*100)}%`,backgroundColor:stageColor}]}/></View>:null}<Text style={s.paymentDetail}>{order.amount_paid>0?`${order.payment_channel||"Payment method not set"}${latestPayment?` · Received ${displayDate(latestPayment.payment_date)}`:""}`:"No customer payment recorded"}</Text><Text style={s.orderDateDetail}>Received: {displayDate(order.order_date)}{order.target_date?` · Ready by: ${displayDate(order.target_date)}`:""}</Text></View>:null}
     {detailsVisible && order.notes?<View style={s.remarks}><Text style={s.factLabel}>REMARKS</Text><Text style={s.remarksText}>{order.notes}</Text></View>:null}
