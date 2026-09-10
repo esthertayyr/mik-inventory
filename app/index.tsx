@@ -2329,7 +2329,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
       ],
     },
     {
-      title: "Sales history & calendar", help: "See past sales, fix mistakes and plan events.", ...SECTION.records, actions: [
+      title: "Sales, expenses & events", help: "View reports, record expenses and manage important dates.", ...SECTION.records, actions: [
         { title: "Sales reports", help: "See daily, weekly or monthly sales", icon: "bar-chart", screen: "reports" },
         { title: "Expenses", help: "Record and explain money spent", icon: "wallet", screen: "expenses" },
         { title: "Events calendar", help: "Add events and reminders", icon: "calendar", screen: "calendar" },
