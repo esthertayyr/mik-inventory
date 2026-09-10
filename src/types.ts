@@ -81,6 +81,7 @@ export interface Business {
   name: string;
   logo_url: string | null;
   login_username?: string | null;
+  visible_modules?: string[];
   role: Role;
 }
 export interface Location {

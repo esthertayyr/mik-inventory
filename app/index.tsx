@@ -378,7 +378,17 @@ type AdminShop = {
   status: string;
   created_at: string;
   last_login?: string | null;
+  visible_modules?: string[];
 };
+type ShopModule="sales"|"orders"|"stock"|"production"|"reports";
+const SHOP_MODULES:Array<{id:ShopModule;label:string;help:string;icon:Icon;color:string}>=[
+  {id:"sales",label:"Sales",help:"Sell, daily sales and missed sales",icon:"cart-outline",color:SECTION.sales.color},
+  {id:"orders",label:"Orders",help:"Customer orders and enquiries",icon:"clipboard-outline",color:SECTION.orders.color},
+  {id:"stock",label:"Stock & products",help:"Stock counts, products and price list",icon:"cube-outline",color:SECTION.stock.color},
+  {id:"production",label:"Printing",help:"Print Queue, printers, filament and calculator",icon:"layers-outline",color:SECTION.production.color},
+  {id:"reports",label:"Reports & planning",help:"Reports, expenses and events calendar",icon:"bar-chart-outline",color:SECTION.records.color},
+];
+const allShopModules=()=>SHOP_MODULES.map(item=>item.id);
 function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const {width}=useWindowDimensions();
   const [shops, setShops] = useState<AdminShop[]>([]);
@@ -403,7 +413,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const [{ data, error }, { data: loginRows }, { data: todaySales }, { data: activeOrders }, { data: stockRows },{data:orderPayments},{data:expenses}] = await Promise.all([
-      supabase.from("businesses").select("id,name,logo_url,slug,login_username,status,created_at").order("created_at"),
+      supabase.from("businesses").select("id,name,logo_url,slug,login_username,status,created_at,visible_modules").order("created_at"),
       supabase.from("activity_logs").select("business_id,created_at").eq("action", "login").order("created_at", { ascending: false }).limit(1000),
       supabase.from("sales").select("total,status").eq("status", "completed").gte("created_at", today.toISOString()),
       supabase.from("external_orders").select("id,status").not("status", "in", "(completed,cancelled)"),
@@ -824,7 +834,7 @@ function ShopApp({
     setLoading(true);
     if (adminBusiness) {
       setProfile({ id: "platform-admin", display_name: "Owner" });
-      const b = { id: adminBusiness.id, name: adminBusiness.name, logo_url: adminBusiness.logo_url, role: "owner" } as Business;
+      const b = { id: adminBusiness.id, name: adminBusiness.name, logo_url: adminBusiness.logo_url, visible_modules:adminBusiness.visible_modules, role: "owner" } as Business;
       setBusiness(b);
       const { data: ld } = await supabase.from("locations").select("id,business_id,name").eq("business_id", b.id).eq("active", true).order("name");
       const list = (ld ?? []) as Location[];
@@ -845,7 +855,7 @@ function ShopApp({
         .maybeSingle(),
       supabase
         .from("business_memberships")
-        .select("business_id,role,businesses(id,name,logo_url,login_username)")
+        .select("business_id,role,businesses(id,name,logo_url,login_username,visible_modules)")
         .eq("user_id", session.user.id),
       supabase.from("shop_staff_accounts").select("permissions,active").eq("user_id",session.user.id).maybeSingle(),
     ]);
@@ -862,6 +872,7 @@ function ShopApp({
       name: member.businesses.name,
       logo_url: member.businesses.logo_url ?? null,
       login_username: member.businesses.login_username ?? null,
+      visible_modules:member.businesses.visible_modules??allShopModules(),
       role: member.role,
     } as Business;
     setBusiness(b);
@@ -906,7 +917,9 @@ function ShopApp({
     );
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
-  const availableNav = ownerNav;
+  const visibleModules=(business?.visible_modules??allShopModules()) as ShopModule[];
+  const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
+  const availableNav = ownerNav.filter(item=>{const module=screenModule(item.id);return !module||visibleModules.includes(module);});
   const nav = role === "owner" ? availableNav : availableNav.filter((x) =>
     x.id === "home" ||
     (x.id === "sell_start" && staffPermissions?.includes("sell")) ||
@@ -932,6 +945,7 @@ function ShopApp({
         locationId={locationId}
         sales={sales}
         permissions={staffPermissions}
+        visibleModules={visibleModules}
         onOpenProductsMissing={()=>{setEditProductId(null);setProductsBackScreen("home");setMissingPhotosFirst(true);setScreen("products");}}
         onOpen={(next) => {
           if (next === "products") {
@@ -1080,6 +1094,7 @@ function ShopApp({
         deviceUserName={deviceUserName}
         onChangeDeviceUser={onChangeDeviceUser}
         canManageStaff={role === "owner"}
+        visibleModules={visibleModules}
       />
     );
   const selected =
@@ -2239,7 +2254,7 @@ function SaleScreen({
   );
 }
 
-function QuickStart({ businessId, locationId, sales, onOpen, onOpenProductsMissing, permissions }: { businessId:string; locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; onOpenProductsMissing:()=>void; permissions:StaffPermission[]|null }) {
+function QuickStart({ businessId, locationId, sales, onOpen, onOpenProductsMissing, permissions, visibleModules }: { businessId:string; locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; onOpenProductsMissing:()=>void; permissions:StaffPermission[]|null; visibleModules:ShopModule[] }) {
   const { width } = useWindowDimensions();
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0, pendingMoney:0, toPrint:0, printing:0 });
   const [overviewPeriod,setOverviewPeriod]=useState<"today"|"month">("today");
@@ -2350,7 +2365,8 @@ function QuickStart({ businessId, locationId, sales, onOpen, onOpenProductsMissi
     (["reports","expenses"] as Screen[]).includes(screen)?"reports":
     (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
     screen==="calendar"?"calendar":"settings";
-  const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>!permissions||permissions.includes(permissionFor(action.screen)))})).filter(group=>group.actions.length);
+  const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
+  const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>{const module=moduleFor(action.screen);return (!module||visibleModules.includes(module))&&(!permissions||permissions.includes(permissionFor(action.screen)));})})).filter(group=>group.actions.length);
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
       <View style={s.homeIntro}>
@@ -2410,6 +2426,7 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [copyStock, setCopyStock] = useState(false);
+  const [visibleModules,setVisibleModules]=useState<ShopModule[]>((shop.visible_modules??allShopModules()) as ShopModule[]);
   const [busy, setBusy] = useState(false);
   const [securityBusy, setSecurityBusy] = useState(false);
   const functionMessage = async (error: any) => {
@@ -2424,7 +2441,7 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
     if (duplicate && password.length < 6) return Alert.alert("Password is too short", "Use at least 6 characters.");
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("admin-manage-shop", {
-      body: { action: mode === "edit" ? "update" : "duplicate", shopId: shop.id, shopName: name.trim(), username: clean, password, copyStock },
+      body: { action: mode === "edit" ? "update" : "duplicate", shopId: shop.id, shopName: name.trim(), username: clean, password, copyStock, visibleModules },
     });
     setBusy(false);
     if (error) {
@@ -2468,6 +2485,9 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
           <Text style={s.rowHelp}>{duplicate ? "The new shop will have its own login, stock, sales and orders." : "Existing products, stock, sales and orders will not be removed."}</Text>
           <Label>Shop name</Label><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Shop name" />
           <Label>Login username</Label><TextInput style={s.input} value={username} onChangeText={setUsername} placeholder="New username" autoCapitalize="none" autoCorrect={false} />
+          <Label>Functions shown in this shop</Label>
+          <Text style={s.rowHelp}>Turn off areas the shop does not use. Home, settings and help always stay available.</Text>
+          <View style={s.moduleChoiceGrid}>{SHOP_MODULES.map(module=>{const shown=visibleModules.includes(module.id);return <Pressable key={module.id} accessibilityRole="checkbox" accessibilityState={{checked:shown}} style={[s.moduleChoice,shown&&{borderColor:module.color,backgroundColor:`${module.color}14`}]} onPress={()=>setVisibleModules(current=>shown?current.filter(id=>id!==module.id):[...current,module.id])}><View style={[s.moduleChoiceIcon,{backgroundColor:shown?module.color:C.soft}]}><Ionicons name={module.icon} size={21} color={shown?C.white:C.muted}/></View><View style={s.flex}><Text style={s.moduleChoiceTitle}>{module.label}</Text><Text style={s.moduleChoiceHelp}>{module.help}</Text></View><Ionicons name={shown?"checkbox":"square-outline"} size={23} color={shown?module.color:C.muted}/></Pressable>})}</View>
           {duplicate ? <><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry /><Pressable accessibilityRole="button" style={[s.copyStockChoice,copyStock&&s.copyStockChoiceOn]} onPress={() => setCopyStock((value) => !value)}><Ionicons name={copyStock?"checkbox":"square-outline"} size={23} color={copyStock?C.white:C.green}/><View style={s.flex}><Text style={[s.copyStockTitle,copyStock&&{color:C.white}]}>Copy current stock numbers</Text><Text style={[s.copyStockHelp,copyStock&&{color:"#E8F0EC"}]}>{copyStock?"The new shop receives the same counts.":"Recommended off: new shop starts at zero."}</Text></View></Pressable></> : <View style={s.note}><Ionicons name="information-circle" size={22} color={C.green}/><Text style={s.noteText}>Changing the username does not change the password.</Text></View>}
           <BigButton label={busy ? duplicate ? "Duplicating shop…" : "Saving profile…" : duplicate ? "Duplicate shop" : "Save profile"} icon={duplicate?"copy-outline":"save-outline"} onPress={save} disabled={busy} />
         </View>
@@ -3966,6 +3986,7 @@ function More({
   deviceUserName,
   onChangeDeviceUser,
   canManageStaff,
+  visibleModules,
 }: {
   profile: Profile | null;
   business: Business;
@@ -3974,15 +3995,16 @@ function More({
   deviceUserName: string;
   onChangeDeviceUser?: () => void;
   canManageStaff:boolean;
+  visibleModules:ShopModule[];
 }) {
   const { width } = useWindowDimensions();
   type MoreTool = { title: string; help: string; icon: Icon; screen?: Screen; guide?: boolean };
   const groups: Array<{ title: string; color: string; soft: string; border: string; tools: MoreTool[] }> = [
     {
-      title: "Reports", ...SECTION.records, tools: [
+      title: "Reports", ...SECTION.records, tools: visibleModules.includes("reports") ? [
         { icon: "bar-chart-outline", title: "Sales reports", help: "Daily, weekly or monthly", screen: "reports" },
         { icon: "wallet-outline", title: "Expenses", help: "Record what the shop spent", screen: "expenses" },
-      ],
+      ] : [],
     },
     {
       title: "Shop & help", ...SECTION.settings, tools: [
@@ -3997,7 +4019,7 @@ function More({
     <ScrollView contentContainerStyle={s.scroll}>
       <Text style={s.pageTitle}>More</Text>
       <Text style={s.subtitle}>Reports, shop settings and help.</Text>
-      {groups.map((group) => (
+      {groups.filter(group=>group.tools.length).map((group) => (
         <View key={group.title} style={s.quickSection}>
           <View style={s.quickSectionHeading}>
             <View style={[s.quickSectionMark,{backgroundColor:group.color}]} />
@@ -5189,6 +5211,11 @@ const s = StyleSheet.create({
   ownerSecurityHeading:{flexDirection:"row",alignItems:"center",gap:12,marginBottom:8},
   ownerSecurityIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:C.green},
   ownerSecurityTitle:{marginTop:18,color:C.ink,fontSize:17,fontWeight:"700"},
+  moduleChoiceGrid:{marginTop:10,gap:8},
+  moduleChoice:{minHeight:64,padding:11,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
+  moduleChoiceIcon:{width:40,height:40,alignItems:"center",justifyContent:"center",borderRadius:11},
+  moduleChoiceTitle:{color:C.ink,fontSize:14,fontWeight:"700"},
+  moduleChoiceHelp:{marginTop:2,color:C.muted,fontSize:12,lineHeight:17},
   ownerSecurityDivider:{height:1,marginTop:24,backgroundColor:C.border},
   copyStockChoiceOn:{backgroundColor:C.green},
   copyStockTitle:{color:C.ink,fontSize:14,fontWeight:"700"},
