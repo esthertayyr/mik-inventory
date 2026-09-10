@@ -739,7 +739,6 @@ function ShopApp({
   const [staffPermissions,setStaffPermissions]=useState<StaffPermission[]|null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
   const [saleInProgress, setSaleInProgress] = useState(false);
-  const [updatesOpen,setUpdatesOpen]=useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [productsBackScreen, setProductsBackScreen] = useState<Screen>("more");
   const [missingPhotosFirst,setMissingPhotosFirst]=useState(false);
@@ -897,15 +896,6 @@ function ShopApp({
     await AsyncStorage.setItem(`mik-guide-v1-${session?.user.id ?? "platform-admin"}`, "done").catch(
       () => undefined,
     );
-  };
-  useEffect(()=>{
-    if(loading||needsSetup||!business)return;
-    const key=`mik-daily-updates-2026-09-09-enquiries-${business.id}-${localDateKey()}`;
-    AsyncStorage.getItem(key).then(seen=>{if(seen!=="done")setUpdatesOpen(true);}).catch(()=>setUpdatesOpen(true));
-  },[business,loading,needsSetup]);
-  const closeUpdates=async()=>{
-    setUpdatesOpen(false);
-    if(business)await AsyncStorage.setItem(`mik-daily-updates-2026-09-09-enquiries-${business.id}-${localDateKey()}`,"done").catch(()=>undefined);
   };
   if (loading)
     return (
@@ -1199,7 +1189,6 @@ function ShopApp({
       </View>
       {screen!=="report_issue"?<Pressable accessibilityRole="button" accessibilityLabel="Send an issue, feedback or change request to Esther" style={[s.floatingFeedback,width<520&&s.floatingFeedbackMobile,width>=900&&s.floatingFeedbackDesktop]} onPress={()=>{setReportBackScreen(screen);setScreen("report_issue");}}><Ionicons name="chatbubble-ellipses-outline" size={20} color={C.white}/>{width>=520?<Text style={s.floatingFeedbackText}>Help & feedback</Text>:null}</Pressable>:null}
       <GuideModal visible={guideOpen} onClose={closeGuide} />
-      <WhatsNewModal visible={updatesOpen&&!guideOpen} onClose={closeUpdates} onFeedback={()=>{void closeUpdates();setReportBackScreen("home");setScreen("report_issue");}}/>
     </SafeAreaView>
   );
 }
