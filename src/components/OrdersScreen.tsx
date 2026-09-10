@@ -86,13 +86,13 @@ function paymentStage(order: Pick<Order,"total_price"|"amount_paid"|"status">): 
   return "deposit_paid";
 }
 const paymentStageLabel:Record<PaymentStage,string>={pending_deposit:"Pending payment",deposit_paid:"Downpayment paid",pending_final:"Final payment due",full:"Paid in full"};
-type OpenStage = "All" | "Awaiting payment" | "To print" | "Printing" | "Ready";
-const OPEN_STAGES:OpenStage[]=["All","Awaiting payment","To print","Printing","Ready"];
+type OpenStage = "All" | "Awaiting payment" | "Ongoing" | "Ready";
+const OPEN_STAGES:OpenStage[]=["All","Awaiting payment","Ongoing","Ready"];
 function openStage(order:Order):OpenStage {
   if(order.status==="ready")return "Ready";
-  if(order.status==="making")return "Printing";
-  return Number(order.total_price)>0 && Number(order.amount_paid)>=Number(order.total_price)*.5 ? "To print" : "Awaiting payment";
+  return Number(order.total_price)>0 && Number(order.amount_paid)>=Number(order.total_price)*.5 ? "Ongoing" : "Awaiting payment";
 }
+const openStageTone:Record<OpenStage,{color:string;soft:string}>={All:{color:C.navy,soft:C.pale},"Awaiting payment":{color:C.ruby,soft:"#FAF0F2"},Ongoing:{color:C.blue,soft:"#EEF3F8"},Ready:{color:C.green,soft:"#ECF5F0"}};
 
 function dueInfo(order: Order) {
   if (!order.target_date || order.status === "completed" || order.status === "cancelled") return null;
@@ -266,7 +266,7 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
       {([['open',`Open ${counts.open}`],['completed','Completed'],['all','All']] as const).map(([id,label])=><Pressable accessibilityRole="button" key={id} style={[s.tab,width<620&&{flexGrow:1,flexBasis:0,paddingHorizontal:7},view===id&&s.tabOn]} onPress={()=>setView(id)}><Text pointerEvents="none" style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
     </View>
     <View style={s.search}><Ionicons name="search" size={20} color={C.muted}/><TextInput style={s.searchInput} value={search} onChangeText={setSearch} placeholder="Search order or customer"/></View>
-    {view==="open"?<View style={{marginTop:16}}><Text style={{fontSize:13,fontWeight:"600",color:C.muted,marginBottom:8}}>Order progress</Text><View style={{flexDirection:"row",flexWrap:"wrap",gap:8}}>{OPEN_STAGES.map(stage=>{const count=orders.filter(o=>!["completed","cancelled"].includes(o.status)&&(stage==="All"||openStage(o)===stage)).length;return <Pressable key={stage} accessibilityRole="button" accessibilityState={{selected:progressFilter===stage}} accessibilityLabel={`${stage}, ${count} orders`} onPress={()=>setProgressFilter(stage)} style={{minHeight:42,paddingHorizontal:12,borderRadius:8,borderWidth:1,borderColor:progressFilter===stage?C.navy:C.border,backgroundColor:progressFilter===stage?"#EEF3F8":C.white,flexDirection:"row",alignItems:"center",gap:8}}><Text style={{fontSize:13,fontWeight:progressFilter===stage?"700":"400",color:C.navy}}>{stage}</Text><Text style={{fontSize:12,color:C.muted}}>{count}</Text></Pressable>})}</View></View>:null}
+    {view==="open"?<View style={{marginTop:16}}><Text style={{fontSize:13,fontWeight:"600",color:C.muted,marginBottom:8}}>Order progress</Text><View style={{flexDirection:"row",flexWrap:"wrap",gap:8}}>{OPEN_STAGES.map(stage=>{const count=orders.filter(o=>!["completed","cancelled"].includes(o.status)&&(stage==="All"||openStage(o)===stage)).length;const tone=openStageTone[stage];const selected=progressFilter===stage;return <Pressable key={stage} accessibilityRole="button" accessibilityState={{selected}} accessibilityLabel={`${stage}, ${count} orders`} onPress={()=>setProgressFilter(stage)} style={{minHeight:42,paddingHorizontal:13,borderRadius:9,borderWidth:1,borderColor:tone.color,backgroundColor:selected?tone.color:tone.soft,flexDirection:"row",alignItems:"center",gap:8}}><Text style={{fontSize:13,fontWeight:"700",color:selected?C.white:tone.color}}>{stage}</Text><Text style={{fontSize:12,fontWeight:"700",color:selected?C.white:tone.color}}>{count}</Text></Pressable>})}</View></View>:null}
     {loading?<ActivityIndicator size="large" color={C.navy}/>:filtered.length?<ToolGrid minCardWidth={410} maxColumns={width>=980?2:1}>{filtered.map(o=><OrderCard key={o.id} order={o} desktopGrid={width>=980} onEdit={()=>startEdit(o)} onDuplicate={()=>duplicate(o)} onStatus={(st)=>void setStatus(o,st)}/>)}</ToolGrid>:<View style={s.empty}><Ionicons name="file-tray-outline" size={34} color={C.navy}/><Text style={s.emptyTitle}>No orders here</Text><Text style={s.emptyHelp}>Tap New order for social media, walk-in, referral, marketplace or website orders.</Text></View>}
     <Pressable style={s.export} onPress={()=>void exportOrders()}><Ionicons name="download-outline" size={22} color={C.navy}/><Text style={s.exportText}>Export all orders for Excel</Text></Pressable>
   </ScrollView>;

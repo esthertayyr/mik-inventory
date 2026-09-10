@@ -1228,6 +1228,7 @@ function NoShopProfile() {
 }
 
 function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceUserName:string;onOpen:(screen:Screen)=>void}) {
+  const {width}=useWindowDimensions();
   const today = localDateKey();
   const [welcomeVisible,setWelcomeVisible] = useState(false);
   const welcomeKey = `mik-sale-welcome-${businessId}-${today}`;
