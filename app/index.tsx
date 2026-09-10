@@ -111,7 +111,7 @@ const C = {
   redSoft: "#F8F4F5",
 };
 const SECTION = {
-  sales: { color: "#29315C", soft: "#F0F2F8", border: "#D9DDEA" },
+  sales: { color: "#315FBE", soft: "#EEF3FF", border: "#C9D7F2" },
   orders: { color: "#594C8D", soft: "#F3F1F8", border: "#DFDAEB" },
   stock: { color: "#1B685C", soft: "#EEF6F3", border: "#D3E6DF" },
   production: { color: "#8A365B", soft: "#F8F0F4", border: "#EACFDA" },
