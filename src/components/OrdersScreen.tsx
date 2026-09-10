@@ -17,7 +17,6 @@ import {
 import { Text, TextInput } from "./AppTypography";
 import { FormActionBar } from "./FormActionBar";
 import { ToolGrid } from "./ToolGrid";
-import { FilterSelect } from "./FilterSelect";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -106,14 +105,13 @@ function dueInfo(order: Order) {
   return { text: "Upcoming", color: C.blue };
 }
 
-export function OrdersScreen({ businessId, locationId, actorName, initialOrderId, onOrderOpened }: { businessId: string; locationId: string; actorName:string; initialOrderId?:string|null; onOrderOpened?:()=>void }) {
+export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOpened }: { businessId: string; locationId: string; initialOrderId?:string|null; onOrderOpened?:()=>void }) {
   const { width } = useWindowDimensions();
   const [orders,setOrders] = useState<Order[]>([]);
   const [sources,setSources] = useState<Source[]>([]);
   const [loading,setLoading] = useState(true);
   const [view,setView] = useState<"open" | "stopped" | "completed" | "all">("open");
   const [search,setSearch] = useState("");
-  const [sourceFilter,setSourceFilter] = useState("All");
   const [progressFilter,setProgressFilter] = useState<OpenStage>("All");
   const [editing,setEditing] = useState<Order | "new" | null>(null);
   const [form,setForm] = useState<Form>(emptyForm);
@@ -134,24 +132,16 @@ export function OrdersScreen({ businessId, locationId, actorName, initialOrderId
 
   const counts = useMemo(()=>({
     open: orders.filter(o=>!["completed","cancelled"].includes(o.status)).length,
-    stopped: orders.filter(o=>o.status==="cancelled").length,
   }),[orders]);
   const filtered = orders.filter(o => {
     const statusOk = view === "all" || (view === "open" ? !["completed","cancelled"].includes(o.status) : view === "stopped" ? o.status === "cancelled" : o.status === "completed");
-    const sourceOk = sourceFilter === "All" || sourceGroup(o.source) === sourceFilter;
     const q=search.trim().toLowerCase();
     const progressOk=view!=="open" || progressFilter==="All" || openStage(o)===progressFilter;
-    return statusOk && sourceOk && progressOk && (!q || `${o.title} ${o.customer_name ?? ""} ${o.customer_contact ?? ""} ${o.order_number}`.toLowerCase().includes(q));
+    return statusOk && progressOk && (!q || `${o.title} ${o.customer_name ?? ""} ${o.customer_contact ?? ""} ${o.order_number}`.toLowerCase().includes(q));
   });
-  const urgent = orders.filter(o=>{ const d=dueInfo(o); return d && (d.color===C.ruby||d.color===C.amber); }).length;
   const missingPrices = orders.filter(o=>Number(o.total_price)<=0).length;
   const missingPhotos = orders.filter(o=>!o.image_url).length;
   const followUp = useMemo(()=>({collect:orders.filter(o=>o.status==="ready").length,payment:orders.filter(o=>!["completed","cancelled"].includes(o.status)&&Number(o.amount_paid)<Number(o.total_price)*.5).length,print:orders.filter(o=>o.status==="new"&&Number(o.amount_paid)>=Number(o.total_price)*.5).length}),[orders]);
-  const paymentSummary = useMemo(() => {
-    const paid = orders.reduce((sum,o)=>sum+Number(o.amount_paid),0);
-    const outstanding = orders.filter(o=>o.status!=="cancelled").reduce((sum,o)=>sum+Math.max(0,Number(o.total_price)-Number(o.amount_paid)),0);
-    return { paid, outstanding };
-  },[orders]);
 
   const startNew = () => { setConvertingLeadId(null); setForm(emptyForm()); setEditing("new"); };
   const convertEnquiry=(lead:Enquiry)=>{
@@ -257,14 +247,6 @@ export function OrdersScreen({ businessId, locationId, actorName, initialOrderId
     if(status==="completed") return Alert.alert(o.fulfilment_method==="delivery"?"Confirm delivery":"Confirm collection",`Final payment is fully recorded. Mark this order as ${o.fulfilment_method==="delivery"?"delivered":"collected"}?`,[{text:"Not yet",style:"cancel"},{text:o.fulfilment_method==="delivery"?"Yes, delivered":"Yes, collected",onPress:()=>void action({fulfilled_at:new Date().toISOString()})}]);
     await action();
   };
-  const markPaymentFollowedUp=async(o:Order)=>{
-    const {data:{user}}=await supabase.auth.getUser();
-    const now=new Date().toISOString();
-    const {error}=await supabase.from("external_orders").update({payment_followed_up_at:now,payment_followed_up_by:user?.id??null,payment_followed_up_by_name:actorName}).eq("id",o.id);
-    if(error)return Alert.alert("Follow-up not saved",error.message);
-    await load();
-    Alert.alert("Follow-up saved",`${actorName} contacted the customer about the downpayment.`);
-  };
   const exportOrders = async () => {
     const rows=[["Order","Name","Customer","Contact","Source","Order type","Order date","Ready by","Status","Quantity","Total price","Amount paid","Balance","Payment status","Paid via","Reference","Notes"],...orders.map(o=>[`ORD-${o.order_number}`,o.title,o.customer_name??"",o.customer_contact??"",o.source,o.is_past_order?"Past order":"Current order",displayDate(o.order_date),displayDate(o.target_date),statusLabel[o.status],o.quantity,o.total_price,o.amount_paid,Number(o.total_price)-Number(o.amount_paid),paymentStageLabel[paymentStage(o)],o.payment_channel??"",o.payment_reference??"",o.notes??""])];
     const csv="\uFEFF"+rows.map(r=>r.map(csvCell).join(",")).join("\n"); const filename=`mik-orders-${displayDate(isoDate())}.csv`;
@@ -277,25 +259,20 @@ export function OrdersScreen({ businessId, locationId, actorName, initialOrderId
   return <ScrollView contentContainerStyle={s.page}>
     <View style={[s.headingRow,width<520&&s.headingRowMobile]}><View style={s.headingCopy}><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Payments, printing and collection</Text></View><Pressable style={[s.add,width<520&&s.addMobile]} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
     <View style={s.sectionSwitch}><View style={s.sectionSwitchOn}><Text style={s.sectionSwitchOnText}>Confirmed orders</Text></View><Pressable style={s.sectionSwitchOff} onPress={()=>setSection("enquiries")}><Text style={s.sectionSwitchOffText}>Potential orders</Text></Pressable></View>
-    <View style={s.orderOverview}>
-      <View style={s.orderOverviewLead}><Text style={s.heroKicker}>OPEN ORDERS</Text><Text style={s.orderOverviewValue}>{counts.open}</Text><Text style={s.orderOverviewHelp}>{urgent?`${urgent} need attention`:"Everything is up to date"}</Text></View>
-      <View style={s.orderOverviewSteps}><View style={s.orderStep}><Text style={s.orderStepValue}>{followUp.payment}</Text><Text style={s.orderStepLabel}>Need payment</Text></View><View style={s.orderStep}><Text style={s.orderStepValue}>{followUp.print}</Text><Text style={s.orderStepLabel}>To print</Text></View><View style={s.orderStep}><Text style={s.orderStepValue}>{followUp.collect}</Text><Text style={s.orderStepLabel}>To collect</Text></View></View>
-    </View>
+    <View style={s.orderAtGlance}><Text style={s.orderAtGlanceStrong}>{counts.open} open</Text><Text style={s.orderAtGlanceText}>{followUp.payment} need payment</Text><Text style={s.orderAtGlanceText}>{followUp.print} to print</Text><Text style={s.orderAtGlanceText}>{followUp.collect} to collect</Text></View>
     {missingPrices>0?<Pressable style={s.priceWarning} onPress={()=>setView("all")}><Ionicons name="alert-circle" size={22} color={C.ruby}/><View style={{flex:1}}><Text style={s.priceWarningTitle}>{missingPrices} order{missingPrices===1?" needs":"s need"} a price</Text><Text style={s.priceWarningText}>Open each order and enter the full customer price. A ₱0 order cannot continue.</Text></View></Pressable>:null}
     {missingPhotos>0?<Pressable style={s.priceWarning} onPress={()=>setView("all")}><Ionicons name="camera-outline" size={22} color={C.ruby}/><View style={{flex:1}}><Text style={s.priceWarningTitle}>{missingPhotos} order{missingPhotos===1?" needs":"s need"} a photo</Text><Text style={s.priceWarningText}>Open the order and add a photo so the team knows exactly what to make.</Text></View></Pressable>:null}
-    <View style={s.summaryRow}><View style={[s.summaryItem,s.summaryPaid]}><Text style={[s.factLabel,{color:C.green}]}>PAID</Text><Text style={s.summaryValue}>{peso(paymentSummary.paid)}</Text></View><View style={[s.summaryItem,s.summaryOwed]}><Text style={[s.factLabel,{color:C.ruby}]}>STILL TO COLLECT</Text><Text style={s.summaryValue}>{peso(paymentSummary.outstanding)}</Text></View></View>
     <View style={[s.tabs,{flexDirection:"row",flexWrap:"wrap"}]}>
-      {([['open',`Open ${counts.open}`],['stopped',`Stopped ${counts.stopped}`],['completed','Completed'],['all','All']] as const).map(([id,label])=><Pressable accessibilityRole="button" key={id} style={[s.tab,width<620&&{flexGrow:1,flexBasis:width<360?"45%":0,paddingHorizontal:7},view===id&&s.tabOn]} onPress={()=>setView(id)}><Text pointerEvents="none" style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
+      {([['open',`Open ${counts.open}`],['completed','Completed'],['all','All']] as const).map(([id,label])=><Pressable accessibilityRole="button" key={id} style={[s.tab,width<620&&{flexGrow:1,flexBasis:0,paddingHorizontal:7},view===id&&s.tabOn]} onPress={()=>setView(id)}><Text pointerEvents="none" style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
     </View>
     <View style={s.search}><Ionicons name="search" size={20} color={C.muted}/><TextInput style={s.searchInput} value={search} onChangeText={setSearch} placeholder="Search order or customer"/></View>
     {view==="open"?<View style={{marginTop:16}}><Text style={{fontSize:13,fontWeight:"600",color:C.muted,marginBottom:8}}>Order progress</Text><View style={{flexDirection:"row",flexWrap:"wrap",gap:8}}>{OPEN_STAGES.map(stage=>{const count=orders.filter(o=>!["completed","cancelled"].includes(o.status)&&(stage==="All"||openStage(o)===stage)).length;return <Pressable key={stage} accessibilityRole="button" accessibilityState={{selected:progressFilter===stage}} accessibilityLabel={`${stage}, ${count} orders`} onPress={()=>setProgressFilter(stage)} style={{minHeight:42,paddingHorizontal:12,borderRadius:8,borderWidth:1,borderColor:progressFilter===stage?C.navy:C.border,backgroundColor:progressFilter===stage?"#EEF3F8":C.white,flexDirection:"row",alignItems:"center",gap:8}}><Text style={{fontSize:13,fontWeight:progressFilter===stage?"700":"400",color:C.navy}}>{stage}</Text><Text style={{fontSize:12,color:C.muted}}>{count}</Text></Pressable>})}</View></View>:null}
-    {width<620?<FilterSelect label="Order source" value={sourceFilter} options={["All",...ORDER_SOURCES]} onChange={setSourceFilter}/>:<View style={[s.sourceRow,{flexDirection:"row",flexWrap:"wrap"}]}>{["All",...ORDER_SOURCES].map(x=><Pressable key={x} accessibilityRole="button" style={[s.sourceChip,sourceFilter===x&&s.sourceChipOn]} onPress={()=>setSourceFilter(x)}><Text style={[s.sourceText,sourceFilter===x&&s.sourceTextOn]}>{x}</Text></Pressable>)}</View>}
-    {loading?<ActivityIndicator size="large" color={C.navy}/>:filtered.length?<ToolGrid minCardWidth={360} maxColumns={1}>{filtered.map(o=><OrderCard key={o.id} order={o} onEdit={()=>startEdit(o)} onDuplicate={()=>duplicate(o)} onStatus={(st)=>void setStatus(o,st)} onPaymentFollowUp={()=>void markPaymentFollowedUp(o)}/>)}</ToolGrid>:<View style={s.empty}><Ionicons name="file-tray-outline" size={34} color={C.navy}/><Text style={s.emptyTitle}>No orders here</Text><Text style={s.emptyHelp}>Tap New order for social media, walk-in, referral, marketplace or website orders.</Text></View>}
+    {loading?<ActivityIndicator size="large" color={C.navy}/>:filtered.length?<ToolGrid minCardWidth={360} maxColumns={1}>{filtered.map(o=><OrderCard key={o.id} order={o} onEdit={()=>startEdit(o)} onDuplicate={()=>duplicate(o)} onStatus={(st)=>void setStatus(o,st)}/>)}</ToolGrid>:<View style={s.empty}><Ionicons name="file-tray-outline" size={34} color={C.navy}/><Text style={s.emptyTitle}>No orders here</Text><Text style={s.emptyHelp}>Tap New order for social media, walk-in, referral, marketplace or website orders.</Text></View>}
     <Pressable style={s.export} onPress={()=>void exportOrders()}><Ionicons name="download-outline" size={22} color={C.navy}/><Text style={s.exportText}>Export all orders for Excel</Text></Pressable>
   </ScrollView>;
 }
 
-function OrderCard({order,onEdit,onDuplicate,onStatus,onPaymentFollowUp}:{order:Order;onEdit:()=>void;onDuplicate:()=>void;onStatus:(s:OrderStatus)=>void;onPaymentFollowUp:()=>void}) {
+function OrderCard({order,onEdit,onDuplicate,onStatus}:{order:Order;onEdit:()=>void;onDuplicate:()=>void;onStatus:(s:OrderStatus)=>void}) {
   const {width}=useWindowDimensions();
   const compact=width<620;
   const [showDetails, setShowDetails] = useState(false);
@@ -321,7 +298,6 @@ function OrderCard({order,onEdit,onDuplicate,onStatus,onPaymentFollowUp}:{order:
     </View>
     {detailsVisible?<View style={s.detailsPanel}><View style={s.paymentSummaryTop}><View style={[s.paymentSummaryIcon,{backgroundColor:stage==="full"?"#EAF4EF":"#FAF0F2"}]}><Ionicons name={stage==="full"?"checkmark":"wallet-outline"} size={20} color={stageColor}/></View><View style={{flex:1}}><Text style={s.paymentSummaryTitle}>{stage==="full"?"Paid in full":paymentStageLabel[stage]}</Text><Text style={s.paymentSummaryAmount}>{peso(Number(order.amount_paid))} of {peso(Number(order.total_price))}</Text></View>{balance>0?<View style={s.balanceBadge}><Text style={s.balanceBadgeLabel}>LEFT</Text><Text style={s.balanceBadgeValue}>{peso(balance)}</Text></View>:null}</View>{stage!=="full"?<View style={s.paymentProgress}><View style={[s.paymentProgressFill,{width:`${Math.min(100,Number(order.amount_paid)/Math.max(1,Number(order.total_price))*100)}%`,backgroundColor:stageColor}]}/></View>:null}<Text style={s.paymentDetail}>{order.amount_paid>0?`${order.payment_channel||"Payment method not set"}${latestPayment?` · Received ${displayDate(latestPayment.payment_date)}`:""}`:"No customer payment recorded"}</Text><Text style={s.orderDateDetail}>Received: {displayDate(order.order_date)}{order.target_date?` · Ready by: ${displayDate(order.target_date)}`:""}</Text></View>:null}
     {detailsVisible && order.notes?<View style={s.remarks}><Text style={s.factLabel}>REMARKS</Text><Text style={s.remarksText}>{order.notes}</Text></View>:null}
-    {stage==="pending_deposit"?<View style={s.followUpPrompt}><View style={{flex:1}}><Text style={s.followUpPromptTitle}>Downpayment follow-up</Text><Text style={s.followUpPromptHelp}>{order.payment_followed_up_at?`Last followed up ${displayDate(order.payment_followed_up_at)}${order.payment_followed_up_by_name?` by ${order.payment_followed_up_by_name}`:""}`:"Contact the customer, then record it here."}</Text></View><Pressable style={s.followUpButton} onPress={onPaymentFollowUp}><Ionicons name="checkmark" size={17} color={C.white}/><Text style={s.followUpButtonText}>Mark followed up</Text></Pressable></View>:null}
     {next?<Pressable style={[s.next,(priceMissing||(!depositPaid&&next==="making")||(next==="completed"&&stage!=="full"))&&s.nextDisabled]} onPress={()=>priceMissing||(!depositPaid&&next==="making")||(next==="completed"&&stage!=="full")?onEdit():onStatus(next)}><Text style={s.nextText}>{priceMissing?"Add price":next==="making"?(depositPaid?"Start printing":"Add downpayment"):next==="ready"?"Mark as ready":stage==="full"?(order.fulfilment_method==="delivery"?"Confirm delivered":"Confirm collected"):"Add final payment"}</Text><Ionicons name={priceMissing||(next==="making"&&!depositPaid)||(next==="completed"&&stage!=="full")?"create-outline":"arrow-forward"} size={20} color={C.white}/></Pressable>:null}
     <View style={s.cardActions}>{compact?<Pressable accessibilityRole="button" accessibilityState={{expanded:showDetails}} style={s.link} onPress={()=>setShowDetails(!showDetails)}><Text numberOfLines={1} style={s.linkText}>{showDetails?"Hide details":"More details"}</Text></Pressable>:null}<Pressable style={s.link} onPress={onEdit}><Text numberOfLines={1} style={s.linkText}>View / edit</Text></Pressable><Pressable style={s.link} onPress={onDuplicate}><Text numberOfLines={1} style={s.linkText}>Duplicate</Text></Pressable>{!["completed","cancelled"].includes(order.status)?<Pressable style={[s.link,s.stopLink]} onPress={()=>onStatus("cancelled")}><Text numberOfLines={1} style={s.cancelText}>Stop</Text></Pressable>:order.status==="cancelled"?<Pressable style={s.link} onPress={()=>onStatus("new")}><Text numberOfLines={1} style={s.linkText}>Resume</Text></Pressable>:null}</View>
   </View>;
@@ -366,6 +342,7 @@ const s=StyleSheet.create({
   sectionSwitch:{alignSelf:"flex-start",marginTop:14,padding:4,flexDirection:"row",gap:4,borderRadius:11,backgroundColor:C.pale},sectionSwitchOn:{minHeight:38,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderRadius:8,backgroundColor:C.white,shadowColor:C.ink,shadowOpacity:.08,shadowRadius:5,shadowOffset:{width:0,height:2}},sectionSwitchOnText:{color:C.ink,fontSize:13,fontWeight:"700"},sectionSwitchOff:{minHeight:38,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderRadius:8},sectionSwitchOffText:{color:C.muted,fontSize:13,fontWeight:"600"},
   hero:{marginTop:18,padding:18,borderWidth:1,borderColor:"#DCE5EB",borderRadius:14,backgroundColor:"#EEF3F7"},heroKicker:{color:C.navy,fontSize:13,fontWeight:"700",letterSpacing:1.2},heroValue:{marginTop:5,color:C.ink,fontSize:34,fontWeight:"700"},heroHelp:{marginTop:5,color:C.ink,fontSize:15,lineHeight:21,fontWeight:"600"},tabs:{gap:8,paddingVertical:14},tab:{minHeight:44,paddingHorizontal:15,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},tabOn:{backgroundColor:C.ink,borderColor:C.ink},tabText:{color:C.ink,fontSize:13,fontWeight:"700"},tabTextOn:{color:C.white},
   orderOverview:{marginTop:18,overflow:"hidden",flexDirection:"row",flexWrap:"wrap",borderWidth:1,borderColor:"#DDE2EB",borderRadius:16,backgroundColor:C.white},orderOverviewLead:{minWidth:180,flex:1,padding:17,backgroundColor:"#F1F3F8"},orderOverviewValue:{marginTop:4,color:C.ink,fontSize:30,lineHeight:34,fontWeight:"700"},orderOverviewHelp:{marginTop:4,color:C.muted,fontSize:12,lineHeight:17},orderOverviewSteps:{minWidth:280,flex:2,flexDirection:"row",alignItems:"stretch"},orderStep:{minWidth:0,flex:1,paddingHorizontal:12,paddingVertical:16,justifyContent:"center",borderLeftWidth:1,borderLeftColor:"#E6E9EF"},orderStepValue:{color:C.ink,fontSize:21,lineHeight:26,fontWeight:"700"},orderStepLabel:{marginTop:3,color:C.muted,fontSize:12,lineHeight:16,fontWeight:"600"},
+  orderAtGlance:{marginTop:16,paddingVertical:11,paddingHorizontal:13,flexDirection:"row",flexWrap:"wrap",alignItems:"center",gap:12,borderWidth:1,borderColor:C.border,borderRadius:11,backgroundColor:C.pale},orderAtGlanceStrong:{color:C.navy,fontSize:14,fontWeight:"800"},orderAtGlanceText:{color:C.muted,fontSize:13,fontWeight:"600"},
   priceWarning:{marginTop:12,padding:15,flexDirection:"row",alignItems:"flex-start",gap:10,borderWidth:1,borderColor:"#E8C9D2",borderRadius:14,backgroundColor:"#FCF4F6"},priceWarningTitle:{color:C.ruby,fontSize:15,fontWeight:"700"},priceWarningText:{marginTop:3,color:C.ink,fontSize:14,lineHeight:20},
   followUpPrompt:{marginTop:10,padding:11,flexDirection:"row",flexWrap:"wrap",alignItems:"center",gap:10,borderWidth:1,borderColor:"#E4D6BD",borderRadius:11,backgroundColor:"#FCF8F0"},followUpPromptTitle:{color:C.ink,fontSize:13,fontWeight:"700"},followUpPromptHelp:{marginTop:2,color:C.muted,fontSize:12,lineHeight:17},followUpButton:{minHeight:38,paddingHorizontal:11,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:5,borderRadius:9,backgroundColor:C.amber},followUpButtonText:{color:C.white,fontSize:12,fontWeight:"700"},
   summaryRow:{marginTop:10,flexDirection:"row",gap:8},summaryItem:{minWidth:0,flex:1,padding:14,borderWidth:1,borderRadius:11,backgroundColor:C.pale},summaryPaid:{borderColor:"#CFE4D9",backgroundColor:"#F1F8F4"},summaryOwed:{borderColor:"#E8C9D2",backgroundColor:"#FCF4F6"},summaryValue:{marginTop:5,color:C.ink,fontSize:18,lineHeight:23,fontWeight:"700"},followUpGrid:{marginTop:10,flexDirection:"row",flexWrap:"wrap",gap:8},followUpCard:{minWidth:150,flexGrow:1,flexBasis:0,padding:12,borderWidth:1,borderColor:C.border,borderRadius:11,backgroundColor:C.white},followUpValue:{color:C.navy,fontSize:22,fontWeight:"700"},followUpLabel:{marginTop:3,color:C.ink,fontSize:13,lineHeight:18,fontWeight:"600"},

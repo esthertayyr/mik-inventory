@@ -1052,7 +1052,7 @@ function ShopApp({
       />
     );
   else if (screen === "orders")
-    body = <OrdersScreen businessId={business!.id} locationId={locationId} actorName={deviceUserName||profile?.display_name||"Shop team"} initialOrderId={openOrderId} onOrderOpened={()=>setOpenOrderId(null)} />;
+    body = <OrdersScreen businessId={business!.id} locationId={locationId} initialOrderId={openOrderId} onOrderOpened={()=>setOpenOrderId(null)} />;
   else if (screen === "printers")
     body = <PrintersScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
   else if (screen === "filaments")
@@ -2353,11 +2353,13 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
         <Text style={[s.pageTitle,width>=900&&s.homeDesktopTitle]}>Shop overview</Text>
         <Text style={s.subtitle}>Everything you need, organised by task.</Text>
       </View>
-      <View style={s.homePeriodSwitch}><Pressable style={[s.homePeriodButton,overviewPeriod==="today"&&s.homePeriodButtonOn]} onPress={()=>setOverviewPeriod("today")}><Text style={[s.homePeriodText,overviewPeriod==="today"&&s.homePeriodTextOn]}>Today</Text></Pressable><Pressable style={[s.homePeriodButton,overviewPeriod==="month"&&s.homePeriodButtonOn]} onPress={()=>setOverviewPeriod("month")}><Text style={[s.homePeriodText,overviewPeriod==="month"&&s.homePeriodTextOn]}>This month</Text></Pressable></View>
+      <View style={s.homePeriodSwitch}><Pressable style={[s.homePeriodButton,s.homePeriodToday,overviewPeriod==="today"&&s.homePeriodTodayOn]} onPress={()=>setOverviewPeriod("today")}><Text style={[s.homePeriodTodayText,overviewPeriod==="today"&&s.homePeriodTextOn]}>Today</Text></Pressable><Pressable style={[s.homePeriodButton,s.homePeriodMonth,overviewPeriod==="month"&&s.homePeriodMonthOn]} onPress={()=>setOverviewPeriod("month")}><Text style={[s.homePeriodMonthText,overviewPeriod==="month"&&s.homePeriodTextOn]}>This month</Text></Pressable></View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
         {visibleModules.includes("sales")&&(!permissions||permissions.includes("sales"))?<Pressable accessibilityRole="button" accessibilityLabel={`View shop sales for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("dashboard")} style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Shop sales</Text><Text style={s.overviewMetricValue}>{peso(overview.sales)}</Text><Text style={s.overviewMetricHelp}>View sales →</Text></Pressable>:null}
-        {visibleModules.includes("orders")&&(!permissions||permissions.includes("orders"))?<><Pressable accessibilityRole="button" accessibilityLabel={`View order money for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Order money</Text><Text style={s.overviewMetricValue}>{peso(overview.payments)}</Text><Text style={s.overviewMetricHelp}>Paid by order customers</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View money still to collect from orders" onPress={()=>onOpen("orders")} style={[s.overviewMetric,s.overviewAlertMetric]}><Text style={[s.overviewMetricLabel,{color:C.red}]}>Order balance to collect</Text><Text style={s.overviewMetricValue}>{peso(orderSummary.pendingMoney)}</Text><Text style={[s.overviewMetricHelp,{color:C.red}]}>Customers still need to pay →</Text></Pressable></>:null}
-        {visibleModules.includes("reports")&&(!permissions||permissions.includes("reports"))?(()=>{const received=overview.sales+overview.payments;return <><Pressable accessibilityRole="button" accessibilityLabel={`View expenses for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Expenses</Text><Text style={s.overviewMetricValue}>{peso(overview.expenses)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable><View style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Money left</Text><Text style={s.overviewMetricValue}>{peso(received-overview.expenses)}</Text><Text style={s.overviewMetricHelp}>Money received minus expenses</Text></View></>})():null}
+        {visibleModules.includes("orders")&&(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel={`View order money for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Order money</Text><Text style={s.overviewMetricValue}>{peso(overview.payments)}</Text><Text style={s.overviewMetricHelp}>Paid by order customers</Text></Pressable>:null}
+        {visibleModules.includes("reports")&&(!permissions||permissions.includes("reports"))?<Pressable accessibilityRole="button" accessibilityLabel={`View expenses for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("expenses")} style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Expenses</Text><Text style={s.overviewMetricValue}>{peso(overview.expenses)}</Text><Text style={s.overviewMetricHelp}>See breakdown →</Text></Pressable>:null}
+        {visibleModules.includes("reports")&&(!permissions||permissions.includes("reports"))?<View style={s.overviewMetric}><Text numberOfLines={1} style={s.overviewMetricLabel}>Money left</Text><Text style={s.overviewMetricValue}>{peso(overview.sales+overview.payments-overview.expenses)}</Text><Text style={s.overviewMetricHelp}>Money received minus expenses</Text></View>:null}
+        {visibleModules.includes("orders")&&(!permissions||permissions.includes("orders"))?<><Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View money still to collect from orders" onPress={()=>onOpen("orders")} style={[s.overviewMetric,s.overviewAlertMetric]}><Text style={[s.overviewMetricLabel,{color:C.red}]}>Order balance to collect</Text><Text style={s.overviewMetricValue}>{peso(orderSummary.pendingMoney)}</Text><Text style={[s.overviewMetricHelp,{color:C.red}]}>Customers still need to pay →</Text></Pressable></>:null}
       </View>
       {visibleModules.includes("production")&&orderSummary.toPrint>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.production.border,backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("print_queue")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="layers-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.production.color}]}>PRINTING ACTION NEEDED</Text><Text style={s.homeReminderTitle}>{orderSummary.toPrint} paid job{orderSummary.toPrint===1?" is":"s are"} waiting to print</Text><Text style={s.homeReminderMeta}>Open Print Queue and start the next job.</Text></View><View style={s.reminderCount}><Text style={s.reminderCountText}>{orderSummary.toPrint}</Text></View></Pressable>:null}
       {eventReminder ? (
@@ -5239,16 +5241,20 @@ const s = StyleSheet.create({
   scroll: { paddingBottom: 96 },
   quickScroll: { paddingHorizontal: 0, paddingTop: 12, paddingBottom: 96 },
   homeIntro:{paddingTop:10,paddingBottom:16,borderBottomWidth:1,borderBottomColor:C.border},
-  homePeriodSwitch:{alignSelf:"flex-start",marginTop:14,padding:4,flexDirection:"row",gap:4,borderRadius:11,backgroundColor:C.soft},
+  homePeriodSwitch:{alignSelf:"flex-start",marginTop:14,padding:4,flexDirection:"row",gap:4,borderWidth:1,borderColor:"#D9E1F1",borderRadius:11,backgroundColor:C.white},
   homePeriodButton:{minHeight:36,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderRadius:8},
-  homePeriodButtonOn:{backgroundColor:SECTION.records.color,shadowColor:C.ink,shadowOpacity:.10,shadowRadius:5,shadowOffset:{width:0,height:2}},
-  homePeriodText:{color:C.muted,fontSize:13,fontWeight:"600"},
+  homePeriodToday:{backgroundColor:SECTION.sales.soft},
+  homePeriodMonth:{backgroundColor:SECTION.orders.soft},
+  homePeriodTodayOn:{backgroundColor:SECTION.sales.color,shadowColor:SECTION.sales.color,shadowOpacity:.18,shadowRadius:5,shadowOffset:{width:0,height:2}},
+  homePeriodMonthOn:{backgroundColor:SECTION.orders.color,shadowColor:SECTION.orders.color,shadowOpacity:.18,shadowRadius:5,shadowOffset:{width:0,height:2}},
+  homePeriodTodayText:{color:SECTION.sales.color,fontSize:13,fontWeight:"700"},
+  homePeriodMonthText:{color:SECTION.orders.color,fontSize:13,fontWeight:"700"},
   homePeriodTextOn:{color:C.white,fontWeight:"700"},
-  overviewMetric:{flex:1,minWidth:130,padding:14,borderRadius:12,borderWidth:1,borderColor:SECTION.settings.border,backgroundColor:SECTION.settings.soft},
+  overviewMetric:{flex:1,minWidth:130,padding:14,borderRadius:12,borderWidth:1,borderColor:SECTION.sales.border,backgroundColor:SECTION.sales.soft},
   overviewAlertMetric:{borderColor:"#E7D4DB",backgroundColor:"#FBF5F7"},
-  overviewMetricLabel:{color:C.ink,fontSize:13,fontWeight:"600"},
+  overviewMetricLabel:{color:SECTION.sales.color,fontSize:13,fontWeight:"600"},
   overviewMetricValue:{marginTop:6,color:C.ink,fontSize:24,lineHeight:30,fontWeight:"700"},
-  overviewMetricHelp:{marginTop:5,color:C.muted,fontSize:12,lineHeight:17},
+  overviewMetricHelp:{marginTop:5,color:SECTION.sales.color,fontSize:12,lineHeight:17},
   homeEyebrow:{fontSize:11,lineHeight:16,fontWeight:"700",letterSpacing:2,color:C.muted},
   homeDesktopTitle:{fontSize:32,lineHeight:40,fontWeight:"600",letterSpacing:-.8},
   quickSection:{marginTop:24},
