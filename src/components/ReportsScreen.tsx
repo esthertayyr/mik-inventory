@@ -839,7 +839,9 @@ const s = StyleSheet.create({
   groupLabel: { marginTop: 20, marginBottom: 5, color: "#29315C", fontSize: 13, lineHeight: 18, fontWeight: "800", letterSpacing: .7 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   stat: {
-    width: "48%",
+    minWidth: 210,
+    flexGrow: 1,
+    flexBasis: 210,
     padding: 12,
     borderRadius: 12,
     backgroundColor: "#F6F7F8",
