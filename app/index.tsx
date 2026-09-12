@@ -393,6 +393,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const [password, setPassword] = useState("");
   const [openShop, setOpenShop] = useState<AdminShop | null>(null);
   const [showActivity, setShowActivity] = useState(false);
+  const [showOwnerOrders,setShowOwnerOrders]=useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
   const [showTeam,setShowTeam]=useState(false);
@@ -499,6 +500,8 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     return <AdminShopForm shop={manageShop.shop} mode={manageShop.mode} onBack={() => setManageShop(null)} onDone={async () => { setManageShop(null); await load(); }} />;
   if (showActivity)
     return <OwnerActivityLog shops={shops} onBack={() => setShowActivity(false)} />;
+  if (showOwnerOrders)
+    return <OwnerOrders onBack={() => setShowOwnerOrders(false)} />;
   if (showIssues)
     return <OwnerIssueReports onBack={() => setShowIssues(false)} />;
   if (showAccounts)
@@ -539,7 +542,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
           <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>MONEY LEFT</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.salesToday+ownerStats.orderPaymentsToday-ownerStats.expensesToday)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.stock.color}]}/></View>
         </View>
         <View style={[s.ownerDashboardColumns,width<720&&s.ownerDashboardColumnsMobile]}>
-          <View style={s.ownerDashboardPanel}><Text style={s.ownerZoneTitle}>Needs attention</Text><Pressable style={s.ownerAttentionRow} onPress={()=>shops[0]&&setOpenShop(shops[0])}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.orders.soft}]}><Ionicons name="clipboard-outline" size={20} color={SECTION.orders.color}/></View><View style={s.flex}><Text style={s.ownerAttentionValue}>{ownerStats.activeOrders}</Text><Text style={s.ownerAttentionLabel}>Open customer orders</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable><Pressable style={s.ownerAttentionRow} onPress={()=>shops[0]&&setOpenShop(shops[0])}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.stock.soft}]}><Ionicons name="alert-circle-outline" size={20} color={SECTION.stock.color}/></View><View style={s.flex}><Text style={s.ownerAttentionValue}>{ownerStats.lowStock}</Text><Text style={s.ownerAttentionLabel}>Low-stock products</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable><Pressable style={s.ownerAttentionRow} onPress={()=>setShowIssues(true)}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.support.soft}]}><Ionicons name="chatbox-ellipses-outline" size={20} color={SECTION.support.color}/></View><View style={s.flex}><Text style={s.ownerAttentionLabelStrong}>Problem reports</Text><Text style={s.ownerAttentionLabel}>Review messages from shops</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable></View>
+          <View style={s.ownerDashboardPanel}><Text style={s.ownerZoneTitle}>Needs attention</Text><Pressable style={s.ownerAttentionRow} onPress={()=>setShowOwnerOrders(true)}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.orders.soft}]}><Ionicons name="clipboard-outline" size={20} color={SECTION.orders.color}/></View><View style={s.flex}><Text style={s.ownerAttentionValue}>{ownerStats.activeOrders}</Text><Text style={s.ownerAttentionLabel}>Open customer orders · all shops</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable><Pressable style={s.ownerAttentionRow} onPress={()=>shops[0]&&setOpenShop(shops[0])}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.stock.soft}]}><Ionicons name="alert-circle-outline" size={20} color={SECTION.stock.color}/></View><View style={s.flex}><Text style={s.ownerAttentionValue}>{ownerStats.lowStock}</Text><Text style={s.ownerAttentionLabel}>Low-stock products</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable><Pressable style={s.ownerAttentionRow} onPress={()=>setShowIssues(true)}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.support.soft}]}><Ionicons name="chatbox-ellipses-outline" size={20} color={SECTION.support.color}/></View><View style={s.flex}><Text style={s.ownerAttentionLabelStrong}>Problem reports</Text><Text style={s.ownerAttentionLabel}>Review messages from shops</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable></View>
           <View style={s.ownerDashboardPanel}><Text style={s.ownerZoneTitle}>Platform tools</Text><View style={s.ownerToolGrid}><Pressable style={s.ownerTool} onPress={()=>setShowActivity(true)}><Ionicons name="time-outline" size={21} color={SECTION.records.color}/><Text style={s.ownerToolTitle}>Activity</Text><Text style={s.ownerToolHelp}>See every change</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>setShowAccounts(true)}><Ionicons name="people-outline" size={21} color={SECTION.support.color}/><Text style={s.ownerToolTitle}>Accounts</Text><Text style={s.ownerToolHelp}>Owners and staff</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>setShowTeam(true)}><Ionicons name="shield-checkmark-outline" size={21} color={SECTION.records.color}/><Text style={s.ownerToolTitle}>Viewers</Text><Text style={s.ownerToolHelp}>Dashboard access</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>void exportOwnerSales()} disabled={exporting}><Ionicons name="download-outline" size={21} color={C.accent}/><Text style={s.ownerToolTitle}>{exporting?"Preparing…":"Export"}</Text><Text style={s.ownerToolHelp}>All shop sales</Text></Pressable></View></View>
         </View>
         {showForm ? (
@@ -4167,6 +4170,8 @@ type ActivityLog = {
 
 type OwnerOrderDetail = {
   id: string;
+  business_id?: string;
+  business?: { name: string } | null;
   order_number: number;
   title: string;
   customer_name: string | null;
@@ -4180,7 +4185,40 @@ type OwnerOrderDetail = {
   target_date: string | null;
   notes: string | null;
   image_url: string | null;
+  created_at?: string;
 };
+
+function OwnerOrderModal({order,onClose}:{order:OwnerOrderDetail|null;onClose:()=>void}) {
+  return <Modal visible={!!order} transparent animationType="fade" onRequestClose={onClose}>
+    <View style={s.modalShade}><ScrollView style={s.ownerOrderScroll} contentContainerStyle={s.ownerOrderModal}>
+      <View style={s.ownerOrderTop}><View style={s.flex}><Text style={s.kicker}>ORDER DETAILS{order?.business?.name?` · ${order.business.name}`:""}</Text><Text style={s.ownerOrderNumber}>ORD-{order?.order_number}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Close order" style={s.modalClose} onPress={onClose}><Ionicons name="close" size={22} color={C.ink}/></Pressable></View>
+      {order?.image_url?<Image source={{uri:order.image_url}} style={s.ownerOrderImage}/>:null}
+      <Text style={s.ownerOrderTitle}>{order?.title}</Text>
+      <Text style={s.ownerOrderCustomer}>{order?.customer_name||"No customer name"} · {order?.social_platform||order?.source}</Text>
+      <View style={s.ownerOrderFacts}><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>QUANTITY</Text><Text style={s.ownerOrderValue}>{order?.quantity}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>TOTAL</Text><Text style={s.ownerOrderValue}>{peso(Number(order?.total_price||0))}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>BALANCE</Text><Text style={s.ownerOrderValue}>{peso(Math.max(0,Number(order?.total_price||0)-Number(order?.amount_paid||0)))}</Text></View></View>
+      <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Status</Text><Text style={s.ownerOrderLineValue}>{order?.status.replaceAll("_"," ")}</Text></View>
+      <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Ready by</Text><Text style={s.ownerOrderLineValue}>{order?.target_date?friendlyLocalDate(order.target_date):"Not set"}</Text></View>
+      <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Payment</Text><Text style={s.ownerOrderLineValue}>{order?.amount_paid?`${peso(Number(order.amount_paid))} · ${order.payment_channel||"Method not set"}`:"No payment recorded"}</Text></View>
+      {order?.notes?<View style={s.ownerOrderNotes}><Text style={s.ownerOrderLabel}>REMARKS</Text><Text style={s.ownerOrderNotesText}>{order.notes}</Text></View>:null}
+    </ScrollView></View>
+  </Modal>;
+}
+
+function OwnerOrders({onBack}:{onBack:()=>void}) {
+  const [orders,setOrders]=useState<OwnerOrderDetail[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  const [selectedOrder,setSelectedOrder]=useState<OwnerOrderDetail|null>(null);
+  const [view,setView]=useState<"open"|"all">("open");
+  useEffect(()=>{
+    supabase.from("external_orders")
+      .select("id,business_id,business:businesses(name),order_number,title,customer_name,source,social_platform,quantity,total_price,amount_paid,payment_channel,status,target_date,notes,image_url,created_at")
+      .order("created_at",{ascending:false}).limit(1000)
+      .then(({data,error:loadError})=>{setOrders((data??[]) as unknown as OwnerOrderDetail[]);setError(loadError?.message??"");setLoading(false);});
+  },[]);
+  const visible=orders.filter(order=>view==="all"||!["completed","cancelled"].includes(order.status));
+  return <SafeAreaView style={s.app}><StatusBar style="dark"/><View style={s.adminTop}><Pressable accessibilityRole="button" accessibilityLabel="Back to owner dashboard" style={s.backButton} onPress={onBack}><Ionicons name="arrow-back" size={23} color={C.ink}/></Pressable><View style={s.flex}><Text style={s.kicker}>OWNER ONLY</Text><Text style={s.shopName}>Orders from all shops</Text></View></View><ScrollView contentContainerStyle={s.adminPage}><Text style={s.subtitle}>Tap an order to see what was ordered, paid and still owed.</Text><View style={s.ownerOrderTabs}>{(["open","all"] as const).map(option=><Pressable key={option} accessibilityRole="button" accessibilityState={{selected:view===option}} style={[s.activityFilter,view===option&&s.activityFilterOn]} onPress={()=>setView(option)}><Text style={[s.activityFilterText,view===option&&s.activityFilterTextOn]}>{option==="open"?"Open orders":"All orders"}</Text></Pressable>)}</View>{loading?<ActivityIndicator size="large" color={SECTION.orders.color}/>:error?<Text style={s.error}>{error}</Text>:visible.length?visible.map(order=><Pressable key={order.id} accessibilityRole="button" accessibilityLabel={`Open order ${order.order_number}, ${order.title}`} style={s.activityRow} onPress={()=>setSelectedOrder(order)}>{order.image_url?<Image source={{uri:order.image_url}} style={s.ownerOrderThumb}/>:<View style={s.activityIcon}><Ionicons name="clipboard-outline" size={21} color={SECTION.orders.color}/></View>}<View style={s.flex}><Text style={s.activitySummary}>ORD-{order.order_number} · {order.title}</Text><Text style={s.activityMeta}>{order.business?.name??"Shop"} · {order.customer_name||"No customer name"}</Text><Text style={s.activityTime}>{order.status.replaceAll("_"," ")} · {peso(Number(order.amount_paid))} paid of {peso(Number(order.total_price))}</Text></View><Ionicons name="chevron-forward" size={20} color={SECTION.orders.color}/></Pressable>):<Text style={s.activityEmptyText}>No orders in this view.</Text>}</ScrollView><OwnerOrderModal order={selectedOrder} onClose={()=>setSelectedOrder(null)}/></SafeAreaView>;
+}
 
 function activityDetail(item: ActivityLog) {
   if (item.action === "login") {
@@ -4234,12 +4272,15 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
     return shopOk && kindOk;
   });
   const openOrder=async(item:ActivityLog)=>{
-    if(!item.entity_id||!item.action.startsWith("order_"))return;
+    if(!item.action.startsWith("order_"))return;
+    const orderNumber=Number(item.details?.order_number??item.summary.match(/ORD-(\d+)/i)?.[1]);
+    if(!item.entity_id&&!Number.isFinite(orderNumber)){Alert.alert("Order not linked","This older activity entry has no order link. Use Orders from all shops on the owner dashboard.");return;}
     setOrderLoading(true);
-    const {data,error}=await supabase.from("external_orders").select("id,order_number,title,customer_name,source,social_platform,quantity,total_price,amount_paid,payment_channel,status,target_date,notes,image_url").eq("id",item.entity_id).maybeSingle();
+    const orderQuery=supabase.from("external_orders").select("id,business_id,business:businesses(name),order_number,title,customer_name,source,social_platform,quantity,total_price,amount_paid,payment_channel,status,target_date,notes,image_url");
+    const {data,error}=await (item.entity_id?orderQuery.eq("id",item.entity_id):orderQuery.eq("business_id",item.business_id!).eq("order_number",orderNumber)).maybeSingle();
     setOrderLoading(false);
-    if(error||!data){Alert.alert("Order not available",error?.message??"This order could not be found.");return;}
-    setSelectedOrder(data as OwnerOrderDetail);
+    if(error||!data){Alert.alert("Order not available",error?.message??"This order could not be found. You can browse Orders from all shops on the owner dashboard.");return;}
+    setSelectedOrder(data as unknown as OwnerOrderDetail);
   };
   return (
     <SafeAreaView style={s.app}>
@@ -4279,19 +4320,7 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
         )}) : <View style={s.empty}><Ionicons name="time-outline" size={32} color={C.green} /><Text style={s.activityEmptyTitle}>No activity found</Text><Text style={s.activityEmptyText}>Try another shop or activity type.</Text></View>}
       </ScrollView>
       {orderLoading?<View style={s.ownerOrderLoading}><ActivityIndicator color={SECTION.orders.color}/></View>:null}
-      <Modal visible={!!selectedOrder} transparent animationType="fade" onRequestClose={()=>setSelectedOrder(null)}>
-        <View style={s.modalShade}><ScrollView style={s.ownerOrderScroll} contentContainerStyle={s.ownerOrderModal}>
-          <View style={s.ownerOrderTop}><View style={s.flex}><Text style={s.kicker}>ORDER DETAILS</Text><Text style={s.ownerOrderNumber}>ORD-{selectedOrder?.order_number}</Text></View><Pressable accessibilityLabel="Close order" style={s.modalClose} onPress={()=>setSelectedOrder(null)}><Ionicons name="close" size={22} color={C.ink}/></Pressable></View>
-          {selectedOrder?.image_url?<Image source={{uri:selectedOrder.image_url}} style={s.ownerOrderImage}/>:null}
-          <Text style={s.ownerOrderTitle}>{selectedOrder?.title}</Text>
-          <Text style={s.ownerOrderCustomer}>{selectedOrder?.customer_name||"No customer name"} · {selectedOrder?.social_platform||selectedOrder?.source}</Text>
-          <View style={s.ownerOrderFacts}><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>QUANTITY</Text><Text style={s.ownerOrderValue}>{selectedOrder?.quantity}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>TOTAL</Text><Text style={s.ownerOrderValue}>{peso(Number(selectedOrder?.total_price||0))}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>BALANCE</Text><Text style={s.ownerOrderValue}>{peso(Math.max(0,Number(selectedOrder?.total_price||0)-Number(selectedOrder?.amount_paid||0)))}</Text></View></View>
-          <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Status</Text><Text style={s.ownerOrderLineValue}>{selectedOrder?.status.replaceAll("_"," ")}</Text></View>
-          <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Due date</Text><Text style={s.ownerOrderLineValue}>{selectedOrder?.target_date?friendlyLocalDate(selectedOrder.target_date):"Not set"}</Text></View>
-          <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Payment</Text><Text style={s.ownerOrderLineValue}>{selectedOrder?.amount_paid?`${peso(Number(selectedOrder.amount_paid))} · ${selectedOrder.payment_channel||"Method not set"}`:"No payment recorded"}</Text></View>
-          {selectedOrder?.notes?<View style={s.ownerOrderNotes}><Text style={s.ownerOrderLabel}>REMARKS</Text><Text style={s.ownerOrderNotesText}>{selectedOrder.notes}</Text></View>:null}
-        </ScrollView></View>
-      </Modal>
+      <OwnerOrderModal order={selectedOrder} onClose={()=>setSelectedOrder(null)}/>
     </SafeAreaView>
   );
 }
@@ -5095,6 +5124,8 @@ const s = StyleSheet.create({
   activityButtonTitle:{color:C.ink,fontSize:16,fontWeight:"700"},
   activityButtonHelp:{marginTop:2,color:C.muted,fontSize:13},
   activityFilters:{gap:8,paddingVertical:10},
+  ownerOrderTabs:{marginTop:12,marginBottom:8,flexDirection:"row",flexWrap:"wrap",gap:8},
+  ownerOrderThumb:{width:44,height:44,borderRadius:10,resizeMode:"contain",backgroundColor:C.soft},
   activityFilter:{minHeight:40,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white},
   activityFilterOn:{borderColor:C.green,backgroundColor:C.green},
   activityFilterText:{color:C.ink,fontSize:12,fontWeight:"700"},
