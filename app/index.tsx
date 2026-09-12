@@ -82,13 +82,6 @@ function friendlyDateTime(value: string) {
   return `${friendlyLocalDate(localDateKey(date))} · ${date.toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-function greetingForNow() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
 const C = {
   ink: "#111522",
   muted: "#626A78",
@@ -1036,7 +1029,7 @@ function ShopApp({
   else if (screen === "report_issue")
     body = <ReportIssue businessId={business!.id} onBack={() => setScreen(reportBackScreen)} />;
   else if (screen === "sell_start")
-    body = <SellStart businessId={business!.id} deviceUserName={deviceUserName} onOpen={setScreen} />;
+    body = <SellStart onOpen={setScreen} />;
   else if (screen === "print_queue")
     body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} onOpenOrder={(orderId) => { setOpenOrderId(orderId); setScreen("orders"); }} />;
   else if (screen === "price_calculator")
@@ -1124,7 +1117,11 @@ function ShopApp({
               : current?.name ?? "Shop location"}
           </Text>:null}
         </View>
-        <Text style={s.workspaceBrand}>MIK</Text>
+        {width>=600?<Text style={s.workspaceBrand}>MIK</Text>:null}
+        <Pressable accessibilityRole="button" accessibilityLabel="Log out" style={s.headerLogout} onPress={() => supabase.auth.signOut()}>
+          <Ionicons name="log-out-outline" size={19} color={C.ink} />
+          {width>=600?<Text style={s.headerLogoutText}>Log out</Text>:null}
+        </Pressable>
       </View>
       {locations.length > 1 ? (
         <ScrollView
@@ -1227,39 +1224,10 @@ function NoShopProfile() {
   );
 }
 
-function SellStart({businessId,deviceUserName,onOpen}:{businessId:string;deviceUserName:string;onOpen:(screen:Screen)=>void}) {
+function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   const {width}=useWindowDimensions();
   const today = localDateKey();
-  const [welcomeVisible,setWelcomeVisible] = useState(false);
-  const welcomeKey = `mik-sale-welcome-${businessId}-${today}`;
-  useEffect(() => {
-    AsyncStorage.getItem(welcomeKey)
-      .then((seen) => setWelcomeVisible(seen !== "done"))
-      .catch(() => setWelcomeVisible(true));
-  }, [welcomeKey]);
-  const closeWelcome = async () => {
-    setWelcomeVisible(false);
-    await AsyncStorage.setItem(welcomeKey,"done").catch(() => undefined);
-  };
-  const start = async (screen:Screen) => {
-    await closeWelcome();
-    onOpen(screen);
-  };
   return <ScrollView contentContainerStyle={s.sellStartPage}>
-    <Modal visible={welcomeVisible} transparent animationType="fade" onRequestClose={() => void closeWelcome()}>
-      <SafeAreaView style={s.saleWelcomeOverlay}>
-        <View style={s.saleWelcomeCard}>
-          <View style={s.saleWelcomeIcon}><Ionicons name="sunny-outline" size={34} color={C.white}/></View>
-          <Text style={s.saleWelcomeTitle}>{greetingForNow()}, {deviceUserName} 👋</Text>
-          <Text style={s.saleWelcomeDate}>{friendlyLocalDate(today)}</Text>
-          <Text style={s.saleWelcomeHelp}>Sales entered now will be recorded under today.</Text>
-          <Pressable accessibilityRole="button" style={s.saleWelcomePrimary} onPress={() => void start("sale")}><Ionicons name="storefront" size={22} color={C.white}/><View style={s.flex}><Text style={s.saleWelcomePrimaryText}>Shop Sale</Text><Text style={s.saleWelcomePrimaryHelp}>Normal Checkout</Text></View></Pressable>
-          <Pressable accessibilityRole="button" style={s.saleWelcomeSecondary} onPress={() => void start("event_sale")}><View style={s.saleWelcomeSecondaryIcon}><Ionicons name="flash" size={22} color={C.white}/></View><View style={s.flex}><Text style={s.saleWelcomeSecondaryText}>Event Sale</Text><Text style={s.saleWelcomeSecondaryMode}>Fast checkout</Text></View><Ionicons name="arrow-forward" size={20} color={SECTION.production.color}/></Pressable>
-          <Text style={s.saleWelcomeEventNote}>Letter choices are skipped. Count A–Z keycaps after the event.</Text>
-          <Pressable accessibilityRole="button" style={s.saleWelcomeLater} onPress={() => void closeWelcome()}><Text style={s.saleWelcomeLaterText}>Choose later</Text></Pressable>
-        </View>
-      </SafeAreaView>
-    </Modal>
     <View style={s.sellTodayCard}><Ionicons name="calendar-outline" size={22} color={C.green}/><View style={s.flex}><Text style={s.sellTodayLabel}>RECORDING FOR TODAY</Text><Text style={s.sellTodayDate}>{friendlyLocalDate(today)}</Text></View></View>
     <Text style={s.pageTitle}>How are you selling?</Text>
     <Text style={s.subtitle}>Choose one to start.</Text>
@@ -4943,6 +4911,8 @@ const s = StyleSheet.create({
   },
   shopLogo: { width: 34, height: 34, borderRadius: 8, resizeMode:"contain",backgroundColor:C.white },
   workspaceBrand:{fontSize:12,fontWeight:"600",letterSpacing:3,color:C.muted},
+  headerLogout:{minWidth:40,minHeight:40,paddingHorizontal:10,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:6,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},
+  headerLogoutText:{color:C.ink,fontSize:13,fontWeight:"700"},
   sidebarLabel:{paddingHorizontal:12,marginBottom:10,color:C.muted,fontSize:10,fontWeight:"700",letterSpacing:1.6},
   shopLogoPreview: {
     width: 180,

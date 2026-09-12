@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Text } from "./AppTypography";
@@ -179,6 +180,8 @@ export function ReportsScreen({
   correctionMode?: boolean;
   onBack?: () => void;
 }) {
+  const { width } = useWindowDimensions();
+  const mobile = width < 600;
   const [period, setPeriod] = useState<Period>("daily");
   const [offset, setOffset] = useState(0);
   const [exactDate, setExactDate] = useState<Date | null>(null);
@@ -481,7 +484,7 @@ export function ReportsScreen({
         {(["daily", "weekly", "monthly", "custom"] as Period[]).map((p) => (
           <Pressable
             key={p}
-            style={[s.tab, period === p && s.tabOn]}
+            style={[s.tab, mobile && s.tabMobile, period === p && s.tabOn]}
             onPress={() => {
               setPeriod(p);
               setOffset(0);
@@ -533,9 +536,9 @@ export function ReportsScreen({
         />
       ) : null}
       {period === "custom" ? <>
-        <View style={s.dateTools}>
-          <Pressable style={s.chooseDate} onPress={()=>{setRangePicking("start");setCalendarMonth(new Date(customStart.getFullYear(),customStart.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#365D8C"/><Text style={s.chooseDateText}>From {dateText(customStart)}</Text></Pressable>
-          <Pressable style={s.chooseDate} onPress={()=>{setRangePicking("end");setCalendarMonth(new Date(customEnd.getFullYear(),customEnd.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#365D8C"/><Text style={s.chooseDateText}>To {dateText(customEnd)}</Text></Pressable>
+        <View style={[s.dateTools,mobile&&s.dateToolsMobile]}>
+          <Pressable style={[s.chooseDate,mobile&&s.chooseDateMobile]} onPress={()=>{setRangePicking("start");setCalendarMonth(new Date(customStart.getFullYear(),customStart.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#294B73"/><Text style={s.chooseDateText}>From {dateText(customStart)}</Text></Pressable>
+          <Pressable style={[s.chooseDate,mobile&&s.chooseDateMobile]} onPress={()=>{setRangePicking("end");setCalendarMonth(new Date(customEnd.getFullYear(),customEnd.getMonth(),1));setCalendarOpen(true);}}><Ionicons name="calendar-outline" size={21} color="#294B73"/><Text style={s.chooseDateText}>To {dateText(customEnd)}</Text></Pressable>
         </View>
         {calendarOpen?<CalendarPicker month={calendarMonth} selected={rangePicking==="start"?customStart:customEnd} onMonth={setCalendarMonth} onSelect={(date)=>{if(rangePicking==="start"){setCustomStart(date);if(date>customEnd)setCustomEnd(date);}else if(date<customStart){Alert.alert("Check date range","The To date must be on or after the From date.");return;}else setCustomEnd(date);setCalendarOpen(false);}}/>:null}
       </> : null}
@@ -575,22 +578,22 @@ export function ReportsScreen({
           </View>
           <Text style={s.groupLabel}>MONEY</Text>
           <View style={s.grid}>
-            <Stat label="Shop sales" value={peso(total)} />
-            <Stat label="Order payments" value={peso(orderPaymentTotal)} />
-            <Stat label="Expenses" value={peso(expenseTotal)} />
+            <Stat label="Shop sales" value={peso(total)} mobile={mobile} />
+            <Stat label="Order payments" value={peso(orderPaymentTotal)} mobile={mobile} />
+            <Stat label="Expenses" value={peso(expenseTotal)} mobile={mobile} />
           </View>
           <Text style={s.groupLabel}>PAYMENT METHODS</Text>
           <View style={s.grid}>
-            <Stat label="Cash" value={peso(cash)} />
-            <Stat label="GCash" value={peso(gcash)} />
+            <Stat label="Cash" value={peso(cash)} mobile={mobile} />
+            <Stat label="GCash" value={peso(gcash)} mobile={mobile} />
           </View>
           <Text style={s.groupLabel}>SALES ACTIVITY</Text>
           <View style={s.grid}>
-            <Stat label="Transactions" value={String(completed.length)} />
-            <Stat label="Items sold" value={String(itemsSold)} />
-            <Stat label="Damaged" value={String(damaged)} />
-            <Stat label="Cancelled" value={String(cancelled)} />
-            <Stat label="Average sale" value={peso(average)} />
+            <Stat label="Transactions" value={String(completed.length)} mobile={mobile} />
+            <Stat label="Items sold" value={String(itemsSold)} mobile={mobile} />
+            <Stat label="Damaged" value={String(damaged)} mobile={mobile} />
+            <Stat label="Cancelled" value={String(cancelled)} mobile={mobile} />
+            <Stat label="Average sale" value={peso(average)} mobile={mobile} />
           </View>
           {orderPayments.length?<><Text style={s.section}>Order payments received</Text>{orderPayments.map((payment,index)=><View key={`${payment.payment_date}-${payment.order?.order_number}-${index}`} style={s.row}><Text style={s.rowName}>{payment.order?`ORD-${payment.order.order_number} · ${payment.order.title}`:"Customer order"}</Text><Text style={s.rowSmall}>{dateText(new Date(`${payment.payment_date}T12:00:00`))} · {payment.payment_method.toUpperCase()}</Text><Text style={s.rowValue}>{peso(Number(payment.amount))}</Text></View>)}</>:null}
           {expenses.length?<><Text style={s.section}>Expense breakdown</Text>{expenses.map((expense,index)=><View key={`${expense.expense_date}-${expense.description}-${index}`} style={s.row}><Text style={s.rowName}>{expense.description}</Text><Text style={s.rowSmall}>{expense.category} · {expense.payment_method.toUpperCase()}</Text><Text style={s.rowValue}>{peso(Number(expense.amount))}</Text></View>)}</>:null}
@@ -691,9 +694,9 @@ export function ReportsScreen({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, mobile }: { label: string; value: string; mobile: boolean }) {
   return (
-    <View style={s.stat}>
+    <View style={[s.stat,mobile&&s.statMobile]}>
       <Text style={s.statLabel}>{label}</Text>
       <Text style={s.statValue}>{value}</Text>
     </View>
@@ -720,8 +723,9 @@ const s = StyleSheet.create({
     borderColor: "#D5E0EB",
     backgroundColor: "#EFF3F8",
   },
-  tabOn: { backgroundColor: "#365D8C" },
-  tabText: { fontSize: 14, fontWeight: "700", color: "#365D8C" },
+  tabOn: { backgroundColor: "#294B73" },
+  tabMobile: { minWidth: 0, flexBasis: "46%" },
+  tabText: { fontSize: 14, fontWeight: "700", color: "#294B73" },
   tabTextOn: { color: "#FFF" },
   voidButton: { marginTop: 8, minHeight: 38, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderRadius: 9, borderWidth: 1, borderColor: "#65243A", backgroundColor: "#FFF" },
   voidText: { color: "#65243A", fontSize: 12, fontWeight: "700" },
@@ -734,6 +738,8 @@ const s = StyleSheet.create({
   cancelVoid: { minHeight: 48, alignItems: "center", justifyContent: "center" },
   cancelVoidText: { color: "#697582", fontSize: 15, fontWeight: "700" },
   dateTools: { marginTop: 10, flexDirection: "row", gap: 8 },
+  dateToolsMobile: { flexWrap: "wrap" },
+  chooseDateMobile: { minWidth: 160 },
   chooseDate: {
     flex: 1,
     minHeight: 50,
@@ -755,10 +761,10 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#365D8C",
+    borderColor: "#294B73",
     backgroundColor: "#FFF",
   },
-  todayText: { color: "#365D8C", fontSize: 14, fontWeight: "700" },
+  todayText: { color: "#294B73", fontSize: 14, fontWeight: "700" },
   calendar: {
     marginTop: 10,
     padding: 13,
@@ -797,7 +803,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 13,
   },
-  dayOn: { backgroundColor: "#365D8C" },
+  dayOn: { backgroundColor: "#294B73" },
   dayText: { color: "#16283A", fontSize: 14, fontWeight: "700" },
   dayTextOn: { color: "#FFF" },
   periodNav: {
@@ -830,11 +836,11 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: "#16283A",
   },
-  hero: { padding: 18, borderRadius: 14, backgroundColor: "#365D8C" },
+  hero: { padding: 18, borderRadius: 14, backgroundColor: "#294B73" },
   heroLabel: { color: "#E7EEF6", fontSize:13, letterSpacing:.6, fontWeight: "700" },
   heroValue: { color: "#FFF", fontSize: 30, lineHeight:36, fontWeight: "700", marginTop: 4 },
   heroHelp: { color: "#EDF3F8", fontSize: 14, lineHeight:20, fontWeight: "600", marginTop: 5 },
-  groupLabel: { marginTop: 20, marginBottom: 6, color: "#365D8C", fontSize: 14, lineHeight: 19, fontWeight: "800", letterSpacing: .6 },
+  groupLabel: { marginTop: 20, marginBottom: 6, color: "#294B73", fontSize: 14, lineHeight: 19, fontWeight: "800", letterSpacing: .6 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   stat: {
     minWidth: 210,
@@ -846,6 +852,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D5E0EB",
   },
+  statMobile: { minWidth: 0, flexBasis: "46%", minHeight: 76 },
   statLabel: { fontSize: 13, lineHeight:18, color: "#5F6F80", fontWeight: "700" },
   statValue: {
     fontSize: 20,
@@ -865,6 +872,7 @@ const s = StyleSheet.create({
     minHeight: 54,
     marginBottom: 8,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
     padding: 12,
@@ -873,10 +881,10 @@ const s = StyleSheet.create({
     borderColor: "#E0E3E7",
     borderRadius: 14,
   },
-  rank: { width: 22, fontWeight: "700", color: "#365D8C" },
+  rank: { width: 22, fontWeight: "700", color: "#294B73" },
   rowName: { flex: 1, fontSize: 15, fontWeight: "700", color: "#16283A" },
   rowSmall: { fontSize: 12, color: "#697582" },
-  rowValue: { fontWeight: "700", color: "#365D8C" },
+  rowValue: { fontWeight: "700", color: "#294B73" },
   empty: { padding: 14, color: "#697582", backgroundColor: "#FFF" },
   export: {
     minHeight: 60,
@@ -885,7 +893,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 9,
     borderRadius: 12,
-    backgroundColor: "#365D8C",
+    backgroundColor: "#294B73",
     alignItems: "center",
   },
   exportText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
