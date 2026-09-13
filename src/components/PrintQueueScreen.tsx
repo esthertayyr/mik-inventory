@@ -15,6 +15,7 @@ import { Text, TextInput } from "./AppTypography";
 import { Ionicons } from "@expo/vector-icons";
 import { ToolGrid } from "./ToolGrid";
 import { supabase } from "@/src/lib/supabase";
+import { UI_COLORS } from "@/src/theme/colors";
 
 type Status = "to_print" | "printing" | "ready" | "done";
 type Job = {
@@ -31,13 +32,13 @@ type Job = {
 };
 type Printer = { id: string; name: string; status: string };
 const C = {
-  ink: "#111522",
-  muted: "#626A78",
-  production: "#8A365B",
-  soft: "#FAF5F8",
-  border: "#E8DDE3",
-  white: "#FFF",
-  green: "#1B685C",
+  ink: UI_COLORS.ink,
+  muted: UI_COLORS.muted,
+  production: UI_COLORS.actionBlue,
+  soft: UI_COLORS.actionBlueSoft,
+  border: UI_COLORS.actionBlueBorder,
+  white: UI_COLORS.white,
+  green: UI_COLORS.successGreen,
 };
 const steps: Array<{ id: Status; label: string; help: string }> = [
   { id: "to_print", label: "To print", help: "Waiting to be made" },

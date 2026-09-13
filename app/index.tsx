@@ -35,6 +35,7 @@ import { WorkspaceAction } from "@/src/components/WorkspaceAction";
 import { PrintQueueScreen } from "@/src/components/PrintQueueScreen";
 import { PrintPriceCalculator } from "@/src/components/PrintPriceCalculator";
 import { Text, TextInput } from "@/src/components/AppTypography";
+import { UI_COLORS } from "@/src/theme/colors";
 import type {
   Business,
   CartItem,
@@ -85,15 +86,15 @@ function friendlyDateTime(value: string) {
 const C = {
   ink: "#111522",
   muted: "#626A78",
-  green: "#29315C",
+  brand: UI_COLORS.brand,
   dark: "#11162B",
   soft: "#F5F6F9",
-  accent: "#1B685C",
+  accent: UI_COLORS.successGreen,
   accentDark: "#124C43",
   accentSoft: "#EDF6F3",
   teal: "#365D8C",
   tealSoft: "#EFF3F8",
-  purple: "#594C8D",
+  purple: UI_COLORS.orderPurple,
   purpleSoft: "#F2F0F8",
   cream: "#F7F8FB",
   white: "#FFFFFF",
@@ -104,12 +105,12 @@ const C = {
   redSoft: "#F8F4F5",
 };
 const SECTION = {
-  sales: { color: "#315FBE", soft: "#EEF3FF", border: "#C9D7F2" },
-  orders: { color: "#594C8D", soft: "#F3F1F8", border: "#DFDAEB" },
-  stock: { color: "#1B685C", soft: "#EEF6F3", border: "#D3E6DF" },
-  production: { color: "#8A365B", soft: "#F8F0F4", border: "#EACFDA" },
-  records: { color: "#365D8C", soft: "#EFF3F8", border: "#D5E0EB" },
-  settings: { color: "#4B5158", soft: "#F3F4F5", border: "#DFE1E3" },
+  sales: { color: UI_COLORS.actionBlue, soft: UI_COLORS.actionBlueSoft, border: UI_COLORS.actionBlueBorder },
+  orders: { color: UI_COLORS.orderPurple, soft: UI_COLORS.orderPurpleSoft, border: UI_COLORS.orderPurpleBorder },
+  stock: { color: UI_COLORS.neutral, soft: UI_COLORS.neutralSoft, border: UI_COLORS.neutralBorder },
+  production: { color: UI_COLORS.actionBlue, soft: UI_COLORS.actionBlueSoft, border: UI_COLORS.actionBlueBorder },
+  records: { color: UI_COLORS.neutral, soft: UI_COLORS.neutralSoft, border: UI_COLORS.neutralBorder },
+  settings: { color: UI_COLORS.neutral, soft: UI_COLORS.neutralSoft, border: UI_COLORS.neutralBorder },
   support: { color: "#5A405F", soft: "#F7F3F8", border: "#E5DCE7" },
 } as const;
 type Icon = keyof typeof Ionicons.glyphMap;
@@ -230,7 +231,7 @@ export default function Home() {
     return () => data.subscription.unsubscribe();
   }, []);
   if (!iconsReady)
-    return <SafeAreaView style={s.loading}><ActivityIndicator size="large" color={C.green} /></SafeAreaView>;
+    return <SafeAreaView style={s.loading}><ActivityIndicator size="large" color={C.brand} /></SafeAreaView>;
   return session ? <SignedIn session={session} deviceUserName="team" /> : <Login />;
 }
 
@@ -283,7 +284,7 @@ function Login() {
     <SafeAreaView style={s.login}>
       <StatusBar style="dark" />
       <View style={[s.loginShell, wide && s.loginShellWide]}>
-        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK · MIKAEL</Text><View style={s.loginAccent}/><Text style={s.loginEditorialTitle}>{"More clarity.\nLess busywork."}</Text><Text style={s.loginEditorialBody}>A thoughtful workspace for your 3D printing shop.</Text><View style={s.loginFeatures}>{[{icon:"cart-outline",title:"Sell with confidence",help:"Simple checkout, clear sales records."},{icon:"cube-outline",title:"Know what is in stock",help:"Products, keycaps and supplies together."},{icon:"layers-outline",title:"Keep orders moving",help:"From the first payment to collection."}].map(item=><View key={item.title} style={s.loginFeature}><Ionicons name={item.icon as Icon} size={23} color={C.green}/><View style={s.flex}><Text style={s.loginFeatureTitle}>{item.title}</Text><Text style={s.loginFeatureHelp}>{item.help}</Text></View></View>)}</View></View> : null}
+        {wide ? <View style={s.loginEditorial}><Text style={s.loginKicker}>MIK · MIKAEL</Text><View style={s.loginAccent}/><Text style={s.loginEditorialTitle}>{"More clarity.\nLess busywork."}</Text><Text style={s.loginEditorialBody}>A thoughtful workspace for your 3D printing shop.</Text><View style={s.loginFeatures}>{[{icon:"cart-outline",title:"Sell with confidence",help:"Simple checkout, clear sales records."},{icon:"cube-outline",title:"Know what is in stock",help:"Products, keycaps and supplies together."},{icon:"layers-outline",title:"Keep orders moving",help:"From the first payment to collection."}].map(item=><View key={item.title} style={s.loginFeature}><Ionicons name={item.icon as Icon} size={23} color={C.brand}/><View style={s.flex}><Text style={s.loginFeatureTitle}>{item.title}</Text><Text style={s.loginFeatureHelp}>{item.help}</Text></View></View>)}</View></View> : null}
         <View style={[s.loginCard, wide && s.loginCardWide]}>
         <Image
           source={require("../assets/mik-logo.png")}
@@ -319,7 +320,7 @@ function Login() {
           disabled={busy}
         />
         <Pressable style={s.guidePreview} onPress={() => setGuideOpen(true)}>
-          <Ionicons name="help-circle-outline" size={21} color={C.green} />
+          <Ionicons name="help-circle-outline" size={21} color={C.brand} />
           <Text style={s.guidePreviewText}>See how Mik works</Text>
         </Pressable>
         </View>
@@ -349,7 +350,7 @@ function SignedIn({ session,deviceUserName,onChangeDeviceUser }: { session: Sess
   if (checking)
     return (
       <SafeAreaView style={s.loading}>
-        <ActivityIndicator size="large" color={C.green} />
+        <ActivityIndicator size="large" color={C.brand} />
         <Text style={s.help}>Opening your account…</Text>
       </SafeAreaView>
     );
@@ -510,11 +511,11 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   if (staffShop)
     return <AdminStaffManager shop={staffShop} onBack={() => setStaffShop(null)} />;
   if(actionShop)
-    return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}><Back title="Shop profiles" onPress={()=>setActionShop(null)}/><View style={s.manageShopHero}><View style={s.shopAvatar}><Ionicons name="storefront" size={25} color={C.green}/></View><View style={s.flex}><Text style={s.pageTitle}>{actionShop.name}</Text><Text style={s.subtitle}>Choose what you want to manage.</Text></View></View><View style={s.manageShopGrid}>
+    return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}><Back title="Shop profiles" onPress={()=>setActionShop(null)}/><View style={s.manageShopHero}><View style={s.shopAvatar}><Ionicons name="storefront" size={25} color={C.brand}/></View><View style={s.flex}><Text style={s.pageTitle}>{actionShop.name}</Text><Text style={s.subtitle}>Choose what you want to manage.</Text></View></View><View style={s.manageShopGrid}>
       <Pressable style={s.manageShopCard} onPress={()=>{setStaffShop(actionShop);setActionShop(null);}}><View style={[s.quickIcon,{backgroundColor:SECTION.sales.color}]}><Ionicons name="people-outline" size={24} color={C.white}/></View><Text style={s.quickTitle}>Staff accounts</Text><Text style={s.quickHelp}>Create staff and choose their access</Text><Ionicons name="arrow-forward" size={20} color={SECTION.sales.color}/></Pressable>
       <Pressable style={s.manageShopCard} onPress={()=>{setManageShop({shop:actionShop,mode:"edit"});setActionShop(null);}}><View style={[s.quickIcon,{backgroundColor:SECTION.settings.color}]}><Ionicons name="create-outline" size={24} color={C.white}/></View><Text style={s.quickTitle}>Edit shop</Text><Text style={s.quickHelp}>Change its name, username or password</Text><Ionicons name="arrow-forward" size={20} color={SECTION.settings.color}/></Pressable>
       <Pressable style={s.manageShopCard} onPress={()=>{setManageShop({shop:actionShop,mode:"duplicate"});setActionShop(null);}}><View style={[s.quickIcon,{backgroundColor:SECTION.records.color}]}><Ionicons name="copy-outline" size={24} color={C.white}/></View><Text style={s.quickTitle}>Copy shop</Text><Text style={s.quickHelp}>Create another shop from this profile</Text><Ionicons name="arrow-forward" size={20} color={SECTION.records.color}/></Pressable>
-      <Pressable style={s.manageShopCard} onPress={()=>setShopStatus(actionShop)}><View style={[s.quickIcon,{backgroundColor:actionShop.status==="active"?C.red:C.green}]}><Ionicons name={actionShop.status==="active"?"pause-circle-outline":"play-circle-outline"} size={24} color={C.white}/></View><Text style={s.quickTitle}>{actionShop.status==="active"?"Pause shop":"Activate shop"}</Text><Text style={s.quickHelp}>{actionShop.status==="active"?"Stop new logins without deleting data":"Allow this shop to sign in again"}</Text><Ionicons name="arrow-forward" size={20} color={actionShop.status==="active"?C.red:C.green}/></Pressable>
+      <Pressable style={s.manageShopCard} onPress={()=>setShopStatus(actionShop)}><View style={[s.quickIcon,{backgroundColor:actionShop.status==="active"?C.red:C.brand}]}><Ionicons name={actionShop.status==="active"?"pause-circle-outline":"play-circle-outline"} size={24} color={C.white}/></View><Text style={s.quickTitle}>{actionShop.status==="active"?"Pause shop":"Activate shop"}</Text><Text style={s.quickHelp}>{actionShop.status==="active"?"Stop new logins without deleting data":"Allow this shop to sign in again"}</Text><Ionicons name="arrow-forward" size={20} color={actionShop.status==="active"?C.red:C.brand}/></Pressable>
     </View></ScrollView></SafeAreaView>;
   return (
     <SafeAreaView style={s.app}>
@@ -591,12 +592,12 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
         )}
         <Text style={s.section}>All shops</Text>
         {loading ? (
-          <ActivityIndicator color={C.green} />
+          <ActivityIndicator color={C.brand} />
         ) : (
           shops.map((shop) => (
             <View key={shop.id} style={s.adminShop}>
               <View style={s.adminShopTop}>
-                <View style={s.shopAvatar}><Ionicons name="storefront" size={24} color={C.green} /></View>
+                <View style={s.shopAvatar}><Ionicons name="storefront" size={24} color={C.brand} /></View>
                 <View style={s.flex}>
                   <Text style={s.rowTitle}>{shop.name}</Text>
                   <Text style={s.adminShopUsername}>@{shop.slug === "sebu3d" ? "pixelbug" : shop.login_username ?? "No username connected"}</Text>
@@ -611,7 +612,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
                 style={[s.adminShopAction,s.adminShopActionHalf,width<620&&s.adminShopActionMobile]}
                 onPress={() => setActionShop(shop)}
               >
-                <Ionicons name="options-outline" size={21} color={C.green} /><Text style={s.adminShopActionText}>Manage shop</Text>
+                <Ionicons name="options-outline" size={21} color={C.brand} /><Text style={s.adminShopActionText}>Manage shop</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -657,11 +658,11 @@ function OwnerAccounts({onBack,onManage}:{onBack:()=>void;onManage:(account:Owne
     <Text style={s.pageTitle}>All accounts</Text><Text style={s.subtitle}>Every username connected to MIK and its shop.</Text>
     <View style={s.accountSafetyNote}><Ionicons name="shield-checkmark-outline" size={22} color={SECTION.support.color}/><Text style={s.accountSafetyText}>Passwords cannot be viewed. To give someone access, change their password from Manage shop.</Text></View>
     <View style={s.stockSortRow}><Chip label={`All ${accounts.length}`} selected={filter==="all"} onPress={()=>setFilter("all")}/><Chip label="Owners" selected={filter==="owners"} onPress={()=>setFilter("owners")}/><Chip label="Staff" selected={filter==="staff"} onPress={()=>setFilter("staff")}/></View>
-    {loading?<ActivityIndicator color={C.green}/>:shown.length?shown.map(account=><View key={`${account.shop_id??"platform"}-${account.user_id}`} style={s.accountListCard}>
+    {loading?<ActivityIndicator color={C.brand}/>:shown.length?shown.map(account=><View key={`${account.shop_id??"platform"}-${account.user_id}`} style={s.accountListCard}>
       <View style={s.adminShopTop}><View style={[s.shopAvatar,{backgroundColor:account.role==="platform_owner"?SECTION.support.soft:account.role==="shop_owner"?SECTION.records.soft:SECTION.sales.soft}]}><Ionicons name={account.role==="staff"?"person-outline":"person-circle-outline"} size={24} color={account.role==="platform_owner"?SECTION.support.color:account.role==="shop_owner"?SECTION.records.color:SECTION.sales.color}/></View><View style={s.flex}><Text style={s.rowTitle}>{account.display_name}</Text><Text style={s.accountUsername}>@{account.login_username}</Text><Text style={s.rowHelp}>{account.shop_name}</Text></View><View style={[s.statusPill,!account.active&&s.statusPillPaused]}><Text style={[s.statusText,!account.active&&s.statusTextPaused]}>{account.active?"ACTIVE":"DISABLED"}</Text></View></View>
       <View style={s.accountMetaRow}><Text style={s.accountRole}>{roleName(account.role)}</Text><Text style={s.adminLastLogin}>{account.last_login?`Last login: ${friendlyDateTime(account.last_login)}`:"No login yet"}</Text></View>
       {account.role==="staff"&&account.permissions.length?<Text style={s.staffAccessSummary}>{account.permissions.map(id=>STAFF_PERMISSIONS.find(item=>item.id===id)?.label).filter(Boolean).join(" · ")}</Text>:null}
-      {account.shop_id?<Pressable style={s.accountManageButton} onPress={()=>onManage(account)}><Ionicons name="settings-outline" size={18} color={C.green}/><Text style={s.accountManageText}>Manage account</Text><Ionicons name="chevron-forward" size={18} color={C.green}/></Pressable>:null}
+      {account.shop_id?<Pressable style={s.accountManageButton} onPress={()=>onManage(account)}><Ionicons name="settings-outline" size={18} color={C.brand}/><Text style={s.accountManageText}>Manage account</Text><Ionicons name="chevron-forward" size={18} color={C.brand}/></Pressable>:null}
     </View>):<Empty title="No accounts found"/>}
   </ScrollView></SafeAreaView>;
 }
@@ -709,10 +710,10 @@ function AdminStaffManager({shop,onBack}:{shop:AdminShop;onBack:()=>void}){
   const savePermissions=async()=>{if(!editing)return;try{await invoke({action:"permissions",userId:editing.user_id,permissions:editing.permissions});setEditing(null);await load();Alert.alert("Access updated",`${editing.display_name} will see only the selected functions.`);}catch(e){Alert.alert("Access not updated",e instanceof Error?e.message:"Please try again.");}};
   const resetPassword=async()=>{if(!passwordPerson)return;try{await invoke({action:"password",userId:passwordPerson.user_id,password:newPassword});setPasswordPerson(null);setNewPassword("");Alert.alert("Password changed");}catch(e){Alert.alert("Password not changed",e instanceof Error?e.message:"Please try again.");}};
   const setStatus=(person:AdminStaff)=>Alert.alert(person.active?"Disable this staff account?":"Enable this staff account?",person.active?"They will not be able to sign in. Their history stays saved.":"They will be able to sign in again.",[{text:"Cancel",style:"cancel"},{text:person.active?"Disable":"Enable",style:person.active?"destructive":"default",onPress:async()=>{try{await invoke({action:"status",userId:person.user_id,active:!person.active});await load();}catch(e){Alert.alert("Account not changed",e instanceof Error?e.message:"Please try again.");}}}]);
-  const permissionGrid=(current:StaffPermission[],setter:(value:StaffPermission[])=>void)=><View style={s.staffPermissionGrid}>{STAFF_PERMISSIONS.map(item=><Pressable key={item.id} style={[s.staffPermissionCard,current.includes(item.id)&&s.staffPermissionCardOn]} onPress={()=>toggle(item.id,setter,current)}><Ionicons name={item.icon} size={21} color={current.includes(item.id)?C.white:C.green}/><View style={s.flex}><Text style={[s.staffPermissionTitle,current.includes(item.id)&&{color:C.white}]}>{item.label}</Text><Text style={[s.staffPermissionHelp,current.includes(item.id)&&{color:"#E6EFEA"}]}>{item.help}</Text></View><Ionicons name={current.includes(item.id)?"checkmark-circle":"ellipse-outline"} size={21} color={current.includes(item.id)?C.white:C.muted}/></Pressable>)}</View>;
+  const permissionGrid=(current:StaffPermission[],setter:(value:StaffPermission[])=>void)=><View style={s.staffPermissionGrid}>{STAFF_PERMISSIONS.map(item=><Pressable key={item.id} style={[s.staffPermissionCard,current.includes(item.id)&&s.staffPermissionCardOn]} onPress={()=>toggle(item.id,setter,current)}><Ionicons name={item.icon} size={21} color={current.includes(item.id)?C.white:C.brand}/><View style={s.flex}><Text style={[s.staffPermissionTitle,current.includes(item.id)&&{color:C.white}]}>{item.label}</Text><Text style={[s.staffPermissionHelp,current.includes(item.id)&&{color:"#E6EFEA"}]}>{item.help}</Text></View><Ionicons name={current.includes(item.id)?"checkmark-circle":"ellipse-outline"} size={21} color={current.includes(item.id)?C.white:C.muted}/></Pressable>)}</View>;
   return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}><Back title="Manage staff" onPress={onBack}/><Text style={s.pageTitle}>{shop.name} staff</Text><Text style={s.subtitle}>Each person sees only the functions you select.</Text>
     <View style={s.editCard}><Text style={s.editName}>Create staff account</Text><Label>Staff name</Label><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Example: Anna"/><Label>Short username</Label><TextInput style={s.input} value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="Example: anna"/><Text style={s.rowHelp}>Their login will be {shop.login_username??"shop"}.{username.trim().toLowerCase()||"anna"}</Text><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 6 characters"/><Label>Quick role</Label><View style={s.stockSortRow}>{Object.entries(STAFF_PRESETS).map(([label,value])=><Chip key={label} label={label} selected={permissions.length===value.length&&value.every(x=>permissions.includes(x))} onPress={()=>setPermissions([...value])}/>)}</View><Label>Functions this person can use</Label>{permissionGrid(permissions,setPermissions)}<BigButton label={creating?"Creating account…":"Create staff account"} icon="person-add-outline" onPress={()=>void create()} disabled={creating}/></View>
-    <Text style={s.section}>Staff accounts</Text>{loading?<ActivityIndicator color={C.green}/>:staff.length?staff.map(person=><View key={person.user_id} style={s.adminShop}><View style={s.adminShopTop}><View style={s.shopAvatar}><Ionicons name="person-outline" size={23} color={C.green}/></View><View style={s.flex}><Text style={s.rowTitle}>{person.display_name}</Text><Text style={s.rowHelp}>{person.login_username}</Text><Text style={s.adminLastLogin}>{person.last_login?`Last login: ${friendlyDateTime(person.last_login)}`:"No login yet"}</Text></View><View style={[s.statusPill,!person.active&&s.statusPillPaused]}><Text style={[s.statusText,!person.active&&s.statusTextPaused]}>{person.active?"ACTIVE":"DISABLED"}</Text></View></View><Text style={s.staffAccessSummary}>{person.permissions.map(id=>STAFF_PERMISSIONS.find(x=>x.id===id)?.label).filter(Boolean).join(" · ")}</Text><View style={[s.adminShopActions,width<620&&s.adminShopActionsMobile]}><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setEditing({...person,permissions:[...person.permissions]})}><Ionicons name="options-outline" size={20} color={C.green}/><Text style={s.adminShopActionText}>Access</Text></Pressable><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>{setPasswordPerson(person);setNewPassword("");}}><Ionicons name="key-outline" size={20} color={C.accent}/><Text style={s.adminShopActionText}>Password</Text></Pressable><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setStatus(person)}><Ionicons name={person.active?"pause-circle-outline":"play-circle-outline"} size={20} color={person.active?C.red:C.green}/><Text style={s.adminShopActionText}>{person.active?"Disable":"Enable"}</Text></Pressable></View></View>):<Empty title="No staff accounts yet"/>}
+    <Text style={s.section}>Staff accounts</Text>{loading?<ActivityIndicator color={C.brand}/>:staff.length?staff.map(person=><View key={person.user_id} style={s.adminShop}><View style={s.adminShopTop}><View style={s.shopAvatar}><Ionicons name="person-outline" size={23} color={C.brand}/></View><View style={s.flex}><Text style={s.rowTitle}>{person.display_name}</Text><Text style={s.rowHelp}>{person.login_username}</Text><Text style={s.adminLastLogin}>{person.last_login?`Last login: ${friendlyDateTime(person.last_login)}`:"No login yet"}</Text></View><View style={[s.statusPill,!person.active&&s.statusPillPaused]}><Text style={[s.statusText,!person.active&&s.statusTextPaused]}>{person.active?"ACTIVE":"DISABLED"}</Text></View></View><Text style={s.staffAccessSummary}>{person.permissions.map(id=>STAFF_PERMISSIONS.find(x=>x.id===id)?.label).filter(Boolean).join(" · ")}</Text><View style={[s.adminShopActions,width<620&&s.adminShopActionsMobile]}><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setEditing({...person,permissions:[...person.permissions]})}><Ionicons name="options-outline" size={20} color={C.brand}/><Text style={s.adminShopActionText}>Access</Text></Pressable><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>{setPasswordPerson(person);setNewPassword("");}}><Ionicons name="key-outline" size={20} color={C.accent}/><Text style={s.adminShopActionText}>Password</Text></Pressable><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setStatus(person)}><Ionicons name={person.active?"pause-circle-outline":"play-circle-outline"} size={20} color={person.active?C.red:C.brand}/><Text style={s.adminShopActionText}>{person.active?"Disable":"Enable"}</Text></Pressable></View></View>):<Empty title="No staff accounts yet"/>}
     {editing?<View style={s.editCard}><Text style={s.editName}>Access for {editing.display_name}</Text>{permissionGrid(editing.permissions,value=>setEditing({...editing,permissions:value}))}<BigButton label="Save access" icon="checkmark-circle-outline" onPress={()=>void savePermissions()}/><Pressable style={s.cancel} onPress={()=>setEditing(null)}><Text style={s.help}>Cancel</Text></Pressable></View>:null}
     {passwordPerson?<View style={s.editCard}><Text style={s.editName}>New password for {passwordPerson.display_name}</Text><TextInput style={s.input} secureTextEntry value={newPassword} onChangeText={setNewPassword} placeholder="At least 6 characters"/><BigButton label="Change password" icon="key-outline" onPress={()=>void resetPassword()}/><Pressable style={s.cancel} onPress={()=>setPasswordPerson(null)}><Text style={s.help}>Cancel</Text></Pressable></View>:null}
   </ScrollView></SafeAreaView>;
@@ -928,7 +929,7 @@ function ShopApp({
   if (loading)
     return (
       <SafeAreaView style={s.loading}>
-        <ActivityIndicator size="large" color={C.green} />
+        <ActivityIndicator size="large" color={C.brand} />
         <Text style={s.help}>Opening your shop…</Text>
       </SafeAreaView>
     );
@@ -1262,9 +1263,9 @@ function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   const {width}=useWindowDimensions();
   const today = localDateKey();
   return <ScrollView contentContainerStyle={s.sellStartPage}>
-    <View style={s.sellTodayCard}><Ionicons name="calendar-outline" size={22} color={C.green}/><View style={s.flex}><Text style={s.sellTodayLabel}>RECORDING FOR TODAY</Text><Text style={s.sellTodayDate}>{friendlyLocalDate(today)}</Text></View></View>
-    <Text style={s.pageTitle}>How are you selling?</Text>
-    <Text style={s.subtitle}>Choose one to start.</Text>
+    {width<600?<View style={s.sellTodayCardMobile}><Ionicons name="calendar-outline" size={17} color={C.brand}/><Text style={s.sellTodayMobileText}>Today · {friendlyLocalDate(today)}</Text></View>:<View style={s.sellTodayCard}><Ionicons name="calendar-outline" size={22} color={C.brand}/><View style={s.flex}><Text style={s.sellTodayLabel}>RECORDING FOR TODAY</Text><Text style={s.sellTodayDate}>{friendlyLocalDate(today)}</Text></View></View>}
+    <Text style={[s.pageTitle,width<600&&s.sellStartTitleMobile]}>How are you selling?</Text>
+    {width>=600?<Text style={s.subtitle}>Choose one to start.</Text>:null}
     <View style={[s.sellModeGrid,width>=760&&s.sellModeGridDesktop]}>
       <Pressable accessibilityRole="button" accessibilityLabel="Open Shop Sale. Normal Checkout." style={[s.sellModeCard,width>=760&&s.sellModeCardDesktop,{backgroundColor:SECTION.sales.soft}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:SECTION.sales.color}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop Sale</Text><Text style={s.sellModeHelp}>Normal Checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.sales.color}/></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Open Event Sale. Fast checkout. Letter selection is skipped." style={[s.sellModeCard,width>=760&&s.sellModeCardDesktop,{backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event Sale</Text><Text style={s.sellModeHelp}>Fast Checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
@@ -1740,7 +1741,7 @@ function SaleScreen({
                   <Ionicons
                     name="phone-portrait-outline"
                     size={27}
-                    color={C.green}
+                    color={C.brand}
                   />
                 </View>
                 <View style={s.flex}>
@@ -1757,7 +1758,7 @@ function SaleScreen({
                 <Ionicons
                   name={gcashReceived ? "checkmark-circle" : "ellipse-outline"}
                   size={26}
-                  color={gcashReceived ? C.white : C.green}
+                  color={gcashReceived ? C.white : C.brand}
                 />
                 <Text
                   style={[s.receivedText, gcashReceived && s.receivedTextOn]}
@@ -1829,9 +1830,9 @@ function SaleScreen({
           <>
             <View style={{height:1,width:"100%"}} onLayout={(event)=>setSaleContentWidth(event.nativeEvent.layout.width)}/>
             {!startPastSale ? (
-              <View style={s.saleDateBar}>
-                <Ionicons name="calendar-outline" size={20} color={C.green} />
-                <View style={s.flex}><Text style={s.saleDateBarLabel}>{eventMode ? "EVENT SALE · RECORDING FOR TODAY" : "SHOP SALE · RECORDING FOR TODAY"}</Text><Text style={s.saleDateBarValue}>{friendlyLocalDate()}</Text></View>
+              <View style={[s.saleDateBar,width<600&&s.saleDateBarMobile]}>
+                <Ionicons name="calendar-outline" size={width<600?17:20} color={C.brand} />
+                {width<600?<Text style={s.saleDateMobileText}>{eventMode?"Event":"Shop"} sale · Today, {friendlyLocalDate()}</Text>:<View style={s.flex}><Text style={s.saleDateBarLabel}>{eventMode ? "EVENT SALE · RECORDING FOR TODAY" : "SHOP SALE · RECORDING FOR TODAY"}</Text><Text style={s.saleDateBarValue}>{friendlyLocalDate()}</Text></View>}
               </View>
             ) : null}
             {startPastSale ? (
@@ -1848,9 +1849,7 @@ function SaleScreen({
                 <Ionicons name="flash" size={22} color={C.accent} />
                 <View style={s.flex}>
                   <Text style={s.eventBannerTitle}>Event mode: fast checkout</Text>
-                  <Text style={s.eventBannerText}>
-                    Tap the clicker and choose how many. No letters are selected now. The clicker base stock updates after payment. Count the remaining A–Z keycaps after the event, and take a photo of sold items to help with counting.
-                  </Text>
+                  <Text style={s.eventBannerText}>{width<600?"Choose products and quantities now. Count A–Z keycaps after the event.":"Tap the clicker and choose how many. No letters are selected now. The clicker base stock updates after payment. Count the remaining A–Z keycaps after the event, and take a photo of sold items to help with counting."}</Text>
                 </View>
               </View>
             ) : null}
@@ -2191,7 +2190,7 @@ function SaleScreen({
                               });
                             }}
                           >
-                            <Ionicons name="remove" size={15} color={C.green} />
+                            <Ionicons name="remove" size={15} color={C.brand} />
                           </Pressable>
                         ) : null}
                       </Pressable>
@@ -2535,7 +2534,7 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
           <Label>Functions shown in this shop</Label>
           <Text style={s.rowHelp}>Turn off areas the shop does not use. Home, settings and help always stay available.</Text>
           <View style={s.moduleChoiceGrid}>{SHOP_MODULES.map(module=>{const shown=visibleModules.includes(module.id);return <Pressable key={module.id} accessibilityRole="checkbox" accessibilityState={{checked:shown}} style={[s.moduleChoice,shown&&{borderColor:module.color,backgroundColor:`${module.color}14`}]} onPress={()=>setVisibleModules(current=>shown?current.filter(id=>id!==module.id):[...current,module.id])}><View style={[s.moduleChoiceIcon,{backgroundColor:shown?module.color:C.soft}]}><Ionicons name={module.icon} size={21} color={shown?C.white:C.muted}/></View><View style={s.flex}><Text style={s.moduleChoiceTitle}>{module.label}</Text><Text style={s.moduleChoiceHelp}>{module.help}</Text></View><Ionicons name={shown?"checkbox":"square-outline"} size={23} color={shown?module.color:C.muted}/></Pressable>})}</View>
-          {duplicate ? <><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry /><Pressable accessibilityRole="button" style={[s.copyStockChoice,copyStock&&s.copyStockChoiceOn]} onPress={() => setCopyStock((value) => !value)}><Ionicons name={copyStock?"checkbox":"square-outline"} size={23} color={copyStock?C.white:C.green}/><View style={s.flex}><Text style={[s.copyStockTitle,copyStock&&{color:C.white}]}>Copy current stock numbers</Text><Text style={[s.copyStockHelp,copyStock&&{color:"#E8F0EC"}]}>{copyStock?"The new shop receives the same counts.":"Recommended off: new shop starts at zero."}</Text></View></Pressable></> : <View style={s.note}><Ionicons name="information-circle" size={22} color={C.green}/><Text style={s.noteText}>Changing the username does not change the password.</Text></View>}
+          {duplicate ? <><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry /><Pressable accessibilityRole="button" style={[s.copyStockChoice,copyStock&&s.copyStockChoiceOn]} onPress={() => setCopyStock((value) => !value)}><Ionicons name={copyStock?"checkbox":"square-outline"} size={23} color={copyStock?C.white:C.brand}/><View style={s.flex}><Text style={[s.copyStockTitle,copyStock&&{color:C.white}]}>Copy current stock numbers</Text><Text style={[s.copyStockHelp,copyStock&&{color:"#E8F0EC"}]}>{copyStock?"The new shop receives the same counts.":"Recommended off: new shop starts at zero."}</Text></View></Pressable></> : <View style={s.note}><Ionicons name="information-circle" size={22} color={C.brand}/><Text style={s.noteText}>Changing the username does not change the password.</Text></View>}
           <BigButton label={busy ? duplicate ? "Duplicating shop…" : "Saving profile…" : duplicate ? "Duplicate shop" : "Save profile"} icon={duplicate?"copy-outline":"save-outline"} onPress={save} disabled={busy} />
         </View>
         {!duplicate ? (
@@ -2620,7 +2619,7 @@ function Dashboard({
           label="GCash"
           value={peso(total - cash)}
           icon="phone-portrait-outline"
-          color={C.green}
+          color={C.brand}
         />
       </View>
       <BigButton
@@ -3433,7 +3432,7 @@ function Products({
                     placeholder="Example: Letter"
                   />
                   <Pressable style={s.alphabetButton} onPress={useAlphabet}>
-                    <Ionicons name="text-outline" size={22} color={C.green} />
+                    <Ionicons name="text-outline" size={22} color={C.brand} />
                     <Text style={s.alphabetText}>Use letters A to Z</Text>
                   </Pressable>
                   <Label>Choices · Required when choices are on</Label>
@@ -3485,7 +3484,7 @@ function Products({
             </>
           ) : null}
           <View style={s.note}>
-            <Ionicons name="information-circle" size={22} color={C.green} />
+            <Ionicons name="information-circle" size={22} color={C.brand} />
             <Text style={s.noteText}>
               {creating
                 ? "A photo is optional. Without one, Mik shows “Product photo needed” until a photo is added."
@@ -4171,7 +4170,7 @@ function OwnerIssueReports({onBack}:{onBack:()=>void}) {
   return <SafeAreaView style={s.app}><View style={s.adminTop}><Pressable accessibilityRole="button" accessibilityLabel="Back to owner account" style={s.backButton} onPress={onBack}><Ionicons name="arrow-back" size={23} color={C.ink}/></Pressable><View style={s.flex}><Text style={s.kicker}>OWNER ONLY</Text><Text style={s.shopName}>Problem reports</Text></View></View><ScrollView contentContainerStyle={s.adminPage}>
     <Pressable style={s.issueToggle} onPress={()=>setShowResolved(v=>!v)}><Ionicons name={showResolved?"eye-off-outline":"eye-outline"} size={20} color={C.accent}/><Text style={s.issueToggleText}>{showResolved?"Hide completed reports":"Show completed reports"}</Text></Pressable>
     {loading ? (
-      <ActivityIndicator color={C.green}/>
+      <ActivityIndicator color={C.brand}/>
     ) : items.length ? (
       items.map(item=><View key={item.id} style={s.issueOwnerCard}><View style={s.issueOwnerTop}><View style={s.flex}><Text style={s.issueOwnerShop}>{item.business?.name??"Unknown shop"}</Text><Text style={s.issueOwnerMeta}>{item.category} · {friendlyDateTime(item.created_at)}</Text></View><View style={[s.statusPill,item.status==="resolved"&&s.statusPillPaused]}><Text style={[s.statusText,item.status==="resolved"&&s.statusTextPaused]}>{item.status==="open"?"OPEN":"DONE"}</Text></View></View><Text style={s.issueOwnerMessage}>{item.message}</Text>{item.image_url?<Image source={{uri:item.image_url}} style={s.issueOwnerImage} resizeMode="contain"/>:null}<Pressable style={s.issueResolve} onPress={()=>void resolve(item)}><Ionicons name={item.status==="open"?"checkmark-circle-outline":"refresh-outline"} size={20} color={C.accent}/><Text style={s.issueResolveText}>{item.status==="open"?"Mark as completed":"Reopen report"}</Text></Pressable></View>)
     ) : (
@@ -4394,11 +4393,11 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
             </Pressable>
           ))}
         </ScrollView>
-        {loading ? <ActivityIndicator size="large" color={C.green} /> : visible.length ? visible.map((item) => {
+        {loading ? <ActivityIndicator size="large" color={C.brand} /> : visible.length ? visible.map((item) => {
           const detail = activityDetail(item);
           return (
           <Pressable key={item.id} disabled={!item.action.startsWith("order_")} accessibilityRole={item.action.startsWith("order_")?"button":undefined} accessibilityLabel={item.action.startsWith("order_")?`Open ${item.summary}`:undefined} style={s.activityRow} onPress={()=>void openOrder(item)}>
-            <View style={s.activityIcon}><Ionicons name={activityIcon(item.action)} size={21} color={C.green} /></View>
+            <View style={s.activityIcon}><Ionicons name={activityIcon(item.action)} size={21} color={C.brand} /></View>
             <View style={s.flex}>
               <Text style={s.activitySummary}>{item.summary}</Text>
               {detail ? <Text style={s.activityDetail}>{detail}</Text> : null}
@@ -4407,7 +4406,7 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
             </View>
             {item.action.startsWith("order_")?<View style={s.activityOpen}><Text style={s.activityOpenText}>Open</Text><Ionicons name="chevron-forward" size={17} color={SECTION.orders.color}/></View>:null}
           </Pressable>
-        )}) : <View style={s.empty}><Ionicons name="time-outline" size={32} color={C.green} /><Text style={s.activityEmptyTitle}>No activity found</Text><Text style={s.activityEmptyText}>Try another shop or activity type.</Text></View>}
+        )}) : <View style={s.empty}><Ionicons name="time-outline" size={32} color={C.brand} /><Text style={s.activityEmptyTitle}>No activity found</Text><Text style={s.activityEmptyText}>Try another shop or activity type.</Text></View>}
       </ScrollView>
       {orderLoading?<View style={s.ownerOrderLoading}><ActivityIndicator color={SECTION.orders.color}/></View>:null}
       <OwnerOrderModal order={selectedOrder} onClose={()=>setSelectedOrder(null)}/>
@@ -4528,7 +4527,7 @@ function WhatsNewModal({visible,onClose,onFeedback}:{visible:boolean;onClose:()=
     <Pressable accessibilityRole="button" accessibilityLabel="Close what's new" style={s.whatsNewClose} onPress={onClose}><Ionicons name="close" size={22} color={C.ink}/></Pressable>
     <ScrollView style={s.whatsNewScroll} contentContainerStyle={s.whatsNewScrollContent} showsVerticalScrollIndicator>
       <View style={s.whatsNewIcon}><Ionicons name="sparkles" size={28} color={C.white}/></View><Text style={s.whatsNewKicker}>WHAT'S NEW IN MIK</Text><Text style={s.whatsNewTitle}>Today’s improvements</Text><Text style={s.whatsNewDate}>{friendlyLocalDate()}</Text>
-      <View style={s.whatsNewList}>{updates.map(item=><View key={item.title} style={s.whatsNewRow}><View style={s.whatsNewRowIcon}><Ionicons name={item.icon} size={21} color={C.green}/></View><View style={s.flex}><Text style={s.whatsNewRowTitle}>{item.title}</Text><Text style={s.whatsNewRowText}>{item.text}</Text></View></View>)}</View>
+      <View style={s.whatsNewList}>{updates.map(item=><View key={item.title} style={s.whatsNewRow}><View style={s.whatsNewRowIcon}><Ionicons name={item.icon} size={21} color={C.brand}/></View><View style={s.flex}><Text style={s.whatsNewRowTitle}>{item.title}</Text><Text style={s.whatsNewRowText}>{item.text}</Text></View></View>)}</View>
       <Text style={s.whatsNewFeedback}>Have feedback or found an issue? Let Esther know and it can be reviewed.</Text>
     </ScrollView>
     <View style={s.whatsNewActions}>
@@ -4593,7 +4592,7 @@ function GuideModal({
                     />
                   ) : null}
                   <View style={s.guideFlowItem}>
-                    <Ionicons name={part.icon} size={25} color={C.green} />
+                    <Ionicons name={part.icon} size={25} color={C.brand} />
                     <Text style={s.guideFlowLabel}>{part.label}</Text>
                   </View>
                 </View>
@@ -4764,7 +4763,7 @@ function Choice({
       <Ionicons
         name={icon}
         size={27}
-        color={selected ? (danger ? C.red : C.green) : C.muted}
+        color={selected ? (danger ? C.red : C.brand) : C.muted}
       />
       <Text
         style={[s.choiceText, selected && { color: danger ? C.red : C.dark }]}
@@ -4775,7 +4774,7 @@ function Choice({
         <Ionicons
           name="checkmark-circle"
           size={21}
-          color={danger ? C.red : C.green}
+          color={danger ? C.red : C.brand}
         />
       ) : null}
     </Pressable>
@@ -4816,7 +4815,7 @@ function Stat({
   label,
   value,
   icon,
-  color = C.green,
+  color = C.brand,
 }: {
   label: string;
   value: string;
@@ -4835,7 +4834,7 @@ function Menu({
   icon,
   title,
   help,
-  color = C.green,
+  color = C.brand,
   soft = C.soft,
   onPress,
 }: {
@@ -4862,7 +4861,7 @@ function Menu({
 function Empty({ title }: { title: string }) {
   return (
     <View style={s.empty}>
-      <Ionicons name="checkmark-circle-outline" size={34} color={C.green} />
+      <Ionicons name="checkmark-circle-outline" size={34} color={C.brand} />
       <Text style={s.rowTitle}>{title}</Text>
     </View>
   );
@@ -4896,7 +4895,7 @@ const s = StyleSheet.create({
   loginShell:{width:"100%",maxWidth:1040,overflow:"hidden",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white,shadowColor:"#071521",shadowOpacity:.09,shadowRadius:28,shadowOffset:{width:0,height:14},elevation:8},
   loginShellWide:{minHeight:650,flexDirection:"row"},
   loginEditorial:{width:"52%",padding:52,justifyContent:"center",backgroundColor:C.white,borderRightWidth:1,borderRightColor:C.border},
-  loginKicker:{color:C.green,fontSize:12,fontWeight:"700",letterSpacing:4},
+  loginKicker:{color:C.brand,fontSize:12,fontWeight:"700",letterSpacing:4},
   loginAccent:{width:44,height:3,backgroundColor:C.orange,marginTop:32},
   loginFeatures:{marginTop:32,gap:22},
   loginFeature:{flexDirection:"row",alignItems:"flex-start",gap:13},
@@ -4905,7 +4904,7 @@ const s = StyleSheet.create({
   loginBrandLine:{flexDirection:"row",alignItems:"baseline",gap:12},
   loginBrandName:{color:"#BFC9D2",fontSize:12,fontWeight:"500",letterSpacing:2},
   loginMobileName:{marginTop:-5,marginBottom:8,color:C.muted,fontSize:12,fontWeight:"600",letterSpacing:2,textAlign:"center"},
-  loginEditorialTitle:{maxWidth:430,marginTop:24,color:C.green,fontSize:46,lineHeight:53,fontWeight:"600",letterSpacing:-1.8},
+  loginEditorialTitle:{maxWidth:430,marginTop:24,color:C.brand,fontSize:46,lineHeight:53,fontWeight:"600",letterSpacing:-1.8},
   loginEditorialBody:{maxWidth:410,marginTop:20,color:C.muted,fontSize:17,lineHeight:26,fontWeight:"400"},
   loginCard: {
     width: "100%",
@@ -4937,7 +4936,7 @@ const s = StyleSheet.create({
   brand: {
     marginTop: 14,
     textAlign: "center",
-    color: C.green,
+    color: C.brand,
     fontSize: 20,
     fontWeight: "700",
     letterSpacing: 3,
@@ -4995,7 +4994,7 @@ const s = StyleSheet.create({
     backgroundColor: C.cream,
   },
   kicker: {
-    color: C.green,
+    color: C.brand,
     fontSize: 13,
     fontWeight: "700",
     letterSpacing: 1.3,
@@ -5128,7 +5127,7 @@ const s = StyleSheet.create({
     borderRadius: 8,
   },
   desktopNavIcon:{width:30,height:30},
-  navIconOn: { backgroundColor: C.green },
+  navIconOn: { backgroundColor: C.brand },
   navText: { marginTop: 2, color: C.muted, fontSize: 14, lineHeight: 18, fontWeight: "700" },
   navTextOn: { color: C.dark, fontWeight: "700" },
   headerHome: {
@@ -5139,7 +5138,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     borderRadius: 14,
-    backgroundColor: C.green,
+    backgroundColor: C.brand,
   },
   headerHomeText: { color: C.white, fontSize: 14, fontWeight: "700" },
   desktopBrand:{color:C.ink,fontSize:18,fontWeight:"600",letterSpacing:5},
@@ -5170,7 +5169,7 @@ const s = StyleSheet.create({
   },
   adminHero: { padding: 20, borderRadius: 20, backgroundColor: C.dark },
   ownerDashboardIntro:{paddingTop:8,paddingBottom:20,flexDirection:"row",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:16,borderBottomWidth:1,borderBottomColor:C.border},
-  ownerDashboardEyebrow:{color:C.green,fontSize:11,lineHeight:16,fontWeight:"700",letterSpacing:2},
+  ownerDashboardEyebrow:{color:C.brand,fontSize:11,lineHeight:16,fontWeight:"700",letterSpacing:2},
   ownerDashboardTitle:{marginTop:5,color:C.ink,fontSize:30,lineHeight:36,fontWeight:"700",letterSpacing:-.7},
   ownerDashboardSubtitle:{marginTop:3,color:C.muted,fontSize:14,lineHeight:20},
   ownerLivePill:{minHeight:36,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:7,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:18,backgroundColor:SECTION.stock.soft},
@@ -5211,15 +5210,15 @@ const s = StyleSheet.create({
   accountMetaRow:{marginTop:11,paddingTop:10,flexDirection:"row",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:8,borderTopWidth:1,borderTopColor:C.border},
   accountRole:{color:SECTION.support.color,fontSize:11,fontWeight:"800",letterSpacing:.8},
   accountManageButton:{minHeight:44,marginTop:10,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:7,borderWidth:1,borderColor:SECTION.stock.border,borderRadius:10,backgroundColor:SECTION.stock.soft},
-  accountManageText:{flex:1,color:C.green,fontSize:13,fontWeight:"700"},
-  activityButtonIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.green},
+  accountManageText:{flex:1,color:C.brand,fontSize:13,fontWeight:"700"},
+  activityButtonIcon:{width:42,height:42,alignItems:"center",justifyContent:"center",borderRadius:12,backgroundColor:C.brand},
   activityButtonTitle:{color:C.ink,fontSize:16,fontWeight:"700"},
   activityButtonHelp:{marginTop:2,color:C.muted,fontSize:13},
   activityFilters:{gap:8,paddingVertical:10},
   ownerOrderTabs:{marginTop:12,marginBottom:8,flexDirection:"row",flexWrap:"wrap",gap:8},
   ownerOrderThumb:{width:44,height:44,borderRadius:10,resizeMode:"contain",backgroundColor:C.soft},
   activityFilter:{minHeight:40,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:20,backgroundColor:C.white},
-  activityFilterOn:{borderColor:C.green,backgroundColor:C.green},
+  activityFilterOn:{borderColor:C.brand,backgroundColor:C.brand},
   activityFilterText:{color:C.ink,fontSize:12,fontWeight:"700"},
   activityFilterTextOn:{color:C.white},
   activityRow:{marginTop:10,padding:14,flexDirection:"row",alignItems:"flex-start",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
@@ -5272,10 +5271,10 @@ const s = StyleSheet.create({
   issueOwnerImage:{width:"100%",height:220,marginTop:12,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.soft},
   issueResolve:{minHeight:44,marginTop:14,paddingHorizontal:12,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderTopWidth:1,borderTopColor:C.border},
   issueResolveText:{color:C.accent,fontSize:14,fontWeight:"700"},
-  copyStockChoice:{minHeight:74,marginTop:18,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.green,borderRadius:12,backgroundColor:C.white},
+  copyStockChoice:{minHeight:74,marginTop:18,padding:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.brand,borderRadius:12,backgroundColor:C.white},
   ownerSecurityCard:{marginTop:18,padding:18,borderWidth:1,borderColor:C.border,borderRadius:16,backgroundColor:C.white},
   ownerSecurityHeading:{flexDirection:"row",alignItems:"center",gap:12,marginBottom:8},
-  ownerSecurityIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:C.green},
+  ownerSecurityIcon:{width:48,height:48,alignItems:"center",justifyContent:"center",borderRadius:14,backgroundColor:C.brand},
   ownerSecurityTitle:{marginTop:18,color:C.ink,fontSize:17,fontWeight:"700"},
   moduleChoiceGrid:{marginTop:10,gap:8},
   moduleChoice:{minHeight:64,padding:11,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
@@ -5283,7 +5282,7 @@ const s = StyleSheet.create({
   moduleChoiceTitle:{color:C.ink,fontSize:14,fontWeight:"700"},
   moduleChoiceHelp:{marginTop:2,color:C.muted,fontSize:12,lineHeight:17},
   ownerSecurityDivider:{height:1,marginTop:24,backgroundColor:C.border},
-  copyStockChoiceOn:{backgroundColor:C.green},
+  copyStockChoiceOn:{backgroundColor:C.brand},
   copyStockTitle:{color:C.ink,fontSize:14,fontWeight:"700"},
   copyStockHelp:{marginTop:3,color:C.muted,fontSize:12},
   adminShop: {
@@ -5313,7 +5312,7 @@ const s = StyleSheet.create({
     backgroundColor: C.soft,
   },
   statusText: {
-    color: C.green,
+    color: C.brand,
     fontSize: 11,
     fontWeight: "700",
     textTransform: "uppercase",
@@ -5383,14 +5382,14 @@ const s = StyleSheet.create({
   adminShopAction:{flex:1,minWidth:0,minHeight:46,paddingHorizontal:12,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},
   adminShopActionsMobile:{flexDirection:"column",gap:8},
   adminShopActionMobile:{width:"100%",flexGrow:0,flexBasis:"auto",minHeight:48},
-  adminShopActionPrimary:{backgroundColor:C.green},
+  adminShopActionPrimary:{backgroundColor:C.brand},
   adminShopActionHalf:{flexBasis:"48%"},
   adminShopActionText:{color:C.dark,fontSize:12,fontWeight:"700"},
-  adminShopUsername:{marginTop:2,color:C.green,fontSize:13,lineHeight:18,fontWeight:"700"},
+  adminShopUsername:{marginTop:2,color:C.brand,fontSize:13,lineHeight:18,fontWeight:"700"},
   adminLastLogin:{marginTop:3,color:C.muted,fontSize:12},
   staffPermissionGrid:{marginTop:8,gap:8},
   staffPermissionCard:{minHeight:64,padding:12,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:13,backgroundColor:C.white},
-  staffPermissionCardOn:{backgroundColor:C.green,borderColor:C.green},
+  staffPermissionCardOn:{backgroundColor:C.brand,borderColor:C.brand},
   staffPermissionTitle:{color:C.ink,fontSize:15,fontWeight:"700"},
   staffPermissionHelp:{marginTop:2,color:C.muted,fontSize:13,lineHeight:18},
   staffAccessSummary:{marginTop:11,marginBottom:10,color:C.muted,fontSize:13,lineHeight:19},
@@ -5483,11 +5482,11 @@ const s = StyleSheet.create({
   formStepHelp:{marginTop:3,color:C.muted,fontSize:13,lineHeight:19},
   saleWelcomeOverlay:{flex:1,padding:20,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(13,23,34,.62)"},
   saleWelcomeCard:{width:"100%",maxWidth:430,padding:26,borderRadius:24,backgroundColor:C.white,shadowColor:"#000",shadowOpacity:.18,shadowRadius:24,shadowOffset:{width:0,height:10},elevation:8},
-  saleWelcomeIcon:{width:58,height:58,marginBottom:20,alignItems:"center",justifyContent:"center",borderRadius:18,backgroundColor:C.green},
+  saleWelcomeIcon:{width:58,height:58,marginBottom:20,alignItems:"center",justifyContent:"center",borderRadius:18,backgroundColor:UI_COLORS.actionBlue},
   saleWelcomeTitle:{color:C.ink,fontSize:29,lineHeight:35,fontWeight:"700",letterSpacing:-.7},
   saleWelcomeDate:{marginTop:7,color:C.accent,fontSize:16,lineHeight:22,fontWeight:"700"},
   saleWelcomeHelp:{marginTop:8,marginBottom:20,color:C.muted,fontSize:14,lineHeight:21},
-  saleWelcomePrimary:{minHeight:58,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderRadius:15,backgroundColor:C.green},
+  saleWelcomePrimary:{minHeight:58,paddingHorizontal:18,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderRadius:15,backgroundColor:UI_COLORS.actionBlue},
   saleWelcomePrimaryText:{color:C.white,fontSize:16,fontWeight:"700"},
   saleWelcomePrimaryHelp:{marginTop:2,color:"#DDE7F0",fontSize:13,fontWeight:"600"},
   saleWelcomeSecondary:{minHeight:76,marginTop:12,paddingHorizontal:14,paddingVertical:11,flexDirection:"row",alignItems:"center",gap:12,borderWidth:1,borderColor:SECTION.production.border,borderRadius:15,backgroundColor:SECTION.production.soft},
@@ -5499,9 +5498,14 @@ const s = StyleSheet.create({
   saleWelcomeLater:{minHeight:44,marginTop:7,alignItems:"center",justifyContent:"center"},
   saleWelcomeLaterText:{color:C.muted,fontSize:14,fontWeight:"600"},
   sellTodayCard:{marginBottom:18,padding:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  sellTodayCardMobile:{minHeight:34,marginBottom:8,paddingHorizontal:9,flexDirection:"row",alignItems:"center",gap:7,borderWidth:1,borderColor:C.border,borderRadius:8,backgroundColor:C.white},
+  sellTodayMobileText:{color:C.ink,fontSize:13,fontWeight:"700"},
+  sellStartTitleMobile:{fontSize:24,lineHeight:30},
   sellTodayLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.6},
   sellTodayDate:{marginTop:3,color:C.ink,fontSize:14,fontWeight:"700"},
   saleDateBar:{marginBottom:14,paddingVertical:11,paddingHorizontal:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
+  saleDateBarMobile:{minHeight:34,marginBottom:8,paddingVertical:5,paddingHorizontal:9,gap:7,borderRadius:8},
+  saleDateMobileText:{color:C.ink,fontSize:12,fontWeight:"700"},
   saleDateBarLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.45},
   saleDateBarValue:{marginTop:2,color:C.ink,fontSize:14,fontWeight:"700"},
   sellModeGrid:{width:"100%"},
@@ -5543,7 +5547,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: C.green,
+    backgroundColor: UI_COLORS.actionBlue,
   },
   stepNumber: { color: C.white, fontSize: 16, fontWeight: "700" },
   stepText: {
@@ -5679,7 +5683,7 @@ const s = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: C.white,
   },
-  chipOn: { borderColor: C.green, backgroundColor: C.green },
+  chipOn: { borderColor: C.brand, backgroundColor: C.brand },
   chipText: { color: C.ink, fontSize: 14, fontWeight: "700" },
   chipTextOn: { color: C.white },
   productList: { paddingBottom: 26 },
@@ -5704,7 +5708,7 @@ const s = StyleSheet.create({
   disabled: { opacity: 0.78 },
   productOn: {
     borderWidth: 1,
-    borderColor: C.green,
+    borderColor: C.brand,
     backgroundColor: "#FCFDFF",
   },
   productVisual: {
@@ -5762,7 +5766,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
-    backgroundColor: C.green,
+    backgroundColor: C.brand,
   },
   badgeText: { color: C.white, fontSize: 16, fontWeight: "700" },
   saleBadge: {
@@ -5831,7 +5835,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     borderRadius: 7,
-    backgroundColor: C.green,
+    backgroundColor: C.brand,
   },
   reviewText: { color: C.white, fontSize: 16, fontWeight: "700" },
   back: { minHeight: 64, flexDirection: "row", alignItems: "center", gap: 10 },
@@ -5935,7 +5939,7 @@ const s = StyleSheet.create({
     borderRadius: 13,
     backgroundColor: C.white,
   },
-  choiceOn: { borderWidth: 2.5, borderColor: C.green, backgroundColor: C.soft },
+  choiceOn: { borderWidth: 2.5, borderColor: C.brand, backgroundColor: C.soft },
   choiceDanger: { borderColor: C.red, backgroundColor: C.redSoft },
   choiceText: { color: C.muted, fontSize: 14, fontWeight: "700" },
   bigButton: {
@@ -6004,7 +6008,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 14,
-    backgroundColor: C.green,
+    backgroundColor: C.brand,
   },
   soldQtyText: { color: C.white, fontSize: 18, fontWeight: "700" },
   receipt: {
@@ -6274,7 +6278,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
   },
-  addText: { color: C.green, fontSize: 15, fontWeight: "700" },
+  addText: { color: C.brand, fontSize: 15, fontWeight: "700" },
   cancel: { minHeight: 48, alignItems: "center", justifyContent: "center" },
   account: {
     minHeight: 80,
@@ -6293,7 +6297,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 26,
-    backgroundColor: C.green,
+    backgroundColor: C.brand,
   },
   avatarText: { color: C.white, fontSize: 21, fontWeight: "700" },
   signout: {
@@ -6324,8 +6328,8 @@ const s = StyleSheet.create({
   whatsNewClose:{position:"absolute",zIndex:2,top:12,right:12,width:40,height:40,alignItems:"center",justifyContent:"center",borderRadius:20,backgroundColor:C.soft,borderWidth:1,borderColor:C.border},
   whatsNewScroll:{flexShrink:1},
   whatsNewScrollContent:{padding:6,paddingTop:4,paddingRight:48,paddingBottom:12},
-  whatsNewIcon:{width:54,height:54,alignItems:"center",justifyContent:"center",borderRadius:16,backgroundColor:C.green},
-  whatsNewKicker:{marginTop:18,color:C.green,fontSize:11,fontWeight:"800",letterSpacing:1.4},
+  whatsNewIcon:{width:54,height:54,alignItems:"center",justifyContent:"center",borderRadius:16,backgroundColor:C.brand},
+  whatsNewKicker:{marginTop:18,color:C.brand,fontSize:11,fontWeight:"800",letterSpacing:1.4},
   whatsNewTitle:{marginTop:5,color:C.ink,fontSize:25,lineHeight:31,fontWeight:"700",letterSpacing:-.4},
   whatsNewDate:{marginTop:5,color:C.muted,fontSize:13,fontWeight:"600"},
   whatsNewList:{marginTop:18,gap:9},
@@ -6393,7 +6397,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 18,
-    backgroundColor: C.green,
+    backgroundColor: C.brand,
   },
   guideTitle: {
     marginTop: 18,
@@ -6444,7 +6448,7 @@ const s = StyleSheet.create({
     gap: 6,
   },
   guideDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.border },
-  guideDotOn: { width: 22, backgroundColor: C.green },
+  guideDotOn: { width: 22, backgroundColor: C.brand },
   guideActions: { padding: 16, paddingTop: 4, flexDirection: "row", gap: 10 },
   guideBack: {
     minHeight: 58,
@@ -6469,7 +6473,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     borderRadius: 19,
-    backgroundColor: C.green,
+    backgroundColor: C.brand,
   },
   guideNextText: { color: C.white, fontSize: 16, fontWeight: "700" },
   gcashCheck: {
@@ -6571,7 +6575,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 9,
     borderWidth: 2,
-    borderColor: C.green,
+    borderColor: C.brand,
     borderRadius: 13,
     backgroundColor: C.soft,
   },
@@ -6643,8 +6647,8 @@ const s = StyleSheet.create({
   },
   variantButtonOn: {
     borderWidth: 3,
-    borderColor: C.green,
-    backgroundColor: C.green,
+    borderColor: C.brand,
+    backgroundColor: C.brand,
   },
   variantButtonText: {
     color: C.ink,
@@ -6681,7 +6685,7 @@ const s = StyleSheet.create({
     backgroundColor: C.white,
   },
   designButtonText: { color: C.ink, fontSize: 20, fontWeight: "700" },
-  designPrice: { marginTop: 5, color: C.green, fontSize: 24, fontWeight: "700" },
+  designPrice: { marginTop: 5, color: C.brand, fontSize: 24, fontWeight: "700" },
   designStock: { marginTop: 3, color: C.muted, fontSize: 14, fontWeight: "700" },
   letterFooter: {
     width: "100%",
@@ -6705,7 +6709,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 9,
     borderRadius: 14,
-    backgroundColor: C.green,
+    backgroundColor: C.brand,
   },
   letterAddText: { color: C.white, fontSize: 18, fontWeight: "700" },
   productKindChoices: { marginTop: 8, gap: 8 },
@@ -6790,7 +6794,7 @@ const s = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     borderWidth: 1.5,
-    borderColor: C.green,
+    borderColor: C.brand,
     borderRadius: 18,
     backgroundColor: C.soft,
   },
