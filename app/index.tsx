@@ -1127,11 +1127,6 @@ function ShopApp({
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
       <View style={s.top}>
-        {onAdminExit ? (
-          <Pressable accessibilityLabel="Back to all shops" style={s.backButton} onPress={onAdminExit}>
-            <Ionicons name="arrow-back" size={23} color={C.ink} />
-          </Pressable>
-        ) : null}
         <Image source={business?.logo_url ? { uri: business.logo_url } : require("../assets/mik-app-icon.png")} style={s.shopLogo} />
         <View style={s.flex}>
           <Text style={s.shopName} numberOfLines={1}>
@@ -1149,6 +1144,7 @@ function ShopApp({
           {width>=600?<Text style={s.headerLogoutText}>Log out</Text>:null}
         </Pressable>
       </View>
+      {onAdminExit ? <Pressable accessibilityRole="button" accessibilityLabel="Back to owner portal" style={s.ownerPortalReturn} onPress={onAdminExit}><Ionicons name="arrow-back" size={18} color={SECTION.records.color}/><Text style={s.ownerPortalReturnText}>Back to owner portal</Text></Pressable> : null}
       {locations.length > 1 ? (
         <ScrollView
           horizontal
@@ -5036,6 +5032,8 @@ const s = StyleSheet.create({
   workspaceBrand:{fontSize:12,fontWeight:"600",letterSpacing:3,color:C.muted},
   headerLogout:{minWidth:40,minHeight:40,paddingHorizontal:10,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:6,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},
   headerLogoutText:{color:C.ink,fontSize:13,fontWeight:"700"},
+  ownerPortalReturn:{minHeight:44,paddingHorizontal:22,flexDirection:"row",alignItems:"center",gap:8,borderBottomWidth:1,borderBottomColor:C.border,backgroundColor:SECTION.records.soft},
+  ownerPortalReturnText:{color:SECTION.records.color,fontSize:14,fontWeight:"700"},
   sidebarLabel:{paddingHorizontal:12,marginBottom:10,color:C.muted,fontSize:10,fontWeight:"700",letterSpacing:1.6},
   shopLogoPreview: {
     width: 180,
