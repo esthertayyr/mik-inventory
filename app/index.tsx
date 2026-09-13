@@ -2228,6 +2228,50 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
   const [openHomeGroups, setOpenHomeGroups] = useState<string[]>(["Start here"]);
   const [showAllTools,setShowAllTools]=useState(false);
+  const [socialImages,setSocialImages]=useState<{id:string;title:string;image_url:string;storage_path:string}[]>([]);
+  const [socialBusy,setSocialBusy]=useState(false);
+  const [showAllSocial,setShowAllSocial]=useState(false);
+  useEffect(()=>{let active=true;supabase.from("shop_social_images").select("id,title,image_url,storage_path").eq("business_id",businessId).order("created_at",{ascending:false}).then(({data})=>{if(active)setSocialImages(data??[])});return()=>{active=false}},[businessId]);
+  const addSocialImage=async()=>{
+    const permission=await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if(!permission.granted)return Alert.alert("Photo access needed","Allow MIK to choose a picture from this device.");
+    const chosen=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],quality:1});
+    if(chosen.canceled)return;
+    setSocialBusy(true);
+    let path="";
+    try{
+      const asset=chosen.assets[0];
+      const resized=await ImageManipulator.manipulateAsync(asset.uri,[asset.width>=asset.height?{resize:{width:1080}}:{resize:{height:1080}}],{compress:.82,format:ImageManipulator.SaveFormat.JPEG});
+      const response=await fetch(resized.uri);
+      if(!response.ok)throw new Error("The picture could not be read.");
+      path=`${businessId}/social/${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
+      const {error:uploadError}=await supabase.storage.from("product-images").upload(path,await response.arrayBuffer(),{contentType:"image/jpeg"});
+      if(uploadError)throw uploadError;
+      const {data:{user}}=await supabase.auth.getUser();
+      if(!user)throw new Error("Please sign in again.");
+      const image_url=supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
+      const title=`Post image · ${friendlyLocalDate()}`;
+      const {data,error}=await supabase.from("shop_social_images").insert({business_id:businessId,title,image_url,storage_path:path,created_by:user.id}).select("id,title,image_url,storage_path").single();
+      if(error)throw error;
+      setSocialImages(current=>[data,...current]);
+    }catch(error:any){if(path)await supabase.storage.from("product-images").remove([path]);Alert.alert("Picture not added",error?.message??"Please try again.")}
+    finally{setSocialBusy(false)}
+  };
+  const downloadSocialImage=async(item:{title:string;image_url:string})=>{
+    try{
+      const response=await fetch(item.image_url);
+      if(!response.ok)throw new Error("Picture could not be downloaded.");
+      const bytes=await response.arrayBuffer();
+      if(Platform.OS==="web"){
+        const url=URL.createObjectURL(new Blob([bytes],{type:"image/jpeg"}));
+        const link=document.createElement("a");link.href=url;link.download="mik-post-image.jpg";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }else{
+        const file=new File(Paths.cache,"mik-post-image.jpg");file.create({overwrite:true});file.write(new Uint8Array(bytes));
+        await Sharing.shareAsync(file.uri,{mimeType:"image/jpeg"});
+      }
+    }catch(error:any){Alert.alert("Download failed",error?.message??"Please try again.")}
+  };
+  const removeSocialImage=(item:{id:string;storage_path:string})=>confirmDestructive("Remove this picture?","It will no longer be available to download.","Remove",()=>{void(async()=>{const {error}=await supabase.from("shop_social_images").delete().eq("id",item.id);if(error)return Alert.alert("Could not remove picture",error.message);setSocialImages(current=>current.filter(image=>image.id!==item.id));await supabase.storage.from("product-images").remove([item.storage_path])})()});
   useEffect(() => {
     setEventReminder(null);
     Promise.all([
@@ -2374,6 +2418,13 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
         </View>
       ))}
       {visibleGroups.length>1?<Pressable accessibilityRole="button" accessibilityState={{expanded:showAllTools}} style={s.homeAllTools} onPress={()=>setShowAllTools(value=>!value)}><Ionicons name={showAllTools?"chevron-up":"grid-outline"} size={20} color={SECTION.records.color}/><Text style={s.homeAllToolsText}>{showAllTools?"Show fewer tools":"See all shop tools"}</Text><Ionicons name={showAllTools?"chevron-up":"chevron-forward"} size={19} color={SECTION.records.color}/></Pressable>:null}
+      <View style={[s.quickSection,{marginTop:28}]}>
+        <View style={s.quickSectionHeading}><View style={[s.quickSectionMark,{backgroundColor:SECTION.records.color}]}/><View style={s.flex}><Text style={s.quickSectionTitle}>Ready to post</Text><Text style={s.quickSectionHelp}>Download a shop picture for Facebook or other social media. MIK does not post it automatically.</Text></View></View>
+        {socialImages.length===0?<Text style={s.subtitle}>No pictures yet.</Text>:null}
+        {(showAllSocial?socialImages:socialImages.slice(0,1)).map(item=><View key={item.id} style={{borderWidth:1,borderColor:C.border,borderRadius:16,padding:12,marginTop:12,maxWidth:440,backgroundColor:C.white}}><Image source={{uri:item.image_url}} resizeMode="contain" style={{width:"100%",height:220,backgroundColor:"#F4F6F8",borderRadius:10}}/><Text style={[s.quickSectionTitle,{marginTop:10}]}>{item.title}</Text><View style={{flexDirection:"row",flexWrap:"wrap",gap:8,marginTop:10}}><Pressable accessibilityRole="button" onPress={()=>void downloadSocialImage(item)} style={{backgroundColor:SECTION.records.color,borderRadius:9,paddingVertical:10,paddingHorizontal:16}}><Text style={{color:C.white,fontWeight:"700"}}>Download picture</Text></Pressable>{!permissions?<Pressable accessibilityRole="button" onPress={()=>removeSocialImage(item)} style={{borderWidth:1,borderColor:C.border,borderRadius:9,paddingVertical:10,paddingHorizontal:16}}><Text style={{color:C.ink}}>Remove</Text></Pressable>:null}</View></View>)}
+        {socialImages.length>1?<Pressable accessibilityRole="button" onPress={()=>setShowAllSocial(value=>!value)} style={{paddingVertical:12}}><Text style={{color:SECTION.records.color,fontWeight:"700"}}>{showAllSocial?"Show latest only":`See all ${socialImages.length} pictures`}</Text></Pressable>:null}
+        {!permissions?<Pressable accessibilityRole="button" disabled={socialBusy} onPress={()=>void addSocialImage()} style={{alignSelf:"flex-start",marginTop:12,borderRadius:9,borderWidth:1,borderColor:SECTION.records.color,paddingVertical:10,paddingHorizontal:16}}><Text style={{color:SECTION.records.color,fontWeight:"700"}}>{socialBusy?"Adding picture…":"Add a picture"}</Text></Pressable>:null}
+      </View>
     </ScrollView>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -76,6 +76,7 @@ const emptyForm = (): Form => ({ title: "", customer_name: "", customer_contact:
 const statusLabel: Record<OrderStatus,string> = { new: "Pending", making: "Active", ready: "Ready", completed: "Completed", cancelled: "Stopped" };
 const statusIcon: Record<OrderStatus,keyof typeof Ionicons.glyphMap> = { new: "sparkles-outline", making: "construct-outline", ready: "checkmark-circle-outline", completed: "bag-check-outline", cancelled: "close-circle-outline" };
 const csvCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+const newOrderId = () => globalThis.crypto?.randomUUID?.() ?? "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const n=Math.floor(Math.random()*16);return (c==="x"?n:(n&3)|8).toString(16)});
 
 type PaymentStage = "pending_deposit" | "deposit_paid" | "pending_final" | "full";
 function paymentStage(order: Pick<Order,"total_price"|"amount_paid"|"status">): PaymentStage {
@@ -118,6 +119,7 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
   const [saving,setSaving] = useState(false);
   const [section,setSection]=useState<"orders"|"enquiries">("orders");
   const [convertingLeadId,setConvertingLeadId]=useState<string|null>(null);
+  const pendingNewId=useRef<string|null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -141,8 +143,9 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
   });
   const missingPrices = orders.filter(o=>Number(o.total_price)<=0).length;
 
-  const startNew = () => { setConvertingLeadId(null); setForm(emptyForm()); setEditing("new"); };
+  const startNew = () => { pendingNewId.current=null; setConvertingLeadId(null); setForm(emptyForm()); setEditing("new"); };
   const convertEnquiry=(lead:Enquiry)=>{
+    pendingNewId.current=null;
     const grouped=sourceGroup(lead.source);
     setConvertingLeadId(lead.id);
     setForm({...emptyForm(),title:lead.title,customer_name:lead.customer_name??"",customer_contact:lead.customer_contact??"",source:grouped,social_platform:SOCIAL_PLATFORMS.includes(lead.source)?lead.source:"Facebook",custom_source:grouped==="Other"?lead.source:"",total_price:lead.estimated_value?String(lead.estimated_value):"",target_date:displayDate(lead.follow_up_date),notes:lead.notes??""});
@@ -161,7 +164,7 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
       onOrderOpened?.();
     }
   },[initialOrderId,loading,orders,editing,onOrderOpened]);
-  const duplicate = (o: Order) => { startEdit(o); setForm(f=>({...f,title:`${o.title} copy`,order_date:displayDate(isoDate()),target_date:"",amount_paid:"",payment_channel:"",payment_reference:"",is_past_order:false,past_order_progress:"in_progress"})); setEditing("new"); };
+  const duplicate = (o: Order) => { pendingNewId.current=null; startEdit(o); setForm(f=>({...f,title:`${o.title} copy`,order_date:displayDate(isoDate()),target_date:"",amount_paid:"",payment_channel:"",payment_reference:"",is_past_order:false,past_order_progress:"in_progress"})); setEditing("new"); };
   const choosePhoto = async () => {
     const permission=await ImagePicker.requestMediaLibraryPermissionsAsync();
     if(!permission.granted) return Alert.alert("Photo access needed","Allow Mik to choose an order photo.");
@@ -190,44 +193,39 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
     if(paid<previousPaid) return Alert.alert("Payment cannot be reduced","Payments already recorded stay in the payment history. Contact the MIK owner if a payment needs correcting.");
     setSaving(true);
     const payment_status:PaymentStatus=paid<=0?"unpaid":paid>=total?"paid":"partial";
-    const payload={business_id:businessId,location_id:locationId,title:form.title.trim(),customer_name:form.customer_name.trim()||null,customer_contact:form.customer_contact.trim()||null,source,quantity,order_date:orderDate,target_date:pastCompleted?null:targetDate,total_price:total,amount_paid:paid,payment_status,payment_channel:paid>0?form.payment_channel.trim()||null:null,payment_reference:paid>0?form.payment_reference.trim()||null:null,notes:form.notes.trim()||null,fulfilment_method:form.fulfilment_method,is_past_order:form.is_past_order,...(form.is_past_order?{status:(pastCompleted?"completed":"new") as OrderStatus,fulfilled_at:pastCompleted?`${orderDate}T12:00:00+08:00`:null}:{})};
-    let id:string|undefined;
-    if(editing==="new") {
-      const {data,error}=await supabase.from("external_orders").insert({...payload,created_by:(await supabase.auth.getUser()).data.user?.id}).select("id").single();
-      if(error){setSaving(false);return Alert.alert("Order not saved",error.message);} id=data.id;
-    } else if(editing) {
-      const {error}=await supabase.from("external_orders").update(payload).eq("id",editing.id);
-      if(error){setSaving(false);return Alert.alert("Order not saved",error.message);} id=editing.id;
-    }
-    if(id && form.image_uri && !form.image_uri.startsWith("http")) {
+    const id=editing==="new"?(pendingNewId.current??=newOrderId()):editing!.id;
+    let imageUrl=form.image_uri;
+    let uploadedPath:string|null=null;
+    if(!form.image_uri.startsWith("http")) {
       try {
         const resized=await ImageManipulator.manipulateAsync(form.image_uri,[{resize:{width:900}}],{compress:.82,format:ImageManipulator.SaveFormat.JPEG});
-        const response=await fetch(resized.uri); const path=`${businessId}/orders/${id}.jpg`;
-        const {error}=await supabase.storage.from("product-images").upload(path,await response.arrayBuffer(),{contentType:"image/jpeg",upsert:true});
-        if(error) throw error;
-        const image_url=`${supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl}?v=${Date.now()}`;
-        await supabase.from("external_orders").update({image_url}).eq("id",id);
-      } catch { Alert.alert("Order saved without photo","The order is safe, but the photo could not be uploaded."); }
-    }
-    const addedPayment=paid-previousPaid;
-    if(id && addedPayment>0 && paymentDate) {
-      const method=form.payment_channel.toLowerCase()==="cash"?"cash":form.payment_channel.toLowerCase()==="gcash"?"gcash":form.payment_channel.toLowerCase().includes("bank")?"bank":form.payment_channel.toLowerCase().includes("online")?"online":"other";
-      const kind=paid>=total?"final":previousPaid===0?"downpayment":"additional";
-      const {data:{user}}=await supabase.auth.getUser();
-      const {error:paymentError}=await supabase.from("order_payments").insert({business_id:businessId,location_id:locationId,order_id:id,payment_date:paymentDate,amount:addedPayment,payment_method:method,payment_reference:form.payment_reference.trim()||null,payment_kind:kind,created_by:user?.id});
-      if(paymentError){
-        if(editing==="new") await supabase.from("external_orders").delete().eq("id",id);
-        else await supabase.from("external_orders").update({amount_paid:previousPaid,payment_status:previousPaid<=0?"unpaid":previousPaid>=total?"paid":"partial"}).eq("id",id);
-        setSaving(false);return Alert.alert("Order not saved",`${paymentError.message} Nothing was counted as received. Please try again.`);
+        const response=await fetch(resized.uri);
+        uploadedPath=`${businessId}/orders/${id}${editing==="new"?"":`-${Date.now()}`}.jpg`;
+        const {error:photoError}=await supabase.storage.from("product-images").upload(uploadedPath,await response.arrayBuffer(),{contentType:"image/jpeg",upsert:editing==="new"});
+        if(photoError) throw photoError;
+        imageUrl=supabase.storage.from("product-images").getPublicUrl(uploadedPath).data.publicUrl;
+      } catch(error) {
+        setSaving(false);
+        Alert.alert("Photo not uploaded",`The order and payment were not saved. Try the photo again. ${error instanceof Error?error.message:""}`);
+        return;
       }
     }
-    if(id && !pastCompleted && paid>=total*.5) {
-      const {data:existing}=await supabase.from("print_jobs").select("id").eq("external_order_id",id).maybeSingle();
-      if(!existing) {
-        const {data:{user}}=await supabase.auth.getUser();
-        await supabase.from("print_jobs").insert({business_id:businessId,location_id:locationId,external_order_id:id,title:form.title.trim(),quantity,needed_date:targetDate,status:"to_print",created_by:user!.id});
+    const payload={title:form.title.trim(),image_url:imageUrl,customer_name:form.customer_name.trim()||null,customer_contact:form.customer_contact.trim()||null,source,quantity,order_date:orderDate,target_date:pastCompleted?null:targetDate,total_price:total,amount_paid:paid,payment_status,payment_channel:paid>0?form.payment_channel.trim()||null:null,payment_reference:paid>0?form.payment_reference.trim()||null:null,notes:form.notes.trim()||null,fulfilment_method:form.fulfilment_method,is_past_order:form.is_past_order,...(form.is_past_order?{status:(pastCompleted?"completed":"new") as OrderStatus,fulfilled_at:pastCompleted?`${orderDate}T12:00:00+08:00`:null}:{})};
+    const method=form.payment_channel.toLowerCase()==="cash"?"cash":form.payment_channel.toLowerCase()==="gcash"?"gcash":form.payment_channel.toLowerCase().includes("bank")?"bank":form.payment_channel.toLowerCase().includes("online")?"online":"other";
+    const {error:saveError}=await supabase.rpc("save_order_with_payment",{p_order_id:id,p_is_new:editing==="new",p_business_id:businessId,p_location_id:locationId,p_order:payload,p_payment_date:paymentDate,p_payment_method:paid>previousPaid?method:null});
+    if(saveError){
+      const {data:committed}=await supabase.from("external_orders").select("id,amount_paid").eq("id",id).maybeSingle();
+      if(editing==="new"&&committed&&Number(committed.amount_paid)===paid){
+        pendingNewId.current=null;setConvertingLeadId(null);setSaving(false);setEditing(null);await load();
+        Alert.alert("Order saved","The order and payment were recorded. Please check the order photo if you changed it.");
+        return;
       }
+      if(uploadedPath&&editing==="new"&&!committed) await supabase.storage.from("product-images").remove([uploadedPath]);
+      setSaving(false);
+      Alert.alert("Order not saved",`${saveError.message} No order payment was recorded. Please try again.`);
+      return;
     }
+    pendingNewId.current=null;
     if((form.source==="Other"||form.social_platform==="Other")&&!source.startsWith("Other")) await supabase.from("order_sources").upsert({business_id:businessId,name:source},{onConflict:"business_id,name"});
     if(editing==="new"&&convertingLeadId&&id) await supabase.from("order_enquiries").update({status:"converted",converted_order_id:id}).eq("id",convertingLeadId);
     setConvertingLeadId(null); setSaving(false); setEditing(null); await load();
