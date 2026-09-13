@@ -2227,6 +2227,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
   const [overview,setOverview]=useState({sales:0,payments:0,expenses:0});
   const [eventReminder, setEventReminder] = useState<ShopEvent | null>(null);
   const [openHomeGroups, setOpenHomeGroups] = useState<string[]>(["Start here"]);
+  const [showAllTools,setShowAllTools]=useState(false);
   useEffect(() => {
     setEventReminder(null);
     Promise.all([
@@ -2340,7 +2341,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
         {visibleModules.includes("orders")&&(!permissions||permissions.includes("orders"))?<><Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View money still to collect from orders" onPress={()=>onOpen("orders")} style={[s.overviewMetric,s.overviewAlertMetric]}><Text style={[s.overviewMetricLabel,{color:C.red}]}>Order balance to collect</Text><Text style={s.overviewMetricValue}>{peso(orderSummary.pendingMoney)}</Text><Text style={[s.overviewMetricHelp,{color:C.red}]}>Customers still need to pay →</Text></Pressable></>:null}
       </View>
       {visibleModules.includes("production")&&orderSummary.toPrint>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.production.border,backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("print_queue")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="layers-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.production.color}]}>PRINTING ACTION NEEDED</Text><Text style={s.homeReminderTitle}>{orderSummary.toPrint} paid job{orderSummary.toPrint===1?" is":"s are"} waiting to print</Text><Text style={s.homeReminderMeta}>Open Print Queue and start the next job.</Text></View><View style={s.reminderCount}><Text style={s.reminderCountText}>{orderSummary.toPrint}</Text></View></Pressable>:null}
-      {eventReminder ? (
+      {visibleModules.includes("reports") && eventReminder ? (
         <Pressable style={s.homeReminder} onPress={() => onOpen("calendar")}>
           <View style={s.homeReminderIcon}><Ionicons name="notifications" size={23} color={C.white} /></View>
           <View style={s.flex}>
@@ -2351,7 +2352,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
           <Ionicons name="chevron-forward" size={22} color={SECTION.records.color} />
         </Pressable>
       ) : null}
-      {visibleGroups.map((group) => (
+      {visibleGroups.filter((_,index)=>index===0||showAllTools).map((group) => (
         <View key={group.title} style={s.quickSection}>
           <Pressable
             accessibilityRole="button"
@@ -2372,6 +2373,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
           </ToolGrid> : null}
         </View>
       ))}
+      {visibleGroups.length>1?<Pressable accessibilityRole="button" accessibilityState={{expanded:showAllTools}} style={s.homeAllTools} onPress={()=>setShowAllTools(value=>!value)}><Ionicons name={showAllTools?"chevron-up":"grid-outline"} size={20} color={SECTION.records.color}/><Text style={s.homeAllToolsText}>{showAllTools?"Show fewer tools":"See all shop tools"}</Text><Ionicons name={showAllTools?"chevron-up":"chevron-forward"} size={19} color={SECTION.records.color}/></Pressable>:null}
     </ScrollView>
   );
 }
@@ -4176,7 +4178,6 @@ type OwnerOrderDetail = {
   title: string;
   customer_name: string | null;
   source: string;
-  social_platform: string | null;
   quantity: number;
   total_price: number;
   amount_paid: number;
@@ -4194,7 +4195,7 @@ function OwnerOrderModal({order,onClose}:{order:OwnerOrderDetail|null;onClose:()
       <View style={s.ownerOrderTop}><View style={s.flex}><Text style={s.kicker}>ORDER DETAILS{order?.business?.name?` · ${order.business.name}`:""}</Text><Text style={s.ownerOrderNumber}>ORD-{order?.order_number}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Close order" style={s.modalClose} onPress={onClose}><Ionicons name="close" size={22} color={C.ink}/></Pressable></View>
       {order?.image_url?<Image source={{uri:order.image_url}} style={s.ownerOrderImage}/>:null}
       <Text style={s.ownerOrderTitle}>{order?.title}</Text>
-      <Text style={s.ownerOrderCustomer}>{order?.customer_name||"No customer name"} · {order?.social_platform||order?.source}</Text>
+      <Text style={s.ownerOrderCustomer}>{order?.customer_name||"No customer name"} · {order?.source}</Text>
       <View style={s.ownerOrderFacts}><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>QUANTITY</Text><Text style={s.ownerOrderValue}>{order?.quantity}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>TOTAL</Text><Text style={s.ownerOrderValue}>{peso(Number(order?.total_price||0))}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>BALANCE</Text><Text style={s.ownerOrderValue}>{peso(Math.max(0,Number(order?.total_price||0)-Number(order?.amount_paid||0)))}</Text></View></View>
       <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Status</Text><Text style={s.ownerOrderLineValue}>{order?.status.replaceAll("_"," ")}</Text></View>
       <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Ready by</Text><Text style={s.ownerOrderLineValue}>{order?.target_date?friendlyLocalDate(order.target_date):"Not set"}</Text></View>
@@ -4212,7 +4213,7 @@ function OwnerOrders({onBack}:{onBack:()=>void}) {
   const [view,setView]=useState<"open"|"all">("open");
   useEffect(()=>{
     supabase.from("external_orders")
-      .select("id,business_id,business:businesses(name),order_number,title,customer_name,source,social_platform,quantity,total_price,amount_paid,payment_channel,status,target_date,notes,image_url,created_at")
+      .select("id,business_id,business:businesses(name),order_number,title,customer_name,source,quantity,total_price,amount_paid,payment_channel,status,target_date,notes,image_url,created_at")
       .order("created_at",{ascending:false}).limit(1000)
       .then(({data,error:loadError})=>{setOrders((data??[]) as unknown as OwnerOrderDetail[]);setError(loadError?.message??"");setLoading(false);});
   },[]);
@@ -4276,7 +4277,7 @@ function OwnerActivityLog({ shops, onBack }: { shops: AdminShop[]; onBack: () =>
     const orderNumber=Number(item.details?.order_number??item.summary.match(/ORD-(\d+)/i)?.[1]);
     if(!item.entity_id&&!Number.isFinite(orderNumber)){Alert.alert("Order not linked","This older activity entry has no order link. Use Orders from all shops on the owner dashboard.");return;}
     setOrderLoading(true);
-    const orderQuery=supabase.from("external_orders").select("id,business_id,business:businesses(name),order_number,title,customer_name,source,social_platform,quantity,total_price,amount_paid,payment_channel,status,target_date,notes,image_url");
+    const orderQuery=supabase.from("external_orders").select("id,business_id,business:businesses(name),order_number,title,customer_name,source,quantity,total_price,amount_paid,payment_channel,status,target_date,notes,image_url");
     const {data,error}=await (item.entity_id?orderQuery.eq("id",item.entity_id):orderQuery.eq("business_id",item.business_id!).eq("order_number",orderNumber)).maybeSingle();
     setOrderLoading(false);
     if(error||!data){Alert.alert("Order not available",error?.message??"This order could not be found. You can browse Orders from all shops on the owner dashboard.");return;}
@@ -5255,6 +5256,8 @@ const s = StyleSheet.create({
   homeEyebrow:{fontSize:11,lineHeight:16,fontWeight:"700",letterSpacing:2,color:C.muted},
   homeDesktopTitle:{fontSize:32,lineHeight:40,fontWeight:"600",letterSpacing:-.8},
   quickSection:{marginTop:24},
+  homeAllTools:{minHeight:50,marginTop:22,paddingHorizontal:14,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:9,borderWidth:1,borderColor:SECTION.records.border,borderRadius:11,backgroundColor:SECTION.records.soft},
+  homeAllToolsText:{flex:1,color:SECTION.records.color,fontSize:14,fontWeight:"700"},
   quickSectionHeading:{minHeight:56,flexDirection:"row",alignItems:"center",gap:12},
   quickSectionMark:{width:5,height:22,borderRadius:3},
   quickSectionTitle:{color:C.ink,fontSize:18,fontWeight:"700",letterSpacing:-.25},
