@@ -239,8 +239,20 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
     if(status==="completed" && Number(o.amount_paid)<Number(o.total_price))
       return Alert.alert("Final payment needed",`Record the remaining ${peso(Number(o.total_price)-Number(o.amount_paid))} before completing this order.`);
     const action=async(extra:Record<string,unknown>={})=>{const {error}=await supabase.from("external_orders").update({status,...extra}).eq("id",o.id);if(error)return Alert.alert("Order not updated",error.message);const queueStatus=status==="making"?"printing":status==="ready"?"ready":status==="completed"?"done":null;if(queueStatus)await supabase.from("print_jobs").update({status:queueStatus}).eq("external_order_id",o.id);await load();};
-    if(status==="cancelled") return Alert.alert("Stop this order?","Printing will stop. The order will remain in history.",[{text:"Keep active",style:"cancel"},{text:"Stop order",style:"destructive",onPress:()=>void action()}]);
-    if(status==="completed") return Alert.alert(o.fulfilment_method==="delivery"?"Confirm delivery":"Confirm collection",`Final payment is fully recorded. Mark this order as ${o.fulfilment_method==="delivery"?"delivered":"collected"}?`,[{text:"Not yet",style:"cancel"},{text:o.fulfilment_method==="delivery"?"Yes, delivered":"Yes, collected",onPress:()=>void action({fulfilled_at:new Date().toISOString()})}]);
+    if(status==="cancelled") {
+      const message="Printing will stop. The order will remain in history.";
+      if(Platform.OS==="web") { if(window.confirm(`Stop this order?\n\n${message}`)) await action(); }
+      else Alert.alert("Stop this order?",message,[{text:"Keep active",style:"cancel"},{text:"Stop order",style:"destructive",onPress:()=>void action()}]);
+      return;
+    }
+    if(status==="completed") {
+      const title=o.fulfilment_method==="delivery"?"Confirm delivery":"Confirm collection";
+      const message=`Final payment is fully recorded. Mark this order as ${o.fulfilment_method==="delivery"?"delivered":"collected"}?`;
+      const complete=()=>void action({fulfilled_at:new Date().toISOString()});
+      if(Platform.OS==="web") { if(window.confirm(`${title}\n\n${message}`)) complete(); }
+      else Alert.alert(title,message,[{text:"Not yet",style:"cancel"},{text:o.fulfilment_method==="delivery"?"Yes, delivered":"Yes, collected",onPress:complete}]);
+      return;
+    }
     await action();
   };
   const exportOrders = async () => {

@@ -751,6 +751,27 @@ function ShopApp({
   const [priceListBackScreen, setPriceListBackScreen] = useState<Screen>("home");
   const [reportBackScreen,setReportBackScreen]=useState<Screen>("home");
   const [openOrderId,setOpenOrderId]=useState<string|null>(null);
+  const [resolvedNotices,setResolvedNotices]=useState<{id:string;message:string;resolution_notice_at:string}[]>([]);
+  useEffect(()=>{
+    if(loading||!business?.id||!session?.user.id||screen!=="home"||adminBusiness)return;
+    let active=true;
+    void (async()=>{
+      const [{data:reports,error:reportsError},{data:seen,error:seenError}]=await Promise.all([
+        supabase.from("issue_reports").select("id,message,resolution_notice_at").eq("business_id",business.id).eq("status","resolved").not("resolution_notice_at","is",null).order("resolution_notice_at",{ascending:false}),
+        supabase.from("issue_resolution_acks").select("issue_id,notice_at").eq("user_id",session.user.id),
+      ]);
+      if(reportsError||seenError||!active)return;
+      const seenIds=new Set((seen??[]).map(row=>`${row.issue_id}:${row.notice_at}`));
+      setResolvedNotices((reports??[]).filter(report=>!seenIds.has(`${report.id}:${report.resolution_notice_at}`)) as {id:string;message:string;resolution_notice_at:string}[]);
+    })();
+    return()=>{active=false};
+  },[adminBusiness,business?.id,loading,screen,session?.user.id]);
+  const closeResolvedNotices=async()=>{
+    if(!session?.user.id||!resolvedNotices.length)return;
+    const {error}=await supabase.from("issue_resolution_acks").insert(resolvedNotices.map(report=>({issue_id:report.id,user_id:session.user.id,notice_at:report.resolution_notice_at})));
+    if(error){if(Platform.OS==="web")window.alert(`Could not dismiss update: ${error.message}`);else Alert.alert("Could not dismiss update",error.message);return;}
+    setResolvedNotices([]);
+  };
   const loadData = useCallback(
     async (businessId: string, selectedLocationId: string) => {
       const start = new Date();
@@ -1202,6 +1223,18 @@ function ShopApp({
       </View>
       </View>
       <GuideModal visible={guideOpen} onClose={closeGuide} />
+      <Modal visible={resolvedNotices.length>0&&!guideOpen} transparent animationType="fade" onRequestClose={()=>void closeResolvedNotices()}>
+        <View style={{flex:1,backgroundColor:"rgba(18,25,38,0.52)",justifyContent:"center",alignItems:"center",padding:20}}>
+          <View style={{width:"100%",maxWidth:440,backgroundColor:C.white,borderRadius:18,padding:24,gap:12}}>
+            <Ionicons name="checkmark-circle" size={36} color={C.accent}/>
+            <Text style={{fontSize:22,fontWeight:"700",color:C.ink}}>Your report has been fixed</Text>
+            <Text style={{fontSize:16,color:C.ink,lineHeight:23}}>{resolvedNotices[0]?.message}</Text>
+            {resolvedNotices.length>1?<Text style={{fontSize:14,color:C.muted}}>{resolvedNotices.length-1} more report{resolvedNotices.length===2?" has":"s have"} been fixed.</Text>:null}
+            <Text style={{fontSize:14,color:C.muted}}>Please check the update when you have a moment.</Text>
+            <Pressable accessibilityRole="button" onPress={()=>void closeResolvedNotices()} style={{alignSelf:"flex-end",backgroundColor:C.accent,borderRadius:10,paddingHorizontal:22,paddingVertical:12}}><Text style={{color:C.white,fontWeight:"700"}}>Got it</Text></Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -4126,7 +4159,8 @@ function OwnerIssueReports({onBack}:{onBack:()=>void}) {
   },[showResolved]);
   useEffect(()=>{void load();},[load]);
   const resolve = async(item:IssueReport)=>{
-    const {error}=await supabase.from("issue_reports").update({status:item.status==="open"?"resolved":"open",resolved_at:item.status==="open"?new Date().toISOString():null}).eq("id",item.id);
+    const completedAt=item.status==="open"?new Date().toISOString():null;
+    const {error}=await supabase.from("issue_reports").update({status:item.status==="open"?"resolved":"open",resolved_at:completedAt,resolution_notice_at:completedAt}).eq("id",item.id);
     if(error)return Alert.alert("Report not updated",error.message);
     await load();
   };
