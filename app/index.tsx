@@ -2388,11 +2388,6 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
       ],
     },
     {
-      title: "Social media", help: "Finished designs to share.", ...SECTION.orders, actions: [
-        { title: "Suggested Images", help: "Browse and download Facebook posters", icon: "images", screen: "suggested_images" },
-      ],
-    },
-    {
       title: "Stock & products", help: "Check stock, products and prices.", ...SECTION.stock, actions: [
         { title: "Update stock", help: "Add stock or change the number", icon: "cube", screen: "stock_start" },
         { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products" },
