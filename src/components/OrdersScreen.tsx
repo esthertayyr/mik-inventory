@@ -288,7 +288,7 @@ function OrderCard({order,desktopGrid,onEdit,onDuplicate,onStatus}:{order:Order;
   const depositNeeded=Number(order.total_price)*.5;
   const depositPaid=Number(order.amount_paid)>=depositNeeded;
   const stage=paymentStage(order);
-  const displayStatus=order.status==="cancelled"?"Stopped":order.status==="completed"?(order.fulfilment_method==="delivery"?"Delivered":"Collected"):order.status==="ready"?(order.fulfilment_method==="delivery"?"Ready for delivery":"Ready for collection"):order.status==="making"?"Printing":depositPaid?"To print":"Waiting for downpayment";
+  const displayStatus=order.status==="cancelled"?"Stopped":order.status==="completed"?(order.fulfilment_method==="delivery"?"Delivered":"Collected"):order.status==="ready"?(order.fulfilment_method==="delivery"?"Ready for delivery":"Ready for collection"):order.status==="making"?"Printing":depositPaid?"To print":"Awaiting downpayment";
   const statusColor=order.status==="cancelled"?C.muted:order.status==="ready"||order.status==="completed"?C.green:order.status==="making"?C.blue:depositPaid?C.navy:C.ruby;
   const statusSoft=order.status==="cancelled"?"#F1F2F4":order.status==="ready"||order.status==="completed"?"#ECF5F0":order.status==="making"?"#EEF3F8":depositPaid?C.pale:"#FAF0F2";
   const stageColor=stage==="full"?C.green:stage==="deposit_paid"?C.navy:C.ruby;
@@ -302,12 +302,15 @@ function OrderCard({order,desktopGrid,onEdit,onDuplicate,onStatus}:{order:Order;
     {priceMissing?<Pressable style={s.priceNeededTag} onPress={onEdit}><Ionicons name="alert-circle" size={17} color={C.ruby}/><Text style={s.priceNeededText}>Price needed · Tap to fix</Text></Pressable>:null}
     <View style={s.glanceRow}>
       <View style={[s.infoPill,due&&(due.color===C.ruby||due.color===C.amber)&&s.infoPillAlert]}><Ionicons name="calendar-outline" size={16} color={due?.color??C.muted}/><Text numberOfLines={1} style={[s.infoPillText,due&&{color:due.color}]}>{order.target_date?`Needed by: ${displayDate(order.target_date)}`:"No date needed"}</Text></View>
-      <View style={s.infoPill}><Ionicons name={stage==="full"?"checkmark-circle-outline":"card-outline"} size={16} color={stageColor}/><Text numberOfLines={1} style={[s.infoPillText,{color:stageColor}]}>{priceMissing?"Price needed":paymentStageLabel[stage]}</Text></View>
+      {!priceMissing&&stage!=="pending_deposit"?<View style={s.infoPill}><Ionicons name={stage==="full"?"checkmark-circle-outline":"card-outline"} size={16} color={stageColor}/><Text numberOfLines={1} style={[s.infoPillText,{color:stageColor}]}>{paymentStageLabel[stage]}</Text></View>:null}
     </View>
-    <View style={s.cardMoneyRow}><Text style={s.cardMoneyText}>Total {peso(Number(order.total_price))}</Text><Text style={s.cardMoneyText}>Paid {peso(Number(order.amount_paid))}</Text>{balance>0?<Text style={[s.cardMoneyText,{color:C.ruby}]}>To collect {peso(balance)}</Text>:null}</View>
+    {!priceMissing?<View style={s.cardMoneyBox}>
+      <View style={s.cardTotalLine}><Text style={s.cardTotalValue}>{peso(Number(order.total_price))}</Text><Text style={s.cardTotalLabel}>total price</Text></View>
+      <View style={s.cardMoneyRow}><View style={s.cardMoneyCell}><Text style={s.cardMoneyLabel}>Paid</Text><Text style={[s.cardMoneyValue,{color:Number(order.amount_paid)>0?C.green:C.ink}]}>{peso(Number(order.amount_paid))}</Text></View><View style={s.cardMoneyCell}><Text style={s.cardMoneyLabel}>Still to collect</Text><Text style={[s.cardMoneyValue,{color:balance>0?C.ruby:C.green}]}>{peso(Math.max(0,balance))}</Text></View></View>
+    </View>:null}
     {detailsVisible?<View style={s.detailsPanel}><Text style={s.paymentDetail}>{order.amount_paid>0?`Customer payment: ${order.payment_channel||"Method not recorded"}${latestPayment?` · Paid on ${displayDate(latestPayment.payment_date)}`:""}`:"No customer payment recorded"}</Text><Text style={s.orderDateDetail}>Order received: {displayDate(order.order_date)}{order.target_date?` · Needed by: ${displayDate(order.target_date)}`:""}</Text></View>:null}
     {detailsVisible && order.notes?<View style={s.remarks}><Text style={s.factLabel}>REMARKS</Text><Text style={s.remarksText}>{order.notes}</Text></View>:null}
-    {next?<Pressable style={[s.next,{backgroundColor:nextButtonColor}]} onPress={()=>needsDetails?onEdit():onStatus(next)}><Text style={s.nextText}>{priceMissing?"Add price":next==="making"?(depositPaid?"Start printing":"Add downpayment"):next==="ready"?"Mark as ready":stage==="full"?(order.fulfilment_method==="delivery"?"Confirm delivered":"Confirm collected"):"Add final payment"}</Text><Ionicons name={needsDetails?"create-outline":"arrow-forward"} size={20} color={C.white}/></Pressable>:null}
+    {next?<Pressable style={[s.next,{backgroundColor:nextButtonColor}]} onPress={()=>needsDetails?onEdit():onStatus(next)}><Text style={s.nextText}>{priceMissing?"Add price":next==="making"?(depositPaid?"Start printing":"Record downpayment"):next==="ready"?"Mark as ready":stage==="full"?(order.fulfilment_method==="delivery"?"Confirm delivered":"Confirm collected"):"Record final payment"}</Text><Ionicons name={needsDetails?"create-outline":"arrow-forward"} size={20} color={C.white}/></Pressable>:null}
     <View style={s.cardActions}>{compact||desktopGrid?<Pressable accessibilityRole="button" accessibilityState={{expanded:showDetails}} style={s.link} onPress={()=>setShowDetails(!showDetails)}><Text numberOfLines={1} style={s.linkText}>{showDetails?"Hide details":"More details"}</Text></Pressable>:null}<Pressable style={s.link} onPress={onEdit}><Text numberOfLines={1} style={s.linkText}>View / edit</Text></Pressable><Pressable style={s.link} onPress={onDuplicate}><Text numberOfLines={1} style={s.linkText}>Duplicate</Text></Pressable>{!["completed","cancelled"].includes(order.status)?<Pressable style={[s.link,s.stopLink]} onPress={()=>onStatus("cancelled")}><Text numberOfLines={1} style={s.cancelText}>Stop</Text></Pressable>:order.status==="cancelled"?<Pressable style={s.link} onPress={()=>onStatus("new")}><Text numberOfLines={1} style={s.linkText}>Resume</Text></Pressable>:null}</View>
   </View>;
 }
@@ -348,8 +351,14 @@ function Field(props:TextInputProps&{label:string}) { return <View><Text style={
 
 const s=StyleSheet.create({
   sectionHint:{marginTop:5,color:C.muted,fontSize:12,lineHeight:17},
-  cardMoneyRow:{marginTop:9,flexDirection:"row",flexWrap:"wrap",gap:10,alignItems:"center"},
-  cardMoneyText:{color:C.ink,fontSize:13,lineHeight:19,fontWeight:"700"},
+  cardMoneyBox:{marginTop:10,paddingTop:10,borderTopWidth:1,borderTopColor:"#EDF0F2"},
+  cardTotalLine:{flexDirection:"row",flexWrap:"wrap",alignItems:"baseline",gap:7},
+  cardTotalValue:{color:C.ink,fontSize:23,lineHeight:29,fontWeight:"800",letterSpacing:-.5},
+  cardTotalLabel:{color:C.muted,fontSize:12,lineHeight:18,fontWeight:"600"},
+  cardMoneyRow:{marginTop:8,flexDirection:"row",flexWrap:"wrap",gap:12},
+  cardMoneyCell:{flexGrow:1,flexBasis:110,minWidth:100},
+  cardMoneyLabel:{color:C.muted,fontSize:12,lineHeight:17,fontWeight:"600"},
+  cardMoneyValue:{marginTop:1,color:C.ink,fontSize:16,lineHeight:22,fontWeight:"700"},
   page:{paddingTop:18,paddingBottom:96},headingRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:12},headingRowMobile:{flexWrap:"wrap",alignItems:"center"},headingCopy:{flex:1},title:{fontSize:28,lineHeight:34,fontWeight:"700",color:C.ink,letterSpacing:-.6},subtitle:{marginTop:3,fontSize:15,lineHeight:22,color:C.muted},add:{minHeight:48,paddingHorizontal:16,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:7,borderRadius:12,backgroundColor:C.navy},addMobile:{alignSelf:"flex-start"},addText:{color:C.white,fontSize:14,fontWeight:"700"},
   sectionSwitch:{alignSelf:"flex-start",marginTop:14,padding:4,flexDirection:"row",gap:4,borderRadius:11,backgroundColor:C.pale},sectionSwitchOn:{minHeight:38,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderRadius:8,backgroundColor:C.white,shadowColor:C.ink,shadowOpacity:.08,shadowRadius:5,shadowOffset:{width:0,height:2}},sectionSwitchOnText:{color:C.ink,fontSize:13,fontWeight:"700"},sectionSwitchOff:{minHeight:38,paddingHorizontal:13,alignItems:"center",justifyContent:"center",borderRadius:8},sectionSwitchOffText:{color:C.muted,fontSize:13,fontWeight:"600"},
   hero:{marginTop:18,padding:18,borderWidth:1,borderColor:"#DCE5EB",borderRadius:14,backgroundColor:"#EEF3F7"},heroKicker:{color:C.navy,fontSize:13,fontWeight:"700",letterSpacing:1.2},heroValue:{marginTop:5,color:C.ink,fontSize:34,fontWeight:"700"},heroHelp:{marginTop:5,color:C.ink,fontSize:15,lineHeight:21,fontWeight:"600"},tabs:{gap:8,paddingVertical:14},tab:{minHeight:44,paddingHorizontal:15,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},tabOn:{backgroundColor:C.ink,borderColor:C.ink},tabText:{color:C.ink,fontSize:13,fontWeight:"700"},tabTextOn:{color:C.white},
