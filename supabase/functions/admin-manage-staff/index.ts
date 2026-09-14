@@ -136,5 +136,20 @@ Deno.serve(async(req:Request)=>{
     await admin.from('shop_staff_accounts').update({active,updated_at:new Date().toISOString()}).eq('user_id',userId);
     return reply({updated:true});
   }
+  if(action==='delete'){
+    // Keep the profile referenced by historical sales and stock movements.
+    // Remove shop access and retire the login instead of deleting the auth user.
+    const retiredLogin=`removed-${userId}`;
+    const {error:banError}=await admin.auth.admin.updateUserById(userId,{ban_duration:'876000h'});
+    if(banError) return reply({error:banError.message},400);
+    const {error:membershipError}=await admin.from('business_memberships').delete().eq('user_id',userId).eq('business_id',shopId).eq('role','staff');
+    if(membershipError) return reply({error:membershipError.message},400);
+    const {error:staffError}=await admin.from('shop_staff_accounts').delete().eq('user_id',userId).eq('business_id',shopId);
+    if(staffError) return reply({error:staffError.message},400);
+    await admin.from('profiles').update({username:retiredLogin}).eq('id',userId);
+    await admin.auth.admin.updateUserById(userId,{email:`${retiredLogin}@login.mik.app`});
+    await admin.from('activity_logs').insert({business_id:shopId,actor_id:auth.user.id,actor_name:'Owner',action:'staff_removed',entity_type:'staff',entity_id:userId,summary:`Staff account removed: ${person.display_name}`});
+    return reply({deleted:true});
+  }
   return reply({error:'Unknown action'},400);
 });

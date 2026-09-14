@@ -396,38 +396,44 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const [showOwnerOrders,setShowOwnerOrders]=useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [showAccounts, setShowAccounts] = useState(false);
-  const [showTeam,setShowTeam]=useState(false);
+  const [ownerPeriod,setOwnerPeriod]=useState<"today"|"month"|"range">("today");
+  const [ownerRangeStart,setOwnerRangeStart]=useState(localDateKey());
+  const [ownerRangeEnd,setOwnerRangeEnd]=useState(localDateKey());
+  const [ownerDateField,setOwnerDateField]=useState<"start"|"end"|null>(null);
   const [staffShop, setStaffShop] = useState<AdminShop | null>(null);
   const [actionShop,setActionShop]=useState<AdminShop|null>(null);
   const [manageShop, setManageShop] = useState<{ shop: AdminShop; mode: "edit" | "duplicate" } | null>(null);
-  const [ownerStats, setOwnerStats] = useState({ salesToday: 0, orderPaymentsToday:0, expensesToday:0, activeOrders: 0, lowStock: 0 });
+  const [ownerStats, setOwnerStats] = useState({ sales: 0, orderPayments:0, expenses:0, activeOrders: 0, lowStock: 0 });
   const [exporting, setExporting] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now=new Date();
+    const start=ownerPeriod==="today"?localDateKey(now):ownerPeriod==="month"?`${localDateKey(now).slice(0,7)}-01`:ownerRangeStart;
+    const end=ownerPeriod==="today"?localDateKey(new Date(now.getFullYear(),now.getMonth(),now.getDate()+1)):ownerPeriod==="month"?localDateKey(new Date(now.getFullYear(),now.getMonth()+1,1)):localDateKey(new Date(new Date(`${ownerRangeEnd}T12:00:00`).getTime()+86400000));
+    const startTime=new Date(`${start}T00:00:00`).toISOString();
+    const endTime=new Date(`${end}T00:00:00`).toISOString();
     const [{ data, error }, { data: loginRows }, { data: todaySales }, { data: activeOrders }, { data: stockRows },{data:orderPayments},{data:expenses}] = await Promise.all([
       supabase.from("businesses").select("id,name,logo_url,slug,login_username,status,created_at,visible_modules").order("created_at"),
       supabase.from("activity_logs").select("business_id,created_at").eq("action", "login").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("sales").select("total,status").eq("status", "completed").gte("created_at", today.toISOString()),
+      supabase.from("sales").select("total,status").eq("status", "completed").gte("created_at", startTime).lt("created_at",endTime),
       supabase.from("external_orders").select("id,status").not("status", "in", "(completed,cancelled)"),
       supabase.from("inventory_levels").select("quantity_on_hand,product:products!inner(low_stock_threshold,active)").eq("product.active", true),
-      supabase.from("order_payments").select("amount").eq("payment_date",localDateKey()),
-      supabase.from("expenses").select("amount").eq("expense_date",localDateKey()),
+      supabase.from("order_payments").select("amount").gte("payment_date",start).lt("payment_date",end),
+      supabase.from("expenses").select("amount").gte("expense_date",start).lt("expense_date",end),
     ]);
     if (error) Alert.alert("Shops not loaded", error.message);
     const lastLogin = new Map<string, string>();
     for (const row of loginRows ?? []) if (row.business_id && !lastLogin.has(row.business_id)) lastLogin.set(row.business_id, row.created_at);
     setShops(((data ?? []) as AdminShop[]).map((shop) => ({ ...shop, last_login: lastLogin.get(shop.id) ?? null })));
     setOwnerStats({
-      salesToday: (todaySales ?? []).reduce((sum, sale) => sum + Number(sale.total), 0),
-      orderPaymentsToday:(orderPayments??[]).reduce((sum,row)=>sum+Number(row.amount),0),
-      expensesToday:(expenses??[]).reduce((sum,row)=>sum+Number(row.amount),0),
+      sales: (todaySales ?? []).reduce((sum, sale) => sum + Number(sale.total), 0),
+      orderPayments:(orderPayments??[]).reduce((sum,row)=>sum+Number(row.amount),0),
+      expenses:(expenses??[]).reduce((sum,row)=>sum+Number(row.amount),0),
       activeOrders: activeOrders?.length ?? 0,
       lowStock: (stockRows ?? []).filter((row: any) => row.quantity_on_hand <= Number(row.product?.low_stock_threshold ?? 0)).length,
     });
     setLoading(false);
-  }, []);
+  }, [ownerPeriod,ownerRangeStart,ownerRangeEnd]);
   useEffect(() => {
     load();
   }, [load]);
@@ -506,16 +512,16 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     return <OwnerIssueReports onBack={() => setShowIssues(false)} />;
   if (showAccounts)
     return <OwnerAccounts onBack={() => setShowAccounts(false)} onManage={(account)=>{const shop=shops.find(item=>item.id===account.shop_id);if(!shop)return;setShowAccounts(false);if(account.role==="staff")setStaffShop(shop);else setActionShop(shop);}} />;
-  if(showTeam) return <PlatformTeamManager shops={shops} onBack={()=>setShowTeam(false)}/>;
+  if(ownerDateField) return <SafeAreaView style={s.app}><PastSaleDatePicker value={ownerDateField==="start"?ownerRangeStart:ownerRangeEnd} onChange={value=>{if(ownerDateField==="start"){setOwnerRangeStart(value);if(value>ownerRangeEnd)setOwnerRangeEnd(value);}else{if(value<ownerRangeStart){Alert.alert("Check date","Choose a date on or after the first day.");return;}setOwnerRangeEnd(value);}}} onBack={()=>setOwnerDateField(null)} onContinue={()=>{setOwnerPeriod("range");setOwnerDateField(null);}} title={ownerDateField==="start"?"First day":"Last day"} subtitle="Choose the dates to include in the owner dashboard." continueLabel="Use this date"/></SafeAreaView>;
   if (staffShop)
     return <AdminStaffManager shop={staffShop} onBack={() => setStaffShop(null)} />;
   if(actionShop)
-    return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}><Back title="Shop profiles" onPress={()=>setActionShop(null)}/><View style={s.manageShopHero}><View style={s.shopAvatar}><Ionicons name="storefront" size={25} color={C.green}/></View><View style={s.flex}><Text style={s.pageTitle}>{actionShop.name}</Text><Text style={s.subtitle}>Choose what you want to manage.</Text></View></View><View style={s.manageShopGrid}>
-      <Pressable style={s.manageShopCard} onPress={()=>{setStaffShop(actionShop);setActionShop(null);}}><View style={[s.quickIcon,{backgroundColor:SECTION.sales.color}]}><Ionicons name="people-outline" size={24} color={C.white}/></View><Text style={s.quickTitle}>Staff accounts</Text><Text style={s.quickHelp}>Create staff and choose their access</Text><Ionicons name="arrow-forward" size={20} color={SECTION.sales.color}/></Pressable>
-      <Pressable style={s.manageShopCard} onPress={()=>{setManageShop({shop:actionShop,mode:"edit"});setActionShop(null);}}><View style={[s.quickIcon,{backgroundColor:SECTION.settings.color}]}><Ionicons name="create-outline" size={24} color={C.white}/></View><Text style={s.quickTitle}>Edit shop</Text><Text style={s.quickHelp}>Change its name, username or password</Text><Ionicons name="arrow-forward" size={20} color={SECTION.settings.color}/></Pressable>
-      <Pressable style={s.manageShopCard} onPress={()=>{setManageShop({shop:actionShop,mode:"duplicate"});setActionShop(null);}}><View style={[s.quickIcon,{backgroundColor:SECTION.records.color}]}><Ionicons name="copy-outline" size={24} color={C.white}/></View><Text style={s.quickTitle}>Copy shop</Text><Text style={s.quickHelp}>Create another shop from this profile</Text><Ionicons name="arrow-forward" size={20} color={SECTION.records.color}/></Pressable>
-      <Pressable style={s.manageShopCard} onPress={()=>setShopStatus(actionShop)}><View style={[s.quickIcon,{backgroundColor:actionShop.status==="active"?C.red:C.green}]}><Ionicons name={actionShop.status==="active"?"pause-circle-outline":"play-circle-outline"} size={24} color={C.white}/></View><Text style={s.quickTitle}>{actionShop.status==="active"?"Pause shop":"Activate shop"}</Text><Text style={s.quickHelp}>{actionShop.status==="active"?"Stop new logins without deleting data":"Allow this shop to sign in again"}</Text><Ionicons name="arrow-forward" size={20} color={actionShop.status==="active"?C.red:C.green}/></Pressable>
-    </View></ScrollView></SafeAreaView>;
+    return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}><Back title="Shop profiles" onPress={()=>setActionShop(null)}/><View style={s.manageShopHero}><View style={s.shopAvatar}><Ionicons name="storefront" size={25} color={C.green}/></View><View style={s.flex}><Text style={s.pageTitle}>{actionShop.name}</Text><Text style={s.subtitle}>Choose what you want to manage.</Text></View></View><ToolGrid minCardWidth={300} maxColumns={2}>
+      <WorkspaceAction title="Staff accounts" help="Create staff and choose their access" icon="people-outline" color={SECTION.sales.color} onPress={()=>{setStaffShop(actionShop);setActionShop(null);}}/>
+      <WorkspaceAction title="Edit shop" help="Change its name, username or password" icon="create-outline" color={SECTION.settings.color} onPress={()=>{setManageShop({shop:actionShop,mode:"edit"});setActionShop(null);}}/>
+      <WorkspaceAction title="Copy shop" help="Create another shop from this profile" icon="copy-outline" color={SECTION.records.color} onPress={()=>{setManageShop({shop:actionShop,mode:"duplicate"});setActionShop(null);}}/>
+      <WorkspaceAction title={actionShop.status==="active"?"Pause shop":"Activate shop"} help={actionShop.status==="active"?"Stop new logins without deleting data":"Allow this shop to sign in again"} icon={actionShop.status==="active"?"pause-circle-outline":"play-circle-outline"} color={actionShop.status==="active"?C.red:C.accent} onPress={()=>setShopStatus(actionShop)}/>
+    </ToolGrid></ScrollView></SafeAreaView>;
   return (
     <SafeAreaView style={s.app}>
       <StatusBar style="dark" />
@@ -532,18 +538,20 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={s.adminPage}>
-        <View style={s.ownerDashboardIntro}><View style={s.flex}><Text style={s.ownerDashboardEyebrow}>MIK PLATFORM</Text><Text style={s.ownerDashboardTitle}>Owner dashboard</Text><Text style={s.ownerDashboardSubtitle}>A clear view of every shop today.</Text></View><View style={s.ownerLivePill}><View style={s.ownerLiveDot}/><Text style={s.ownerLiveText}>{shops.filter(shop=>shop.status==="active").length} active shop{shops.filter(shop=>shop.status==="active").length===1?"":"s"}</Text></View></View>
-        <Text style={s.ownerZoneTitle}>Money today</Text>
+        <View style={s.ownerDashboardIntro}><View style={s.flex}><Text style={s.ownerDashboardEyebrow}>MIK PLATFORM</Text><Text style={s.ownerDashboardTitle}>Owner dashboard</Text><Text style={s.ownerDashboardSubtitle}>Money across all shops, for the dates you choose.</Text></View><View style={s.ownerLivePill}><View style={s.ownerLiveDot}/><Text style={s.ownerLiveText}>{shops.filter(shop=>shop.status==="active").length} active shop{shops.filter(shop=>shop.status==="active").length===1?"":"s"}</Text></View></View>
+        <View style={s.ownerPeriodRow}>{([['today','Today'],['month','This month'],['range','Date range']] as const).map(([id,label])=><Pressable key={id} style={[s.ownerPeriodButton,ownerPeriod===id&&s.ownerPeriodButtonOn]} onPress={()=>setOwnerPeriod(id)}><Text style={[s.ownerPeriodText,ownerPeriod===id&&s.ownerPeriodTextOn]}>{label}</Text></Pressable>)}</View>
+        {ownerPeriod==="range"?<View style={s.ownerPeriodRow}><Pressable style={s.ownerDateButton} onPress={()=>setOwnerDateField("start")}><Ionicons name="calendar-outline" size={18} color={C.green}/><Text style={s.ownerPeriodText}>From {friendlyLocalDate(ownerRangeStart)}</Text></Pressable><Pressable style={s.ownerDateButton} onPress={()=>setOwnerDateField("end")}><Ionicons name="calendar-outline" size={18} color={C.green}/><Text style={s.ownerPeriodText}>To {friendlyLocalDate(ownerRangeEnd)}</Text></Pressable></View>:null}
+        <Text style={s.ownerZoneTitle}>Money · {ownerPeriod==="today"?friendlyLocalDate():ownerPeriod==="month"?new Date().toLocaleDateString("en-US",{month:"long",year:"numeric"}):`${friendlyLocalDate(ownerRangeStart)} to ${friendlyLocalDate(ownerRangeEnd)}`}</Text>
         <View style={s.ownerMoneyGrid}>
-          <View style={[s.ownerMoneyCard,s.ownerMoneyPrimary]}><Text style={[s.ownerMoneyLabel,{color:"#D8DCE7"}]}>MONEY RECEIVED</Text><Text style={s.ownerMoneyValue}>{peso(ownerStats.salesToday+ownerStats.orderPaymentsToday)}</Text><Text style={s.ownerMoneyHelp}>Shop sales and order payments</Text></View>
-          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>SHOP SALES</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.salesToday)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.sales.color}]}/></View>
-          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>ORDER PAYMENTS</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.orderPaymentsToday)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.orders.color}]}/></View>
-          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>EXPENSES</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.expensesToday)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.production.color}]}/></View>
-          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>MONEY LEFT</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.salesToday+ownerStats.orderPaymentsToday-ownerStats.expensesToday)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.stock.color}]}/></View>
+          <View style={[s.ownerMoneyCard,s.ownerMoneyPrimary]}><Text style={[s.ownerMoneyLabel,{color:"#D8DCE7"}]}>MONEY RECEIVED</Text><Text style={s.ownerMoneyValue}>{peso(ownerStats.sales+ownerStats.orderPayments)}</Text><Text style={s.ownerMoneyHelp}>Shop sales and order payments</Text></View>
+          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>SHOP SALES</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.sales)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.sales.color}]}/></View>
+          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>ORDER PAYMENTS</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.orderPayments)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.orders.color}]}/></View>
+          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>EXPENSES</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.expenses)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.production.color}]}/></View>
+          <View style={s.ownerMoneyCard}><Text style={s.ownerMoneyLabel}>MONEY LEFT</Text><Text style={s.ownerMoneyValueSmall}>{peso(ownerStats.sales+ownerStats.orderPayments-ownerStats.expenses)}</Text><View style={[s.ownerMoneyMark,{backgroundColor:SECTION.stock.color}]}/></View>
         </View>
         <View style={[s.ownerDashboardColumns,width<720&&s.ownerDashboardColumnsMobile]}>
           <View style={s.ownerDashboardPanel}><Text style={s.ownerZoneTitle}>Needs attention</Text><Pressable style={s.ownerAttentionRow} onPress={()=>setShowOwnerOrders(true)}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.orders.soft}]}><Ionicons name="clipboard-outline" size={20} color={SECTION.orders.color}/></View><View style={s.flex}><Text style={s.ownerAttentionValue}>{ownerStats.activeOrders}</Text><Text style={s.ownerAttentionLabel}>Open customer orders · all shops</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable><Pressable style={s.ownerAttentionRow} onPress={()=>shops[0]&&setOpenShop(shops[0])}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.stock.soft}]}><Ionicons name="alert-circle-outline" size={20} color={SECTION.stock.color}/></View><View style={s.flex}><Text style={s.ownerAttentionValue}>{ownerStats.lowStock}</Text><Text style={s.ownerAttentionLabel}>Low-stock products</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable><Pressable style={s.ownerAttentionRow} onPress={()=>setShowIssues(true)}><View style={[s.ownerAttentionIcon,{backgroundColor:SECTION.support.soft}]}><Ionicons name="chatbox-ellipses-outline" size={20} color={SECTION.support.color}/></View><View style={s.flex}><Text style={s.ownerAttentionLabelStrong}>Problem reports</Text><Text style={s.ownerAttentionLabel}>Review messages from shops</Text></View><Ionicons name="chevron-forward" size={19} color={C.muted}/></Pressable></View>
-          <View style={s.ownerDashboardPanel}><Text style={s.ownerZoneTitle}>Platform tools</Text><View style={s.ownerToolGrid}><Pressable style={s.ownerTool} onPress={()=>setShowActivity(true)}><Ionicons name="time-outline" size={21} color={SECTION.records.color}/><Text style={s.ownerToolTitle}>Activity</Text><Text style={s.ownerToolHelp}>See every change</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>setShowAccounts(true)}><Ionicons name="people-outline" size={21} color={SECTION.support.color}/><Text style={s.ownerToolTitle}>Accounts</Text><Text style={s.ownerToolHelp}>Owners and staff</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>setShowTeam(true)}><Ionicons name="shield-checkmark-outline" size={21} color={SECTION.records.color}/><Text style={s.ownerToolTitle}>Viewers</Text><Text style={s.ownerToolHelp}>Dashboard access</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>void exportOwnerSales()} disabled={exporting}><Ionicons name="download-outline" size={21} color={C.accent}/><Text style={s.ownerToolTitle}>{exporting?"Preparing…":"Export"}</Text><Text style={s.ownerToolHelp}>All shop sales</Text></Pressable></View></View>
+          <View style={s.ownerDashboardPanel}><Text style={s.ownerZoneTitle}>Platform tools</Text><View style={s.ownerToolGrid}><Pressable style={s.ownerTool} onPress={()=>setShowActivity(true)}><Ionicons name="time-outline" size={21} color={SECTION.records.color}/><Text style={s.ownerToolTitle}>Activity</Text><Text style={s.ownerToolHelp}>See every change</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>setShowAccounts(true)}><Ionicons name="people-outline" size={21} color={SECTION.support.color}/><Text style={s.ownerToolTitle}>Accounts</Text><Text style={s.ownerToolHelp}>Owners and staff</Text></Pressable><Pressable style={s.ownerTool} onPress={()=>void exportOwnerSales()} disabled={exporting}><Ionicons name="download-outline" size={21} color={C.accent}/><Text style={s.ownerToolTitle}>{exporting?"Preparing…":"Export"}</Text><Text style={s.ownerToolHelp}>All shop sales</Text></Pressable></View></View>
         </View>
         {showForm ? (
           <View style={s.editCard}>
@@ -708,11 +716,21 @@ function AdminStaffManager({shop,onBack}:{shop:AdminShop;onBack:()=>void}){
   };
   const savePermissions=async()=>{if(!editing)return;try{await invoke({action:"permissions",userId:editing.user_id,permissions:editing.permissions});setEditing(null);await load();Alert.alert("Access updated",`${editing.display_name} will see only the selected functions.`);}catch(e){Alert.alert("Access not updated",e instanceof Error?e.message:"Please try again.");}};
   const resetPassword=async()=>{if(!passwordPerson)return;try{await invoke({action:"password",userId:passwordPerson.user_id,password:newPassword});setPasswordPerson(null);setNewPassword("");Alert.alert("Password changed");}catch(e){Alert.alert("Password not changed",e instanceof Error?e.message:"Please try again.");}};
-  const setStatus=(person:AdminStaff)=>Alert.alert(person.active?"Disable this staff account?":"Enable this staff account?",person.active?"They will not be able to sign in. Their history stays saved.":"They will be able to sign in again.",[{text:"Cancel",style:"cancel"},{text:person.active?"Disable":"Enable",style:person.active?"destructive":"default",onPress:async()=>{try{await invoke({action:"status",userId:person.user_id,active:!person.active});await load();}catch(e){Alert.alert("Account not changed",e instanceof Error?e.message:"Please try again.");}}}]);
+  const setStatus=(person:AdminStaff)=>confirmDestructive(person.active?"Disable this staff account?":"Enable this staff account?",person.active?"They will not be able to sign in. Their history stays saved.":"They will be able to sign in again.",person.active?"Disable":"Enable",()=>{void(async()=>{try{await invoke({action:"status",userId:person.user_id,active:!person.active});await load();}catch(e){Alert.alert("Account not changed",e instanceof Error?e.message:"Please try again.");}})();});
+  const deleteStaff=(person:AdminStaff)=>confirmDestructive("Delete this staff account?",`${person.display_name} will lose access. Old sales and activity will stay in MIK. This cannot be undone.`,"Delete account",()=>{void(async()=>{try{await invoke({action:"delete",userId:person.user_id});await load();}catch(e){Alert.alert("Account not deleted",e instanceof Error?e.message:"Please try again.");}})();});
   const permissionGrid=(current:StaffPermission[],setter:(value:StaffPermission[])=>void)=><View style={s.staffPermissionGrid}>{STAFF_PERMISSIONS.map(item=><Pressable key={item.id} style={[s.staffPermissionCard,current.includes(item.id)&&s.staffPermissionCardOn]} onPress={()=>toggle(item.id,setter,current)}><Ionicons name={item.icon} size={21} color={current.includes(item.id)?C.white:C.green}/><View style={s.flex}><Text style={[s.staffPermissionTitle,current.includes(item.id)&&{color:C.white}]}>{item.label}</Text><Text style={[s.staffPermissionHelp,current.includes(item.id)&&{color:"#E6EFEA"}]}>{item.help}</Text></View><Ionicons name={current.includes(item.id)?"checkmark-circle":"ellipse-outline"} size={21} color={current.includes(item.id)?C.white:C.muted}/></Pressable>)}</View>;
   return <SafeAreaView style={s.app}><StatusBar style="dark"/><ScrollView contentContainerStyle={s.adminPage}><Back title="Manage staff" onPress={onBack}/><Text style={s.pageTitle}>{shop.name} staff</Text><Text style={s.subtitle}>Each person sees only the functions you select.</Text>
     <View style={s.editCard}><Text style={s.editName}>Create staff account</Text><Label>Staff name</Label><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Example: Anna"/><Label>Short username</Label><TextInput style={s.input} value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="Example: anna"/><Text style={s.rowHelp}>Their login will be {shop.login_username??"shop"}.{username.trim().toLowerCase()||"anna"}</Text><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 6 characters"/><Label>Quick role</Label><View style={s.stockSortRow}>{Object.entries(STAFF_PRESETS).map(([label,value])=><Chip key={label} label={label} selected={permissions.length===value.length&&value.every(x=>permissions.includes(x))} onPress={()=>setPermissions([...value])}/>)}</View><Label>Functions this person can use</Label>{permissionGrid(permissions,setPermissions)}<BigButton label={creating?"Creating account…":"Create staff account"} icon="person-add-outline" onPress={()=>void create()} disabled={creating}/></View>
-    <Text style={s.section}>Staff accounts</Text>{loading?<ActivityIndicator color={C.green}/>:staff.length?staff.map(person=><View key={person.user_id} style={s.adminShop}><View style={s.adminShopTop}><View style={s.shopAvatar}><Ionicons name="person-outline" size={23} color={C.green}/></View><View style={s.flex}><Text style={s.rowTitle}>{person.display_name}</Text><Text style={s.rowHelp}>{person.login_username}</Text><Text style={s.adminLastLogin}>{person.last_login?`Last login: ${friendlyDateTime(person.last_login)}`:"No login yet"}</Text></View><View style={[s.statusPill,!person.active&&s.statusPillPaused]}><Text style={[s.statusText,!person.active&&s.statusTextPaused]}>{person.active?"ACTIVE":"DISABLED"}</Text></View></View><Text style={s.staffAccessSummary}>{person.permissions.map(id=>STAFF_PERMISSIONS.find(x=>x.id===id)?.label).filter(Boolean).join(" · ")}</Text><View style={[s.adminShopActions,width<620&&s.adminShopActionsMobile]}><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setEditing({...person,permissions:[...person.permissions]})}><Ionicons name="options-outline" size={20} color={C.green}/><Text style={s.adminShopActionText}>Access</Text></Pressable><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>{setPasswordPerson(person);setNewPassword("");}}><Ionicons name="key-outline" size={20} color={C.accent}/><Text style={s.adminShopActionText}>Password</Text></Pressable><Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setStatus(person)}><Ionicons name={person.active?"pause-circle-outline":"play-circle-outline"} size={20} color={person.active?C.red:C.green}/><Text style={s.adminShopActionText}>{person.active?"Disable":"Enable"}</Text></Pressable></View></View>):<Empty title="No staff accounts yet"/>}
+    <Text style={s.section}>Staff accounts</Text>{loading?<ActivityIndicator color={C.green}/>:staff.length?staff.map(person=><View key={person.user_id} style={s.adminShop}>
+      <View style={s.adminShopTop}><View style={s.shopAvatar}><Ionicons name="person-outline" size={23} color={C.green}/></View><View style={s.flex}><Text style={s.rowTitle}>{person.display_name}</Text><Text style={s.rowHelp}>{person.login_username}</Text><Text style={s.adminLastLogin}>{person.last_login?`Last login: ${friendlyDateTime(person.last_login)}`:"No login yet"}</Text></View><View style={[s.statusPill,!person.active&&s.statusPillPaused]}><Text style={[s.statusText,!person.active&&s.statusTextPaused]}>{person.active?"ACTIVE":"DISABLED"}</Text></View></View>
+      <Text style={s.staffAccessSummary}>{person.permissions.map(id=>STAFF_PERMISSIONS.find(x=>x.id===id)?.label).filter(Boolean).join(" · ")}</Text>
+      <View style={[s.adminShopActions,width<620&&s.adminShopActionsMobile]}>
+        <Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setEditing({...person,permissions:[...person.permissions]})}><Ionicons name="options-outline" size={20} color={C.green}/><Text style={s.adminShopActionText}>Access</Text></Pressable>
+        <Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>{setPasswordPerson(person);setNewPassword("");}}><Ionicons name="key-outline" size={20} color={C.accent}/><Text style={s.adminShopActionText}>Password</Text></Pressable>
+        <Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>setStatus(person)}><Ionicons name={person.active?"pause-circle-outline":"play-circle-outline"} size={20} color={person.active?C.red:C.green}/><Text style={s.adminShopActionText}>{person.active?"Disable":"Enable"}</Text></Pressable>
+        <Pressable style={[s.adminShopAction,width<620&&s.adminShopActionMobile]} onPress={()=>deleteStaff(person)}><Ionicons name="trash-outline" size={20} color={C.red}/><Text style={[s.adminShopActionText,{color:C.red}]}>Delete</Text></Pressable>
+      </View>
+    </View>):<Empty title="No staff accounts yet"/>}
     {editing?<View style={s.editCard}><Text style={s.editName}>Access for {editing.display_name}</Text>{permissionGrid(editing.permissions,value=>setEditing({...editing,permissions:value}))}<BigButton label="Save access" icon="checkmark-circle-outline" onPress={()=>void savePermissions()}/><Pressable style={s.cancel} onPress={()=>setEditing(null)}><Text style={s.help}>Cancel</Text></Pressable></View>:null}
     {passwordPerson?<View style={s.editCard}><Text style={s.editName}>New password for {passwordPerson.display_name}</Text><TextInput style={s.input} secureTextEntry value={newPassword} onChangeText={setNewPassword} placeholder="At least 6 characters"/><BigButton label="Change password" icon="key-outline" onPress={()=>void resetPassword()}/><Pressable style={s.cancel} onPress={()=>setPasswordPerson(null)}><Text style={s.help}>Cancel</Text></Pressable></View>:null}
   </ScrollView></SafeAreaView>;
@@ -910,15 +928,7 @@ function ShopApp({
   useEffect(() => {
     initialize();
   }, [initialize]);
-  useEffect(() => {
-    if (loading || needsSetup || !business) return;
-    const key = `mik-guide-v1-${session?.user.id ?? "platform-admin"}`;
-    AsyncStorage.getItem(key)
-      .then((seen) => {
-        if (seen !== "done") setGuideOpen(true);
-      })
-      .catch(() => setGuideOpen(true));
-  }, [business, loading, needsSetup, session?.user.id]);
+  // The guide remains available on demand; signing in no longer opens a modal.
   const closeGuide = async () => {
     setGuideOpen(false);
     await AsyncStorage.setItem(`mik-guide-v1-${session?.user.id ?? "platform-admin"}`, "done").catch(
@@ -1262,7 +1272,7 @@ function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
   const {width}=useWindowDimensions();
   const today = localDateKey();
   return <ScrollView contentContainerStyle={s.sellStartPage}>
-    <View style={s.sellTodayCard}><Ionicons name="calendar-outline" size={22} color={C.green}/><View style={s.flex}><Text style={s.sellTodayLabel}>RECORDING FOR TODAY</Text><Text style={s.sellTodayDate}>{friendlyLocalDate(today)}</Text></View></View>
+    {width<600?<View style={s.sellTodayCardMobile}><Ionicons name="calendar-outline" size={17} color={C.green}/><Text style={s.sellTodayMobileText}>Today · {friendlyLocalDate(today)}</Text></View>:<View style={s.sellTodayCard}><Ionicons name="calendar-outline" size={22} color={C.green}/><View style={s.flex}><Text style={s.sellTodayLabel}>RECORDING FOR TODAY</Text><Text style={s.sellTodayDate}>{friendlyLocalDate(today)}</Text></View></View>}
     <Text style={s.pageTitle}>How are you selling?</Text>
     <Text style={s.subtitle}>Choose one to start.</Text>
     <View style={[s.sellModeGrid,width>=760&&s.sellModeGridDesktop]}>
@@ -1294,7 +1304,7 @@ function StockStart({businessId,locationId,onOpen}:{businessId:string;locationId
   </ScrollView>;
 }
 
-function PastSaleDatePicker({ value, onChange, onBack, onContinue }: { value: string; onChange: (value: string) => void; onBack: () => void; onContinue: () => void }) {
+function PastSaleDatePicker({ value, onChange, onBack, onContinue,title="When was the sale?",subtitle="Choose the original sale date before adding products.",continueLabel="Continue to products" }: { value: string; onChange: (value: string) => void; onBack: () => void; onContinue: () => void; title?:string; subtitle?:string; continueLabel?:string }) {
   const selected = new Date(`${value}T12:00:00`);
   const [month, setMonth] = useState(() => new Date(selected.getFullYear(), selected.getMonth(), 1));
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
@@ -1316,9 +1326,9 @@ function PastSaleDatePicker({ value, onChange, onBack, onContinue }: { value: st
   };
   return (
     <ScrollView contentContainerStyle={s.pastDatePage}>
-      <Back title="Add missed sale" onPress={onBack} />
-      <Text style={s.pageTitle}>When was the sale?</Text>
-      <Text style={s.subtitle}>Choose the original sale date before adding products.</Text>
+      <Back title={title==="When was the sale?"?"Add missed sale":"Owner dashboard"} onPress={onBack} />
+      <Text style={s.pageTitle}>{title}</Text>
+      <Text style={s.subtitle}>{subtitle}</Text>
       <View style={s.pastQuickDates}>
         <Pressable style={s.pastQuickDate} onPress={() => chooseQuickDate(1)}><Text style={s.pastQuickDateText}>Yesterday</Text></Pressable>
         <Pressable style={s.pastQuickDate} onPress={() => chooseQuickDate(2)}><Text style={s.pastQuickDateText}>2 days ago</Text></Pressable>
@@ -1342,7 +1352,7 @@ function PastSaleDatePicker({ value, onChange, onBack, onContinue }: { value: st
         </View>
       </View>
       <View style={s.pastDateSelected}><Ionicons name="calendar" size={22} color={SECTION.records.color}/><View style={s.flex}><Text style={s.pastDateSelectedLabel}>SALE DATE</Text><Text style={s.pastDateSelectedValue}>{friendlyLocalDate(value)}</Text></View></View>
-      <BigButton label="Continue to products" icon="arrow-forward" color={SECTION.records.color} onPress={onContinue} />
+      <BigButton label={continueLabel} icon="arrow-forward" color={SECTION.records.color} onPress={onContinue} />
     </ScrollView>
   );
 }
@@ -1829,9 +1839,9 @@ function SaleScreen({
           <>
             <View style={{height:1,width:"100%"}} onLayout={(event)=>setSaleContentWidth(event.nativeEvent.layout.width)}/>
             {!startPastSale ? (
-              <View style={s.saleDateBar}>
-                <Ionicons name="calendar-outline" size={20} color={C.green} />
-                <View style={s.flex}><Text style={s.saleDateBarLabel}>{eventMode ? "EVENT SALE · RECORDING FOR TODAY" : "SHOP SALE · RECORDING FOR TODAY"}</Text><Text style={s.saleDateBarValue}>{friendlyLocalDate()}</Text></View>
+              <View style={[s.saleDateBar,width<600&&s.saleDateBarMobile]}>
+                <Ionicons name="calendar-outline" size={width<600?17:20} color={C.green} />
+                {width<600?<Text style={s.sellTodayMobileText}>{eventMode?"Event Sale":"Shop Sale"} · Today, {friendlyLocalDate()}</Text>:<View style={s.flex}><Text style={s.saleDateBarLabel}>{eventMode ? "EVENT SALE · RECORDING FOR TODAY" : "SHOP SALE · RECORDING FOR TODAY"}</Text><Text style={s.saleDateBarValue}>{friendlyLocalDate()}</Text></View>}
               </View>
             ) : null}
             {startPastSale ? (
@@ -2320,6 +2330,8 @@ function SuggestedImages({businessId,canManage,onBack}:{businessId:string;canMan
 
 function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibleModules }: { businessId:string; locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null; visibleModules:ShopModule[] }) {
   const { width } = useWindowDimensions();
+  const [clockNow,setClockNow]=useState(new Date());
+  useEffect(()=>{const timer=setInterval(()=>setClockNow(new Date()),60000);return()=>clearInterval(timer);},[]);
   const [orderSummary, setOrderSummary] = useState({ active: 0, urgent: 0, pendingMoney:0, toPrint:0, printing:0 });
   const [overviewPeriod,setOverviewPeriod]=useState<"today"|"month">("today");
   const [overview,setOverview]=useState({sales:0,payments:0,expenses:0});
@@ -2417,24 +2429,25 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
     screen==="calendar"?"calendar":"settings";
   const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
   const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>{const module=moduleFor(action.screen);return (!module||visibleModules.includes(module))&&(action.screen==="suggested_images"||!permissions||permissions.includes(permissionFor(action.screen)));})})).filter(group=>group.actions.length);
-  const overviewTone=overviewPeriod==="today"?SECTION.sales:SECTION.orders;
+  const overviewTone=overviewPeriod==="today"?SECTION.sales:{color:"#283D70",soft:"#E8EDF7",border:"#BCCAE4"};
   const overviewCardStyle=[s.overviewMetric,{borderColor:overviewTone.border,backgroundColor:overviewTone.soft}];
   const overviewLabelStyle=[s.overviewMetricLabel,{color:overviewTone.color}];
   const overviewHelpStyle=[s.overviewMetricHelp,{color:overviewTone.color}];
+  const periodName=clockNow.toLocaleDateString("en-US",{month:"short",year:"numeric"});
   return (
     <ScrollView contentContainerStyle={s.quickScroll}>
       <View style={s.homeIntro}>
-        <Text style={s.homeEyebrow}>{friendlyLocalDate()}</Text>
+        <Text style={s.homeEyebrow}>Today · {clockNow.toLocaleDateString("en-US",{weekday:"short",day:"numeric",month:"short",year:"numeric"})} · {clockNow.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}</Text>
         <Text style={[s.pageTitle,width>=900&&s.homeDesktopTitle]}>Shop overview</Text>
         <Text style={s.subtitle}>Everything you need, organised by task.</Text>
       </View>
       <View style={s.homePeriodSwitch}><Pressable style={[s.homePeriodButton,s.homePeriodToday,overviewPeriod==="today"&&s.homePeriodTodayOn]} onPress={()=>setOverviewPeriod("today")}><Text style={[s.homePeriodTodayText,overviewPeriod==="today"&&s.homePeriodTextOn]}>Today</Text></Pressable><Pressable style={[s.homePeriodButton,s.homePeriodMonth,overviewPeriod==="month"&&s.homePeriodMonthOn]} onPress={()=>setOverviewPeriod("month")}><Text style={[s.homePeriodMonthText,overviewPeriod==="month"&&s.homePeriodTextOn]}>This month</Text></Pressable></View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
-        {visibleModules.includes("sales")&&(!permissions||permissions.includes("sales"))?<Pressable accessibilityRole="button" accessibilityLabel={`View shop sales for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("dashboard")} style={overviewCardStyle}><Text numberOfLines={1} style={overviewLabelStyle}>Shop sales</Text><Text style={s.overviewMetricValue}>{peso(overview.sales)}</Text><Text style={overviewHelpStyle}>View sales →</Text></Pressable>:null}
-        {visibleModules.includes("orders")&&(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel={`View order money for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("orders")} style={overviewCardStyle}><Text numberOfLines={1} style={overviewLabelStyle}>Order money</Text><Text style={s.overviewMetricValue}>{peso(overview.payments)}</Text><Text style={overviewHelpStyle}>Paid by order customers</Text></Pressable>:null}
-        {visibleModules.includes("reports")&&(!permissions||permissions.includes("reports"))?<Pressable accessibilityRole="button" accessibilityLabel={`View expenses for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("expenses")} style={overviewCardStyle}><Text numberOfLines={1} style={overviewLabelStyle}>Expenses</Text><Text style={s.overviewMetricValue}>{peso(overview.expenses)}</Text><Text style={overviewHelpStyle}>See breakdown →</Text></Pressable>:null}
-        {visibleModules.includes("reports")&&(!permissions||permissions.includes("reports"))?<View style={overviewCardStyle}><Text numberOfLines={1} style={overviewLabelStyle}>Money left</Text><Text style={s.overviewMetricValue}>{peso(overview.sales+overview.payments-overview.expenses)}</Text><Text style={overviewHelpStyle}>Money received minus expenses</Text></View>:null}
-        {visibleModules.includes("orders")&&(!permissions||permissions.includes("orders"))?<><Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} dates to check` : "View orders →"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View money still to collect from orders" onPress={()=>onOpen("orders")} style={[s.overviewMetric,s.overviewAlertMetric]}><Text style={[s.overviewMetricLabel,{color:C.red}]}>Order balance to collect</Text><Text style={s.overviewMetricValue}>{peso(orderSummary.pendingMoney)}</Text><Text style={[s.overviewMetricHelp,{color:C.red}]}>Customers still need to pay →</Text></Pressable></>:null}
+        {visibleModules.includes("sales")&&(!permissions||permissions.includes("sales"))?<Pressable accessibilityRole="button" accessibilityLabel={`View shop sales for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("dashboard")} style={overviewCardStyle}><Text numberOfLines={2} style={overviewLabelStyle}>{overviewPeriod==="today"?"Shop sales":`Shop sales · ${periodName}`}</Text><Text style={s.overviewMetricValue}>{peso(overview.sales)}</Text><Text style={overviewHelpStyle}>View sales →</Text></Pressable>:null}
+        {visibleModules.includes("orders")&&(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel={`View order payments received for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("orders")} style={overviewCardStyle}><Text numberOfLines={2} style={overviewLabelStyle}>{overviewPeriod==="today"?"Order money received":`Order money received · ${periodName}`}</Text><Text style={s.overviewMetricValue}>{peso(overview.payments)}</Text><Text style={overviewHelpStyle}>Paid by order customers</Text></Pressable>:null}
+        {visibleModules.includes("reports")&&(!permissions||permissions.includes("reports"))?<Pressable accessibilityRole="button" accessibilityLabel={`View expenses for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("expenses")} style={overviewCardStyle}><Text numberOfLines={2} style={overviewLabelStyle}>{overviewPeriod==="today"?"Expenses":`Expenses · ${periodName}`}</Text><Text style={s.overviewMetricValue}>{peso(overview.expenses)}</Text><Text style={overviewHelpStyle}>See breakdown →</Text></Pressable>:null}
+        {visibleModules.includes("reports")&&(!permissions||permissions.includes("reports"))?<View style={overviewCardStyle}><Text numberOfLines={2} style={overviewLabelStyle}>{overviewPeriod==="today"?"Money left":`Money left · ${periodName}`}</Text><Text style={s.overviewMetricValue}>{peso(overview.sales+overview.payments-overview.expenses)}</Text><Text style={overviewHelpStyle}>Money received minus expenses</Text></View>:null}
+        {visibleModules.includes("orders")&&(!permissions||permissions.includes("orders"))?<><Pressable accessibilityRole="button" accessibilityLabel="View open customer orders" onPress={()=>onOpen("orders")} style={s.overviewMetric}><Text style={s.overviewMetricLabel}>Open orders</Text><Text style={s.overviewMetricValue}>{orderSummary.active}</Text><Text style={s.overviewMetricHelp}>{orderSummary.urgent?`${orderSummary.urgent} orders need a date check` : "View orders →"}</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="View money still to collect from orders" onPress={()=>onOpen("orders")} style={[s.overviewMetric,s.overviewAlertMetric]}><Text style={[s.overviewMetricLabel,{color:C.red}]}>Order balance to collect</Text><Text style={s.overviewMetricValue}>{peso(orderSummary.pendingMoney)}</Text><Text style={[s.overviewMetricHelp,{color:C.red}]}>Customers still need to pay →</Text></Pressable></>:null}
       </View>
       {visibleModules.includes("production")&&orderSummary.toPrint>0?<Pressable style={[s.homeReminder,{borderColor:SECTION.production.border,backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("print_queue")}><View style={[s.homeReminderIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="layers-outline" size={23} color={C.white}/></View><View style={s.flex}><Text style={[s.homeReminderLabel,{color:SECTION.production.color}]}>PRINTING ACTION NEEDED</Text><Text style={s.homeReminderTitle}>{orderSummary.toPrint} paid job{orderSummary.toPrint===1?" is":"s are"} waiting to print</Text><Text style={s.homeReminderMeta}>Open Print Queue and start the next job.</Text></View><View style={s.reminderCount}><Text style={s.reminderCountText}>{orderSummary.toPrint}</Text></View></Pressable>:null}
       {visibleModules.includes("reports") && eventReminder ? (
@@ -4287,7 +4300,7 @@ function OwnerOrderModal({order,onClose}:{order:OwnerOrderDetail|null;onClose:()
       <Text style={s.ownerOrderCustomer}>{order?.customer_name||"No customer name"} · {order?.source}</Text>
       <View style={s.ownerOrderFacts}><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>QUANTITY</Text><Text style={s.ownerOrderValue}>{order?.quantity}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>TOTAL</Text><Text style={s.ownerOrderValue}>{peso(Number(order?.total_price||0))}</Text></View><View style={s.ownerOrderFact}><Text style={s.ownerOrderLabel}>BALANCE</Text><Text style={s.ownerOrderValue}>{peso(Math.max(0,Number(order?.total_price||0)-Number(order?.amount_paid||0)))}</Text></View></View>
       <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Status</Text><Text style={s.ownerOrderLineValue}>{order?.status.replaceAll("_"," ")}</Text></View>
-      <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Ready by</Text><Text style={s.ownerOrderLineValue}>{order?.target_date?friendlyLocalDate(order.target_date):"Not set"}</Text></View>
+      <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Needed by</Text><Text style={s.ownerOrderLineValue}>{order?.target_date?friendlyLocalDate(order.target_date):"Not set"}</Text></View>
       <View style={s.ownerOrderLine}><Text style={s.ownerOrderLineLabel}>Payment</Text><Text style={s.ownerOrderLineValue}>{order?.amount_paid?`${peso(Number(order.amount_paid))} · ${order.payment_channel||"Method not set"}`:"No payment recorded"}</Text></View>
       {order?.notes?<View style={s.ownerOrderNotes}><Text style={s.ownerOrderLabel}>REMARKS</Text><Text style={s.ownerOrderNotesText}>{order.notes}</Text></View>:null}
     </ScrollView></View>
@@ -5177,6 +5190,12 @@ const s = StyleSheet.create({
   ownerLiveDot:{width:7,height:7,borderRadius:4,backgroundColor:SECTION.stock.color},
   ownerLiveText:{color:SECTION.stock.color,fontSize:12,fontWeight:"700"},
   ownerZoneTitle:{marginTop:20,marginBottom:10,color:C.ink,fontSize:15,lineHeight:20,fontWeight:"700"},
+  ownerPeriodRow:{marginTop:12,flexDirection:"row",flexWrap:"wrap",gap:8},
+  ownerPeriodButton:{minHeight:42,paddingHorizontal:15,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},
+  ownerPeriodButtonOn:{backgroundColor:C.dark,borderColor:C.dark},
+  ownerPeriodText:{color:C.ink,fontSize:14,fontWeight:"700"},
+  ownerPeriodTextOn:{color:C.white},
+  ownerDateButton:{minHeight:42,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:7,borderWidth:1,borderColor:C.border,borderRadius:10,backgroundColor:C.white},
   ownerMoneyGrid:{flexDirection:"row",flexWrap:"wrap",gap:10},
   ownerMoneyCard:{position:"relative",overflow:"hidden",minWidth:145,flexGrow:1,flexBasis:145,minHeight:104,padding:14,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
   ownerMoneyPrimary:{minWidth:250,flexBasis:250,backgroundColor:C.dark,borderColor:C.dark},
@@ -5499,9 +5518,12 @@ const s = StyleSheet.create({
   saleWelcomeLater:{minHeight:44,marginTop:7,alignItems:"center",justifyContent:"center"},
   saleWelcomeLaterText:{color:C.muted,fontSize:14,fontWeight:"600"},
   sellTodayCard:{marginBottom:18,padding:14,flexDirection:"row",alignItems:"center",gap:11,borderWidth:1,borderColor:C.border,borderRadius:14,backgroundColor:C.white},
+  sellTodayCardMobile:{minHeight:34,marginBottom:10,paddingHorizontal:10,flexDirection:"row",alignItems:"center",gap:7,borderWidth:1,borderColor:C.border,borderRadius:9,backgroundColor:C.white},
+  sellTodayMobileText:{color:C.ink,fontSize:13,fontWeight:"700"},
   sellTodayLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.6},
   sellTodayDate:{marginTop:3,color:C.ink,fontSize:14,fontWeight:"700"},
   saleDateBar:{marginBottom:14,paddingVertical:11,paddingHorizontal:13,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},
+  saleDateBarMobile:{marginBottom:8,paddingVertical:6,paddingHorizontal:9,gap:7,borderRadius:9},
   saleDateBarLabel:{color:C.muted,fontSize:12,fontWeight:"700",letterSpacing:.45},
   saleDateBarValue:{marginTop:2,color:C.ink,fontSize:14,fontWeight:"700"},
   sellModeGrid:{width:"100%"},
