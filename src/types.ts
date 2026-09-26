@@ -23,6 +23,7 @@ export type Screen =
   | "expenses"
   | "report_issue"
   | "suggested_images"
+  | "sourcing"
   | "staff"
   | "shop"
   | "more";
