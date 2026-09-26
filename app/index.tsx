@@ -374,15 +374,16 @@ type AdminShop = {
   last_login?: string | null;
   visible_modules?: string[];
 };
-type ShopModule="sales"|"orders"|"stock"|"production"|"reports";
+type ShopModule="sales"|"orders"|"stock"|"production"|"reports"|"sourcing";
 const SHOP_MODULES:Array<{id:ShopModule;label:string;help:string;icon:Icon;color:string}>=[
   {id:"sales",label:"Sales",help:"Sell, daily sales and missed sales",icon:"cart-outline",color:SECTION.sales.color},
   {id:"orders",label:"Orders",help:"Customer orders and enquiries",icon:"clipboard-outline",color:SECTION.orders.color},
   {id:"stock",label:"Stock & products",help:"Stock counts, products and price list",icon:"cube-outline",color:SECTION.stock.color},
   {id:"production",label:"Printing",help:"Print Queue, printers, filament and calculator",icon:"layers-outline",color:SECTION.production.color},
   {id:"reports",label:"Reports & planning",help:"Reports, expenses and events calendar",icon:"bar-chart-outline",color:SECTION.records.color},
+  {id:"sourcing",label:"Product sourcing",help:"Supplier links, resale costs, options and images",icon:"bag-handle-outline",color:SECTION.support.color},
 ];
-const allShopModules=()=>SHOP_MODULES.map(item=>item.id);
+const allShopModules=()=>SHOP_MODULES.filter(item=>item.id!=="sourcing").map(item=>item.id);
 function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const {width}=useWindowDimensions();
   const [shops, setShops] = useState<AdminShop[]>([]);
@@ -946,7 +947,7 @@ function ShopApp({
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
   const visibleModules=(business?.visible_modules??allShopModules()) as ShopModule[];
-  const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":(["stock_start","inventory","alphabet_inventory","products","price_list","sourcing"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
+  const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":value==="sourcing"?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
   const availableNav = ownerNav.filter(item=>{const module=screenModule(item.id);return !module||visibleModules.includes(module);});
   const nav = role === "owner" ? availableNav : availableNav.filter((x) =>
     x.id === "home" ||
@@ -2402,7 +2403,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
       title: "Stock & products", help: "Check stock, products and prices.", ...SECTION.stock, actions: [
         { title: "Update stock", help: "Add stock or change the number", icon: "cube", screen: "stock_start" },
         { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products" },
-        { title: "Source products", help: "Save supplier links, choices, costs and images", icon: "bag-handle", screen: "sourcing" },
+        ...(visibleModules.includes("sourcing") ? [{ title: "Source products", help: "Save supplier links, choices, costs and images", icon: "bag-handle" as Icon, screen: "sourcing" as Screen }] : []),
       ],
     },
     {
@@ -2431,7 +2432,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
     (["reports","expenses"] as Screen[]).includes(screen)?"reports":
     (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
     screen==="calendar"?"calendar":"settings";
-  const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":(["stock_start","inventory","alphabet_inventory","products","price_list","sourcing"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
+  const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":screen==="sourcing"?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
   const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>{const module=moduleFor(action.screen);return (!module||visibleModules.includes(module))&&(action.screen==="suggested_images"||!permissions||permissions.includes(permissionFor(action.screen)));})})).filter(group=>group.actions.length);
   const overviewTone=overviewPeriod==="today"?SECTION.sales:{color:"#283D70",soft:"#E8EDF7",border:"#BCCAE4"};
   const overviewCardStyle=[s.overviewMetric,{borderColor:overviewTone.border,backgroundColor:overviewTone.soft}];
