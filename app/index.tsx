@@ -35,6 +35,7 @@ import { WorkspaceAction } from "@/src/components/WorkspaceAction";
 import { PrintQueueScreen } from "@/src/components/PrintQueueScreen";
 import { PrintPriceCalculator } from "@/src/components/PrintPriceCalculator";
 import { SourcingScreen } from "@/src/components/SourcingScreen";
+import { ResellerPreordersScreen } from "@/src/components/ResellerPreordersScreen";
 import { Text, TextInput } from "@/src/components/AppTypography";
 import type {
   Business,
@@ -947,7 +948,7 @@ function ShopApp({
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
   const visibleModules=(business?.visible_modules??allShopModules()) as ShopModule[];
-  const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":value==="sourcing"?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
+  const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":(["sourcing","preorders"] as Screen[]).includes(value)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
   const availableNav = ownerNav.filter(item=>{const module=screenModule(item.id);return !module||visibleModules.includes(module);});
   const nav = role === "owner" ? availableNav : availableNav.filter((x) =>
     x.id === "home" ||
@@ -1074,6 +1075,8 @@ function ShopApp({
     body = <PrintPriceCalculator onBack={() => setScreen("home")} />;
   else if (screen === "sourcing")
     body = <SourcingScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
+  else if (screen === "preorders")
+    body = <ResellerPreordersScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
   else if (screen === "correct")
     body = <ReportsScreen locationId={locationId} correctionMode onBack={() => setScreen("sell_start")} />;
   else if (screen === "shop")
@@ -1130,7 +1133,7 @@ function ShopApp({
       />
     );
   const selected =
-    (["inventory","alphabet_inventory","products","price_list","sourcing"] as Screen[]).includes(screen)
+    (["inventory","alphabet_inventory","products","price_list","sourcing","preorders"] as Screen[]).includes(screen)
       ? "stock_start"
       : (["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)
         ? "sell_start"
@@ -2404,6 +2407,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
         { title: "Update stock", help: "Add stock or change the number", icon: "cube", screen: "stock_start" },
         { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products" },
         ...(visibleModules.includes("sourcing") ? [{ title: "Source products", help: "Save supplier links, choices, costs and images", icon: "bag-handle" as Icon, screen: "sourcing" as Screen }] : []),
+        ...(visibleModules.includes("sourcing") ? [{ title: "Customer pre-orders", help: "Track deposits, arrivals, payments and delivery", icon: "receipt" as Icon, screen: "preorders" as Screen }] : []),
       ],
     },
     {
@@ -2428,11 +2432,11 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
     (["dashboard","correct"] as Screen[]).includes(screen)?"sales":
     screen==="orders"?"orders":
     (["stock_start","inventory","alphabet_inventory"] as Screen[]).includes(screen)?"stock":
-    (["products","price_list","sourcing"] as Screen[]).includes(screen)?"products":
+    (["products","price_list","sourcing","preorders"] as Screen[]).includes(screen)?"products":
     (["reports","expenses"] as Screen[]).includes(screen)?"reports":
     (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
     screen==="calendar"?"calendar":"settings";
-  const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":screen==="sourcing"?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
+  const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":(["sourcing","preorders"] as Screen[]).includes(screen)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
   const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>{const module=moduleFor(action.screen);return (!module||visibleModules.includes(module))&&(action.screen==="suggested_images"||!permissions||permissions.includes(permissionFor(action.screen)));})})).filter(group=>group.actions.length);
   const overviewTone=overviewPeriod==="today"?SECTION.sales:{color:"#283D70",soft:"#E8EDF7",border:"#BCCAE4"};
   const overviewCardStyle=[s.overviewMetric,{borderColor:overviewTone.border,backgroundColor:overviewTone.soft}];

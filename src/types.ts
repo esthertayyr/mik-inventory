@@ -24,6 +24,7 @@ export type Screen =
   | "report_issue"
   | "suggested_images"
   | "sourcing"
+  | "preorders"
   | "staff"
   | "shop"
   | "more";
