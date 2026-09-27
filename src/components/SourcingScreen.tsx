@@ -17,11 +17,13 @@ import { Text, TextInput } from "@/src/components/AppTypography";
 type SourceItem = {
   id: string;
   name: string;
-  product_url: string;
+  product_url: string | null;
   platform: string;
   final_cost_sgd: number;
   order_quantity: number;
   selling_price_php: number | null;
+  category_name: string;
+  idea_stage: string;
   created_at: string;
   source_product_images: { image_url: string }[] | null;
 };
@@ -39,6 +41,24 @@ type LocalImage = {
   type: "product" | "screenshot";
 };
 const optionTypes = ["Colour", "Size", "Type", "Quantity", "Other"];
+const sourcingCategories = [
+  "3D products",
+  "Filament",
+  "Clicker parts",
+  "Squishies",
+  "Keychains",
+  "Packaging",
+  "Other",
+];
+const stages = [
+  { id: "idea", label: "Idea" },
+  { id: "researching", label: "Researching" },
+  { id: "shortlisted", label: "Shortlisted" },
+  { id: "ready_to_order", label: "Ready to order" },
+  { id: "ordered", label: "Ordered" },
+] as const;
+const stageLabel = (id: string) =>
+  stages.find((stage) => stage.id === id)?.label ?? "Idea";
 const n = (value: string) => Math.max(0, Number(value) || 0);
 const money = (value: number, currency: "SGD" | "PHP") =>
   new Intl.NumberFormat(currency === "SGD" ? "en-SG" : "en-PH", {
@@ -60,7 +80,11 @@ export function SourcingScreen({
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [stageFilter, setStageFilter] = useState("all");
   const [name, setName] = useState("");
+  const [category, setCategory] = useState("Other");
+  const [customCategory, setCustomCategory] = useState("");
+  const [ideaStage, setIdeaStage] = useState("idea");
   const [link, setLink] = useState("");
   const [platform, setPlatform] = useState("Pinduoduo");
   const [supplier, setSupplier] = useState("");
@@ -79,7 +103,7 @@ export function SourcingScreen({
     const { data, error } = await supabase
       .from("source_products")
       .select(
-        "id,name,product_url,platform,final_cost_sgd,order_quantity,selling_price_php,created_at,source_product_images(image_url)",
+        "id,name,product_url,platform,final_cost_sgd,order_quantity,selling_price_php,category_name,idea_stage,created_at,source_product_images(image_url)",
       )
       .eq("business_id", businessId)
       .order("created_at", { ascending: false });
@@ -100,6 +124,9 @@ export function SourcingScreen({
   const expectedProfit = chosenPrice - unitCostPhp;
   const reset = () => {
     setName("");
+    setCategory("Other");
+    setCustomCategory("");
+    setIdeaStage("idea");
     setLink("");
     setPlatform("Pinduoduo");
     setSupplier("");
@@ -156,22 +183,12 @@ export function SourcingScreen({
   const save = async () => {
     if (!name.trim())
       return Alert.alert("Product name needed", "Enter the product name.");
-    if (!link.trim())
-      return Alert.alert(
-        "Product link needed",
-        "Paste the supplier product link.",
-      );
-    if (n(unitSgd) <= 0)
-      return Alert.alert(
-        "Final cost needed",
-        "Enter the final amount you will pay in SGD.",
-      );
-    if (n(rate) <= 0)
+    if (n(unitSgd) > 0 && n(rate) <= 0)
       return Alert.alert(
         "Conversion rate needed",
         "Enter how many Philippine pesos equal S$1.",
       );
-    if (n(sellingPhp) > 0 && n(sellingPhp) < suggestedPhp)
+    if (n(unitSgd) > 0 && n(sellingPhp) > 0 && n(sellingPhp) < suggestedPhp)
       return Alert.alert(
         "Deposit will not cover the cost",
         `At ${money(n(sellingPhp), "PHP")}, the 50% deposit is only ${money(n(sellingPhp) * 0.5, "PHP")}. Set at least ${money(suggestedPhp, "PHP")} or change the payment plan.`,
@@ -182,14 +199,19 @@ export function SourcingScreen({
         "Enter a name for every colour, size or type, or remove the empty row.",
       );
     setSaving(true);
-    const finalPrice = n(sellingPhp) || suggestedPhp;
+    const finalPrice = n(unitSgd) > 0 ? n(sellingPhp) || suggestedPhp : null;
     const { data, error } = await supabase
       .from("source_products")
       .insert({
         business_id: businessId,
         location_id: locationId,
         name: name.trim(),
-        product_url: link.trim(),
+        product_url: link.trim() || null,
+        category_name:
+          category === "Other" && customCategory.trim()
+            ? customCategory.trim()
+            : category,
+        idea_stage: ideaStage,
         platform,
         supplier_name: supplier.trim() || null,
         original_description: description.trim() || null,
@@ -276,10 +298,14 @@ export function SourcingScreen({
     setEditing(false);
     await load();
     Alert.alert(
-      "Product saved",
-      "The supplier link, options, costs and images are now kept together.",
+      ideaStage === "idea" ? "Idea saved" : "Sourcing item saved",
+      "The idea, category, supplier details, costs and images are now kept together.",
     );
   };
+  const shownItems =
+    stageFilter === "all"
+      ? items
+      : items.filter((item) => item.idea_stage === stageFilter);
   if (loading)
     return (
       <View style={styles.loading}>
@@ -290,31 +316,53 @@ export function SourcingScreen({
   if (!editing)
     return (
       <ScrollView contentContainerStyle={styles.page}>
-        <Header title="Sourced products" onBack={onBack} />
+        <Header title="Product ideas" onBack={onBack} />
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
             <Ionicons name="bag-handle-outline" size={25} color="#315FBE" />
           </View>
           <View style={styles.flex}>
-            <Text style={styles.title}>Products to resell</Text>
+            <Text style={styles.title}>Ideas and products to resell</Text>
             <Text style={styles.help}>
-              Keep the supplier link, choices, cost and images in one place.
+              Save an idea first. Add links, choices, costs and images when you
+              find them.
             </Text>
           </View>
         </View>
         <Pressable style={styles.primary} onPress={() => setEditing(true)}>
           <Ionicons name="add" size={22} color="white" />
-          <Text style={styles.primaryText}>Add sourced product</Text>
+          <Text style={styles.primaryText}>Add product idea</Text>
         </Pressable>
-        {items.length === 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          <Chip
+            label={`All ${items.length}`}
+            active={stageFilter === "all"}
+            onPress={() => setStageFilter("all")}
+          />
+          {stages.map((stage) => (
+            <Chip
+              key={stage.id}
+              label={`${stage.label} ${items.filter((item) => item.idea_stage === stage.id).length}`}
+              active={stageFilter === stage.id}
+              onPress={() => setStageFilter(stage.id)}
+            />
+          ))}
+        </ScrollView>
+        {shownItems.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.cardTitle}>No sourced products yet</Text>
+            <Text style={styles.cardTitle}>
+              {items.length ? "Nothing in this stage" : "No product ideas yet"}
+            </Text>
             <Text style={styles.help}>
               Add the first item you may buy and resell.
             </Text>
           </View>
         ) : (
-          items.map((item) => (
+          shownItems.map((item) => (
             <View key={item.id} style={styles.item}>
               {item.source_product_images?.[0]?.image_url ? (
                 <Image
@@ -328,9 +376,17 @@ export function SourcingScreen({
               )}
               <View style={styles.flex}>
                 <Text style={styles.cardTitle}>{item.name}</Text>
+                <View style={styles.cardMeta}>
+                  <Text style={styles.categoryTag}>{item.category_name}</Text>
+                  <Text style={styles.stageTag}>
+                    {stageLabel(item.idea_stage)}
+                  </Text>
+                </View>
                 <Text style={styles.help}>
-                  {item.platform} · {item.order_quantity} item
-                  {item.order_quantity === 1 ? "" : "s"}
+                  {item.product_url ? `${item.platform} · ` : ""}
+                  {item.final_cost_sgd > 0
+                    ? `${item.order_quantity} item${item.order_quantity === 1 ? "" : "s"}`
+                    : "Details can be added later"}
                 </Text>
                 <Text style={styles.price}>
                   {item.selling_price_php
@@ -349,7 +405,7 @@ export function SourcingScreen({
       keyboardShouldPersistTaps="handled"
     >
       <Header
-        title="Add sourced product"
+        title="Add product idea"
         onBack={() => {
           reset();
           setEditing(false);
@@ -362,11 +418,41 @@ export function SourcingScreen({
           setValue={setName}
           placeholder="Example: Mini animal keychain"
         />
+        <Text style={styles.label}>What stage is it at?</Text>
+        <View style={styles.chips}>
+          {stages.map((stage) => (
+            <Chip
+              key={stage.id}
+              label={stage.label}
+              active={ideaStage === stage.id}
+              onPress={() => setIdeaStage(stage.id)}
+            />
+          ))}
+        </View>
+        <Text style={styles.label}>Category</Text>
+        <View style={styles.chips}>
+          {sourcingCategories.map((value) => (
+            <Chip
+              key={value}
+              label={value}
+              active={category === value}
+              onPress={() => setCategory(value)}
+            />
+          ))}
+        </View>
+        {category === "Other" ? (
+          <Field
+            label="Category name · Optional"
+            value={customCategory}
+            setValue={setCustomCategory}
+            placeholder="Create your own category"
+          />
+        ) : null}
         <Field
-          label="Product link · Required"
+          label="Product link · Optional"
           value={link}
           setValue={setLink}
-          placeholder="Paste Pinduoduo, Taobao or supplier link"
+          placeholder="Paste it now or add it later"
         />
         <Text style={styles.label}>Where is it from?</Text>
         <View style={styles.chips}>
@@ -461,8 +547,8 @@ export function SourcingScreen({
       </Section>
       <Section number="3" title="Cost and selling price">
         <Text style={styles.help}>
-          Enter the final SGD amount shown by the supplier. It should already
-          include the item, tax and supplier shipping.
+          Optional while this is only an idea. Enter the final SGD amount once
+          the supplier shows the full item, tax and shipping total.
         </Text>
         <View style={styles.two}>
           <View style={styles.flex}>
@@ -589,7 +675,11 @@ export function SourcingScreen({
           <Ionicons name="checkmark" size={22} color="white" />
         )}
         <Text style={styles.primaryText}>
-          {saving ? "Saving…" : "Save sourced product"}
+          {saving
+            ? "Saving…"
+            : ideaStage === "idea"
+              ? "Save idea"
+              : "Save sourcing item"}
         </Text>
       </Pressable>
     </ScrollView>
@@ -825,6 +915,32 @@ const styles = StyleSheet.create({
   },
   textarea: { minHeight: 92, paddingTop: 12 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  filterRow: { gap: 8, paddingVertical: 2, paddingRight: 18 },
+  cardMeta: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 5,
+    marginBottom: 3,
+  },
+  categoryTag: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#315FBE",
+    backgroundColor: "#EEF3FF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  stageTag: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#594C8D",
+    backgroundColor: "#F3F1F8",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
   chip: {
     paddingHorizontal: 13,
     paddingVertical: 9,
