@@ -26,6 +26,7 @@ export type Screen =
   | "sourcing"
   | "reseller_packages"
   | "preorders"
+  | "reseller_reports"
   | "staff"
   | "shop"
   | "more";
