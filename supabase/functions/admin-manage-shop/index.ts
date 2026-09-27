@@ -30,7 +30,7 @@ Deno.serve(async (request: Request) => {
   const shopId = String(input.shopId ?? '');
   const shopName = String(input.shopName ?? '').trim();
   const username = String(input.username ?? '').trim().toLowerCase();
-  const allowedModules = ['sales', 'orders', 'stock', 'production', 'reports'];
+  const allowedModules = ['sales', 'orders', 'stock', 'production', 'reports', 'sourcing'];
   if (!shopId) return reply({ error: 'Shop profile not found' }, 400);
 
   const { data: source, error: sourceError } = await admin.from('businesses').select('*').eq('id', shopId).maybeSingle();
