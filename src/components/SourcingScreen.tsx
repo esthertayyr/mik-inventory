@@ -50,15 +50,6 @@ const sourcingCategories = [
   "Packaging",
   "Other",
 ];
-const stages = [
-  { id: "idea", label: "Idea" },
-  { id: "researching", label: "Researching" },
-  { id: "shortlisted", label: "Shortlisted" },
-  { id: "ready_to_order", label: "Ready to order" },
-  { id: "ordered", label: "Ordered" },
-] as const;
-const stageLabel = (id: string) =>
-  stages.find((stage) => stage.id === id)?.label ?? "Idea";
 const n = (value: string) => Math.max(0, Number(value) || 0);
 const money = (value: number, currency: "SGD" | "PHP") =>
   new Intl.NumberFormat(currency === "SGD" ? "en-SG" : "en-PH", {
@@ -80,11 +71,10 @@ export function SourcingScreen({
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [stageFilter, setStageFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Other");
   const [customCategory, setCustomCategory] = useState("");
-  const [ideaStage, setIdeaStage] = useState("idea");
   const [link, setLink] = useState("");
   const [platform, setPlatform] = useState("Pinduoduo");
   const [supplier, setSupplier] = useState("");
@@ -126,7 +116,6 @@ export function SourcingScreen({
     setName("");
     setCategory("Other");
     setCustomCategory("");
-    setIdeaStage("idea");
     setLink("");
     setPlatform("Pinduoduo");
     setSupplier("");
@@ -211,7 +200,7 @@ export function SourcingScreen({
           category === "Other" && customCategory.trim()
             ? customCategory.trim()
             : category,
-        idea_stage: ideaStage,
+        idea_stage: "idea",
         platform,
         supplier_name: supplier.trim() || null,
         original_description: description.trim() || null,
@@ -298,14 +287,16 @@ export function SourcingScreen({
     setEditing(false);
     await load();
     Alert.alert(
-      ideaStage === "idea" ? "Idea saved" : "Sourcing item saved",
+      "Idea saved",
       "The idea, category, supplier details, costs and images are now kept together.",
     );
   };
-  const shownItems =
-    stageFilter === "all"
-      ? items
-      : items.filter((item) => item.idea_stage === stageFilter);
+  const itemCategories = Array.from(
+    new Set(items.map((item) => item.category_name).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b));
+  const shownItems = categoryFilter === "all"
+    ? items
+    : items.filter((item) => item.category_name === categoryFilter);
   if (loading)
     return (
       <View style={styles.loading}>
@@ -340,22 +331,22 @@ export function SourcingScreen({
         >
           <Chip
             label={`All ${items.length}`}
-            active={stageFilter === "all"}
-            onPress={() => setStageFilter("all")}
+            active={categoryFilter === "all"}
+            onPress={() => setCategoryFilter("all")}
           />
-          {stages.map((stage) => (
+          {itemCategories.map((itemCategory) => (
             <Chip
-              key={stage.id}
-              label={`${stage.label} ${items.filter((item) => item.idea_stage === stage.id).length}`}
-              active={stageFilter === stage.id}
-              onPress={() => setStageFilter(stage.id)}
+              key={itemCategory}
+              label={`${itemCategory} ${items.filter((item) => item.category_name === itemCategory).length}`}
+              active={categoryFilter === itemCategory}
+              onPress={() => setCategoryFilter(itemCategory)}
             />
           ))}
         </ScrollView>
         {shownItems.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.cardTitle}>
-              {items.length ? "Nothing in this stage" : "No product ideas yet"}
+              {items.length ? "No ideas in this category" : "No product ideas yet"}
             </Text>
             <Text style={styles.help}>
               Add the first item you may buy and resell.
@@ -378,9 +369,6 @@ export function SourcingScreen({
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <View style={styles.cardMeta}>
                   <Text style={styles.categoryTag}>{item.category_name}</Text>
-                  <Text style={styles.stageTag}>
-                    {stageLabel(item.idea_stage)}
-                  </Text>
                 </View>
                 <Text style={styles.help}>
                   {item.product_url ? `${item.platform} · ` : ""}
@@ -418,17 +406,6 @@ export function SourcingScreen({
           setValue={setName}
           placeholder="Example: Mini animal keychain"
         />
-        <Text style={styles.label}>What stage is it at?</Text>
-        <View style={styles.chips}>
-          {stages.map((stage) => (
-            <Chip
-              key={stage.id}
-              label={stage.label}
-              active={ideaStage === stage.id}
-              onPress={() => setIdeaStage(stage.id)}
-            />
-          ))}
-        </View>
         <Text style={styles.label}>Category</Text>
         <View style={styles.chips}>
           {sourcingCategories.map((value) => (
@@ -674,13 +651,7 @@ export function SourcingScreen({
         ) : (
           <Ionicons name="checkmark" size={22} color="white" />
         )}
-        <Text style={styles.primaryText}>
-          {saving
-            ? "Saving…"
-            : ideaStage === "idea"
-              ? "Save idea"
-              : "Save sourcing item"}
-        </Text>
+        <Text style={styles.primaryText}>{saving ? "Saving…" : "Save idea"}</Text>
       </Pressable>
     </ScrollView>
   );
