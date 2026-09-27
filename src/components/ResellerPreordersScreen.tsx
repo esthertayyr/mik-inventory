@@ -37,6 +37,18 @@ type Order = {
   reseller_preorder_payments: Payment[];
 };
 type SourceProduct = { id: string; name: string };
+type ResellerPackage = {
+  id: string;
+  name: string;
+  package_price_php: number;
+  deposit_required_php: number;
+  lead_time_text: string;
+  reseller_package_items: {
+    quantity: number;
+    choices_note: string | null;
+    source_products: { name: string } | null;
+  }[] | null;
+};
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", {
     style: "currency",
@@ -86,6 +98,7 @@ export function ResellerPreordersScreen({
 }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<SourceProduct[]>([]);
+  const [packages, setPackages] = useState<ResellerPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -94,6 +107,7 @@ export function ResellerPreordersScreen({
   const [contact, setContact] = useState("");
   const [address, setAddress] = useState("");
   const [productId, setProductId] = useState<string | null>(null);
+  const [packageId, setPackageId] = useState<string | null>(null);
   const [productName, setProductName] = useState("");
   const [options, setOptions] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -114,7 +128,7 @@ export function ResellerPreordersScreen({
   const [tracking, setTracking] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data, error }, { data: sourceRows }] = await Promise.all([
+    const [{ data, error }, { data: sourceRows }, { data: packageRows }] = await Promise.all([
       supabase
         .from("reseller_preorders")
         .select(
@@ -128,10 +142,17 @@ export function ResellerPreordersScreen({
         .eq("business_id", businessId)
         .neq("idea_stage", "not_proceeding")
         .order("name"),
+      supabase
+        .from("reseller_packages")
+        .select("id,name,package_price_php,deposit_required_php,lead_time_text,reseller_package_items(quantity,choices_note,source_products(name))")
+        .eq("business_id", businessId)
+        .eq("active", true)
+        .order("created_at", { ascending: false }),
     ]);
     if (error) Alert.alert("Pre-orders not loaded", error.message);
     setOrders((data ?? []) as Order[]);
     setProducts((sourceRows ?? []) as SourceProduct[]);
+    setPackages((packageRows ?? []) as unknown as ResellerPackage[]);
     setLoading(false);
   }, [businessId]);
   useEffect(() => {
@@ -142,6 +163,7 @@ export function ResellerPreordersScreen({
     setContact("");
     setAddress("");
     setProductId(null);
+    setPackageId(null);
     setProductName("");
     setOptions("");
     setQuantity("1");
@@ -151,6 +173,7 @@ export function ResellerPreordersScreen({
   };
   const create = async () => {
     const chosen =
+      packages.find((p) => p.id === packageId)?.name ??
       products.find((p) => p.id === productId)?.name ?? productName.trim();
     if (!customer.trim()) return Alert.alert("Customer name needed");
     if (!chosen)
@@ -169,6 +192,8 @@ export function ResellerPreordersScreen({
       business_id: businessId,
       location_id: locationId,
       source_product_id: productId,
+      reseller_package_id: packageId,
+      package_name: packages.find((p) => p.id === packageId)?.name ?? null,
       customer_name: customer.trim(),
       customer_contact: contact.trim() || null,
       delivery_address: address.trim() || null,
@@ -337,7 +362,35 @@ export function ResellerPreordersScreen({
             setValue={setContact}
             placeholder="Phone, Facebook or other contact"
           />
-          <Text style={s.label}>Choose from product ideas</Text>
+          {packages.length ? (
+            <>
+              <Text style={s.label}>Choose a reseller package</Text>
+              <View style={s.chips}>
+                {packages.map((item) => (
+                  <Chip
+                    key={item.id}
+                    label={`${item.name} · ${peso(Number(item.package_price_php))}`}
+                    active={packageId === item.id}
+                    onPress={() => {
+                      setPackageId(item.id);
+                      setProductId(null);
+                      setProductName("");
+                      setTotal(`${Number(item.package_price_php)}`);
+                      setDeposit(`${Number(item.deposit_required_php)}`);
+                      setQuantity("1");
+                      setOptions(
+                        (item.reseller_package_items ?? [])
+                          .map((line) => `${line.quantity} × ${line.source_products?.name ?? "Product"}${line.choices_note ? ` (${line.choices_note})` : ""}`)
+                          .join("; "),
+                      );
+                    }}
+                  />
+                ))}
+              </View>
+              <Text style={s.help}>The package price, deposit and included products are filled in automatically. You can still edit the customer’s choices.</Text>
+            </>
+          ) : null}
+          <Text style={s.label}>Or choose one product idea</Text>
           <View style={s.chips}>
             {products.map((p) => (
               <Chip
@@ -346,6 +399,7 @@ export function ResellerPreordersScreen({
                 active={productId === p.id}
                 onPress={() => {
                   setProductId(p.id);
+                  setPackageId(null);
                   setProductName("");
                 }}
               />
@@ -356,7 +410,10 @@ export function ResellerPreordersScreen({
             value={productName}
             setValue={(v) => {
               setProductName(v);
-              if (v) setProductId(null);
+              if (v) {
+                setProductId(null);
+                setPackageId(null);
+              }
             }}
             placeholder="Product name"
           />
