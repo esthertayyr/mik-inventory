@@ -829,8 +829,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "white",
   },
-  title: { fontSize: 22, fontWeight: "700", color: "#151924", marginBottom: 3 },
-  help: { fontSize: 15, lineHeight: 21, color: "#626A78" },
+  title: { fontSize: 23, fontWeight: "700", color: "#151924", marginBottom: 3 },
+  help: { fontSize: 14, lineHeight: 20, color: "#626A78" },
   primary: {
     minHeight: 50,
     paddingHorizontal: 18,

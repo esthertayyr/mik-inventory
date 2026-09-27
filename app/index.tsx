@@ -38,6 +38,7 @@ import { SourcingScreen } from "@/src/components/SourcingScreen";
 import { ResellerPreordersScreen } from "@/src/components/ResellerPreordersScreen";
 import { ResellerPackagesScreen } from "@/src/components/ResellerPackagesScreen";
 import { ResellerReportsScreen } from "@/src/components/ResellerReportsScreen";
+import { ResellerHomeScreen } from "@/src/components/ResellerHomeScreen";
 import { Text, TextInput } from "@/src/components/AppTypography";
 import type {
   Business,
@@ -224,6 +225,13 @@ const ownerNav: {
     soft: SECTION.records.soft,
   },
 ];
+const resellerNav: typeof ownerNav = [
+  { id: "home", label: "Home", icon: "home-outline", color: "#4F5664", soft: "#F3F4F6" },
+  { id: "sourcing", label: "Ideas", icon: "bag-handle-outline", color: "#315FBE", soft: "#EDF3FB" },
+  { id: "reseller_packages", label: "Packages", icon: "layers-outline", color: "#594C8D", soft: "#F3F0F8" },
+  { id: "preorders", label: "Pre-orders", icon: "receipt-outline", color: "#8A365B", soft: "#FAEFF4" },
+  { id: "reseller_reports", label: "Reports", icon: "bar-chart-outline", color: "#1B685C", soft: "#EDF6F3" },
+];
 
 export default function Home() {
   const [iconsReady] = useFonts(Ionicons.font);
@@ -376,6 +384,7 @@ type AdminShop = {
   created_at: string;
   last_login?: string | null;
   visible_modules?: string[];
+  business_type?: "shop" | "reseller";
 };
 type ShopModule="sales"|"orders"|"stock"|"production"|"reports"|"sourcing";
 const SHOP_MODULES:Array<{id:ShopModule;label:string;help:string;icon:Icon;color:string}>=[
@@ -396,6 +405,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [newBusinessType,setNewBusinessType]=useState<"shop"|"reseller">("shop");
   const [openShop, setOpenShop] = useState<AdminShop | null>(null);
   const [showActivity, setShowActivity] = useState(false);
   const [showOwnerOrders,setShowOwnerOrders]=useState(false);
@@ -418,7 +428,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     const startTime=new Date(`${start}T00:00:00`).toISOString();
     const endTime=new Date(`${end}T00:00:00`).toISOString();
     const [{ data, error }, { data: loginRows }, { data: todaySales }, { data: activeOrders }, { data: stockRows },{data:orderPayments},{data:expenses}] = await Promise.all([
-      supabase.from("businesses").select("id,name,logo_url,slug,login_username,status,created_at,visible_modules").order("created_at"),
+      supabase.from("businesses").select("id,name,logo_url,slug,login_username,status,created_at,visible_modules,business_type").order("created_at"),
       supabase.from("activity_logs").select("business_id,created_at").eq("action", "login").order("created_at", { ascending: false }).limit(1000),
       supabase.from("sales").select("total,status").eq("status", "completed").gte("created_at", startTime).lt("created_at",endTime),
       supabase.from("external_orders").select("id,status").not("status", "in", "(completed,cancelled)"),
@@ -454,13 +464,14 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
       return Alert.alert("Password is too short", "Use at least 6 characters.");
     setCreating(true);
     const { error } = await supabase.functions.invoke("admin-create-shop", {
-      body: { shopName: name.trim(), username: clean, password },
+      body: { shopName: name.trim(), username: clean, password, businessType:newBusinessType },
     });
     setCreating(false);
     if (error) return Alert.alert("Profile not created", error.message);
     setName("");
     setUsername("");
     setPassword("");
+    setNewBusinessType("shop");
     setShowForm(false);
     await load();
     Alert.alert(
@@ -561,6 +572,12 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
         {showForm ? (
           <View style={s.editCard}>
             <Text style={s.editName}>Create a shop profile</Text>
+            <Label>Business type</Label>
+            <View style={s.chips}>
+              <Chip label="Shop / 3D printing" selected={newBusinessType==="shop"} onPress={()=>setNewBusinessType("shop")} />
+              <Chip label="Reseller / Pre-order" selected={newBusinessType==="reseller"} onPress={()=>setNewBusinessType("reseller")} />
+            </View>
+            <Text style={s.rowHelp}>{newBusinessType==="reseller"?"A separate workspace for product ideas, packages, pre-orders and reseller reports.":"The standard MIK workspace for sales, stock, orders and production."}</Text>
             <Label>Shop name</Label>
             <TextInput
               style={s.input}
@@ -874,7 +891,7 @@ function ShopApp({
     setLoading(true);
     if (adminBusiness) {
       setProfile({ id: "platform-admin", display_name: "Owner" });
-      const b = { id: adminBusiness.id, name: adminBusiness.name, logo_url: adminBusiness.logo_url, visible_modules:adminBusiness.visible_modules, role: "owner" } as Business;
+      const b = { id: adminBusiness.id, name: adminBusiness.name, logo_url: adminBusiness.logo_url, visible_modules:adminBusiness.visible_modules, business_type:adminBusiness.business_type??"shop", role: "owner" } as Business;
       setBusiness(b);
       const { data: ld } = await supabase.from("locations").select("id,business_id,name").eq("business_id", b.id).eq("active", true).order("name");
       const list = (ld ?? []) as Location[];
@@ -895,7 +912,7 @@ function ShopApp({
         .maybeSingle(),
       supabase
         .from("business_memberships")
-        .select("business_id,role,businesses(id,name,logo_url,login_username,visible_modules)")
+        .select("business_id,role,businesses(id,name,logo_url,login_username,visible_modules,business_type)")
         .eq("user_id", session.user.id),
       supabase.from("shop_staff_accounts").select("permissions,active").eq("user_id",session.user.id).maybeSingle(),
     ]);
@@ -913,6 +930,7 @@ function ShopApp({
       logo_url: member.businesses.logo_url ?? null,
       login_username: member.businesses.login_username ?? null,
       visible_modules:member.businesses.visible_modules??allShopModules(),
+      business_type:member.businesses.business_type??"shop",
       role: member.role,
     } as Business;
     setBusiness(b);
@@ -949,15 +967,19 @@ function ShopApp({
     );
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
+  const resellerBusiness=business?.business_type==="reseller";
   const visibleModules=(business?.visible_modules??allShopModules()) as ShopModule[];
   const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports"] as Screen[]).includes(value)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
-  const availableNav = ownerNav.filter(item=>{const module=screenModule(item.id);return !module||visibleModules.includes(module);});
+  const availableNav = (resellerBusiness?resellerNav:ownerNav).filter(item=>{const module=screenModule(item.id);return !module||visibleModules.includes(module);});
   const nav = role === "owner" ? availableNav : availableNav.filter((x) =>
     x.id === "home" ||
-    (x.id === "sell_start" && staffPermissions?.includes("sell")) ||
-    (x.id === "orders" && staffPermissions?.includes("orders")) ||
-    (x.id === "stock_start" && staffPermissions?.includes("stock")) ||
-    (x.id === "reports" && staffPermissions?.includes("reports"))
+    (resellerBusiness && (["sourcing","reseller_packages"] as Screen[]).includes(x.id) && staffPermissions?.includes("products")) ||
+    (resellerBusiness && x.id === "preorders" && staffPermissions?.includes("orders")) ||
+    (resellerBusiness && x.id === "reseller_reports" && staffPermissions?.includes("reports")) ||
+    (!resellerBusiness && x.id === "sell_start" && staffPermissions?.includes("sell")) ||
+    (!resellerBusiness && x.id === "orders" && staffPermissions?.includes("orders")) ||
+    (!resellerBusiness && x.id === "stock_start" && staffPermissions?.includes("stock")) ||
+    (!resellerBusiness && x.id === "reports" && staffPermissions?.includes("reports"))
   );
   const current = locations.find((x) => x.id === locationId);
   const reload = () =>
@@ -971,7 +993,9 @@ function ShopApp({
   };
   let body: ReactNode;
   if (screen === "home")
-    body = (
+    body = resellerBusiness ? (
+      <ResellerHomeScreen businessId={business!.id} onOpen={setScreen} />
+    ) : (
       <QuickStart
         businessId={business!.id}
         locationId={locationId}
@@ -1138,7 +1162,7 @@ function ShopApp({
         visibleModules={visibleModules}
       />
     );
-  const selected =
+  const selected = resellerBusiness ? screen :
     (["inventory","alphabet_inventory","products","price_list","sourcing","reseller_packages","preorders","reseller_reports"] as Screen[]).includes(screen)
       ? "stock_start"
       : (["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)
@@ -2508,6 +2532,7 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [copyStock, setCopyStock] = useState(false);
+  const [businessType,setBusinessType]=useState<"shop"|"reseller">(shop.business_type??"shop");
   const [visibleModules,setVisibleModules]=useState<ShopModule[]>((shop.visible_modules??allShopModules()) as ShopModule[]);
   const [busy, setBusy] = useState(false);
   const [securityBusy, setSecurityBusy] = useState(false);
@@ -2523,7 +2548,7 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
     if (duplicate && password.length < 6) return Alert.alert("Password is too short", "Use at least 6 characters.");
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("admin-manage-shop", {
-      body: { action: mode === "edit" ? "update" : "duplicate", shopId: shop.id, shopName: name.trim(), username: clean, password, copyStock, visibleModules },
+      body: { action: mode === "edit" ? "update" : "duplicate", shopId: shop.id, shopName: name.trim(), username: clean, password, copyStock, visibleModules:businessType==="reseller"?["sourcing"]:visibleModules.filter(module=>module!=="sourcing"), businessType },
     });
     setBusy(false);
     if (error) {
@@ -2567,9 +2592,12 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
           <Text style={s.rowHelp}>{duplicate ? "The new shop will have its own login, stock, sales and orders." : "Existing products, stock, sales and orders will not be removed."}</Text>
           <Label>Shop name</Label><TextInput style={s.input} value={name} onChangeText={setName} placeholder="Shop name" />
           <Label>Login username</Label><TextInput style={s.input} value={username} onChangeText={setUsername} placeholder="New username" autoCapitalize="none" autoCorrect={false} />
-          <Label>Functions shown in this shop</Label>
-          <Text style={s.rowHelp}>Turn off areas the shop does not use. Home, settings and help always stay available.</Text>
-          <View style={s.moduleChoiceGrid}>{SHOP_MODULES.map(module=>{const shown=visibleModules.includes(module.id);return <Pressable key={module.id} accessibilityRole="checkbox" accessibilityState={{checked:shown}} style={[s.moduleChoice,shown&&{borderColor:module.color,backgroundColor:`${module.color}14`}]} onPress={()=>setVisibleModules(current=>shown?current.filter(id=>id!==module.id):[...current,module.id])}><View style={[s.moduleChoiceIcon,{backgroundColor:shown?module.color:C.soft}]}><Ionicons name={module.icon} size={21} color={shown?C.white:C.muted}/></View><View style={s.flex}><Text style={s.moduleChoiceTitle}>{module.label}</Text><Text style={s.moduleChoiceHelp}>{module.help}</Text></View><Ionicons name={shown?"checkbox":"square-outline"} size={23} color={shown?module.color:C.muted}/></Pressable>})}</View>
+          <Label>Business type</Label>
+          <View style={s.chips}><Chip label="Shop / 3D printing" selected={businessType==="shop"} onPress={()=>{setBusinessType("shop");if(!visibleModules.some(module=>module!=="sourcing"))setVisibleModules(allShopModules());}}/><Chip label="Reseller / Pre-order" selected={businessType==="reseller"} onPress={()=>setBusinessType("reseller")}/></View>
+          <Text style={s.rowHelp}>{businessType==="reseller"?"This profile gets its own Home, Product Ideas, Packages, Pre-orders and Reports tabs.":"This profile uses MIK's sales, orders, stock, printing and shop reports."}</Text>
+          {businessType==="shop"?<><Label>Functions shown in this shop</Label>
+          <Text style={s.rowHelp}>Turn off areas the shop does not use. Home always stays available.</Text>
+          <View style={s.moduleChoiceGrid}>{SHOP_MODULES.filter(module=>module.id!=="sourcing").map(module=>{const shown=visibleModules.includes(module.id);return <Pressable key={module.id} accessibilityRole="checkbox" accessibilityState={{checked:shown}} style={[s.moduleChoice,shown&&{borderColor:module.color,backgroundColor:`${module.color}14`}]} onPress={()=>setVisibleModules(current=>shown?current.filter(id=>id!==module.id):[...current,module.id])}><View style={[s.moduleChoiceIcon,{backgroundColor:shown?module.color:C.soft}]}><Ionicons name={module.icon} size={21} color={shown?C.white:C.muted}/></View><View style={s.flex}><Text style={s.moduleChoiceTitle}>{module.label}</Text><Text style={s.moduleChoiceHelp}>{module.help}</Text></View><Ionicons name={shown?"checkbox":"square-outline"} size={23} color={shown?module.color:C.muted}/></Pressable>})}</View></>:null}
           {duplicate ? <><Label>Starting password</Label><TextInput style={s.input} value={password} onChangeText={setPassword} placeholder="At least 6 characters" secureTextEntry /><Pressable accessibilityRole="button" style={[s.copyStockChoice,copyStock&&s.copyStockChoiceOn]} onPress={() => setCopyStock((value) => !value)}><Ionicons name={copyStock?"checkbox":"square-outline"} size={23} color={copyStock?C.white:C.green}/><View style={s.flex}><Text style={[s.copyStockTitle,copyStock&&{color:C.white}]}>Copy current stock numbers</Text><Text style={[s.copyStockHelp,copyStock&&{color:"#E8F0EC"}]}>{copyStock?"The new shop receives the same counts.":"Recommended off: new shop starts at zero."}</Text></View></Pressable></> : <View style={s.note}><Ionicons name="information-circle" size={22} color={C.green}/><Text style={s.noteText}>Changing the username does not change the password.</Text></View>}
           <BigButton label={busy ? duplicate ? "Duplicating shop…" : "Saving profile…" : duplicate ? "Duplicate shop" : "Save profile"} icon={duplicate?"copy-outline":"save-outline"} onPress={save} disabled={busy} />
         </View>

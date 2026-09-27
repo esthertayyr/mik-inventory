@@ -31,6 +31,7 @@ Deno.serve(async (request: Request) => {
   const shopName = String(input.shopName ?? '').trim();
   const username = String(input.username ?? '').trim().toLowerCase();
   const password = String(input.password ?? '');
+  const businessType = input.businessType === 'reseller' ? 'reseller' : 'shop';
   if (!shopName) return reply({ error: 'Enter a shop name' }, 400);
   if (!/^[a-z0-9._-]{3,30}$/.test(username)) return reply({ error: 'Check the username' }, 400);
   if (password.length < 6) return reply({ error: 'Password must have at least 6 characters' }, 400);
@@ -50,7 +51,10 @@ Deno.serve(async (request: Request) => {
     const { data: sameSlug } = await admin.from('businesses').select('id').eq('slug', slug).maybeSingle();
     if (sameSlug) slug = `${slug}-${crypto.randomUUID().slice(0, 6)}`;
 
-    const { data: business, error: businessError } = await admin.from('businesses').insert({ name: shopName, slug, login_username: username }).select('id').single();
+    const visibleModules = businessType === 'reseller'
+      ? ['sourcing']
+      : ['sales', 'orders', 'stock', 'production', 'reports'];
+    const { data: business, error: businessError } = await admin.from('businesses').insert({ name: shopName, slug, login_username: username, business_type: businessType, visible_modules: visibleModules }).select('id').single();
     if (businessError || !business) throw businessError ?? new Error('Shop was not created');
     businessId = business.id;
 
@@ -70,7 +74,7 @@ Deno.serve(async (request: Request) => {
     });
     if (adminMembershipError) throw adminMembershipError;
 
-    return reply({ shopId: businessId, username });
+    return reply({ shopId: businessId, username, businessType });
   } catch (error) {
     if (businessId) await admin.from('businesses').delete().eq('id', businessId);
     await admin.auth.admin.deleteUser(created.user.id);

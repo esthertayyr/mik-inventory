@@ -30,6 +30,7 @@ Deno.serve(async (request: Request) => {
   const shopId = String(input.shopId ?? '');
   const shopName = String(input.shopName ?? '').trim();
   const username = String(input.username ?? '').trim().toLowerCase();
+  const businessType = input.businessType === 'reseller' ? 'reseller' : 'shop';
   const allowedModules = ['sales', 'orders', 'stock', 'production', 'reports', 'sourcing'];
   if (!shopId) return reply({ error: 'Shop profile not found' }, 400);
 
@@ -38,6 +39,9 @@ Deno.serve(async (request: Request) => {
   const visibleModules = Array.isArray(input.visibleModules)
     ? [...new Set(input.visibleModules.map(String))].filter((item) => allowedModules.includes(item))
     : (source.visible_modules ?? allowedModules);
+  const finalVisibleModules = businessType === 'reseller'
+    ? ['sourcing']
+    : visibleModules.filter((item) => item !== 'sourcing');
 
   const findShopUser = async () => {
     const { data: members } = await admin.from('business_memberships').select('user_id').eq('business_id', shopId);
@@ -112,11 +116,11 @@ Deno.serve(async (request: Request) => {
     });
     if (authUpdateError) return reply({ error: authUpdateError.message }, 400);
 
-    const { error: businessError } = await admin.from('businesses').update({ name: shopName, login_username: username, visible_modules: visibleModules }).eq('id', shopId);
+    const { error: businessError } = await admin.from('businesses').update({ name: shopName, login_username: username, visible_modules: finalVisibleModules, business_type: businessType }).eq('id', shopId);
     const { error: profileError } = await admin.from('profiles').update({ display_name: shopName, username }).eq('id', shopUserId);
     if (businessError || profileError) {
       if (oldEmail) await admin.auth.admin.updateUserById(shopUserId, { email: oldEmail, email_confirm: true });
-      await admin.from('businesses').update({ name: source.name, login_username: source.login_username, visible_modules: source.visible_modules ?? allowedModules }).eq('id', shopId);
+      await admin.from('businesses').update({ name: source.name, login_username: source.login_username, visible_modules: source.visible_modules ?? allowedModules, business_type: source.business_type ?? 'shop' }).eq('id', shopId);
       await admin.from('profiles').update({ display_name: source.name, username: source.login_username }).eq('id', shopUserId);
       return reply({ error: businessError?.message ?? profileError?.message ?? 'Shop profile was not updated' }, 400);
     }
@@ -128,9 +132,9 @@ Deno.serve(async (request: Request) => {
       entity_type: 'businesses',
       entity_id: shopId,
       summary: `Shop details and visible functions updated for ${shopName}`,
-      details: { visible_modules: visibleModules },
+      details: { visible_modules: finalVisibleModules, business_type: businessType },
     });
-    return reply({ shopId, shopName, username, visibleModules });
+    return reply({ shopId, shopName, username, visibleModules: finalVisibleModules, businessType });
   }
 
   if (action !== 'duplicate') return reply({ error: 'Unknown action' }, 400);
@@ -148,7 +152,7 @@ Deno.serve(async (request: Request) => {
     let slug = shopName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'shop';
     const { data: sameSlug } = await admin.from('businesses').select('id').eq('slug', slug).maybeSingle();
     if (sameSlug) slug = `${slug}-${crypto.randomUUID().slice(0, 6)}`;
-    const { data: business, error: businessError } = await admin.from('businesses').insert({ name: shopName, slug, login_username: username, logo_url: source.logo_url, visible_modules: visibleModules }).select('id').single();
+    const { data: business, error: businessError } = await admin.from('businesses').insert({ name: shopName, slug, login_username: username, logo_url: source.logo_url, visible_modules: finalVisibleModules, business_type: businessType }).select('id').single();
     if (businessError || !business) throw businessError ?? new Error('Shop was not created');
     newBusinessId = business.id;
     const { data: location, error: locationError } = await admin.from('locations').insert({ business_id: newBusinessId, name: 'Main Shop' }).select('id').single();
@@ -203,7 +207,7 @@ Deno.serve(async (request: Request) => {
     await admin.from('profiles').upsert({ id: created.user.id, display_name: shopName, username });
     await admin.from('business_memberships').insert({ user_id: created.user.id, business_id: newBusinessId, role: 'owner', default_location_id: location.id });
     await admin.from('business_memberships').upsert({ user_id: authData.user.id, business_id: newBusinessId, role: 'owner', default_location_id: location.id });
-    return reply({ shopId: newBusinessId, username, copiedProducts: productMap.size, copiedStock: copyStock });
+    return reply({ shopId: newBusinessId, username, copiedProducts: productMap.size, copiedStock: copyStock, businessType });
   } catch (error) {
     if (newBusinessId) await admin.from('businesses').delete().eq('id', newBusinessId);
     await admin.auth.admin.deleteUser(created.user.id);
