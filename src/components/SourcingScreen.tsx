@@ -442,28 +442,39 @@ export function SourcingScreen({
             />
           ))}
         </View>
-        <Field
-          label="Supplier or shop name · Optional"
-          value={supplier}
-          setValue={setSupplier}
-          placeholder="Shop or seller name"
-        />
-        <Field
-          label="Chinese details · Optional"
-          value={description}
-          setValue={setDescription}
-          placeholder="Paste the original description"
-          multiline
-        />
-        <Field
-          label="English details · Optional"
-          value={englishDescription}
-          setValue={setEnglishDescription}
-          placeholder="Add the translated description"
-          multiline
-        />
       </Section>
-      <Section number="2" title="Options">
+      <Section number="2" title="Photos">
+        <Text style={styles.help}>
+          Add product pictures or listing screenshots. MIK makes the files smaller before saving.
+        </Text>
+        <View style={styles.imageButtons}>
+          <Pressable style={styles.secondary} onPress={() => void pickImages("product")}>
+            <Ionicons name="images-outline" size={20} color="#315FBE" />
+            <Text style={styles.secondaryText}>Add product photos</Text>
+          </Pressable>
+          <Pressable style={styles.secondary} onPress={() => void pickImages("screenshot")}>
+            <Ionicons name="phone-portrait-outline" size={20} color="#315FBE" />
+            <Text style={styles.secondaryText}>Add screenshots</Text>
+          </Pressable>
+        </View>
+        <View style={styles.imageGrid}>
+          {images.map((image, index) => (
+            <View key={`${image.uri}-${index}`} style={styles.imageWrap}>
+              <Image source={{ uri: image.uri }} style={styles.preview as any} resizeMode="contain" />
+              <Pressable style={styles.imageRemove} onPress={() => setImages((v) => v.filter((_, i) => i !== index))}>
+                <Ionicons name="close" size={16} color="white" />
+              </Pressable>
+              <Text style={styles.imageType}>{image.type}</Text>
+            </View>
+          ))}
+        </View>
+      </Section>
+      <Section number="3" title="Supplier and description">
+        <Field label="Supplier or shop name · Optional" value={supplier} setValue={setSupplier} placeholder="Shop or seller name" />
+        <Field label="Chinese details · Optional" value={description} setValue={setDescription} placeholder="Paste the original description" multiline />
+        <Field label="English details · Optional" value={englishDescription} setValue={setEnglishDescription} placeholder="Add the translated description" multiline />
+      </Section>
+      <Section number="4" title="Customer choices">
         <Text style={styles.help}>
           Add every choice the customer can select, such as colours, sizes,
           types or pack quantities.
@@ -522,7 +533,7 @@ export function SourcingScreen({
           <Text style={styles.secondaryText}>Add colour, size or type</Text>
         </Pressable>
       </Section>
-      <Section number="3" title="Cost and selling price">
+      <Section number="5" title="Cost and selling price">
         <Text style={styles.help}>
           Optional while this is only an idea. Enter the final SGD amount once
           the supplier shows the full item, tax and shipping total.
@@ -598,48 +609,6 @@ export function SourcingScreen({
           keyboardType="decimal-pad"
           placeholder={`${Math.ceil(suggestedPhp || 0)}`}
         />
-      </Section>
-      <Section number="4" title="Images and screenshots">
-        <Text style={styles.help}>
-          Upload clear product pictures and screenshots of the listing. MIK
-          compresses them before saving.
-        </Text>
-        <View style={styles.imageButtons}>
-          <Pressable
-            style={styles.secondary}
-            onPress={() => void pickImages("product")}
-          >
-            <Ionicons name="images-outline" size={20} color="#315FBE" />
-            <Text style={styles.secondaryText}>Add product images</Text>
-          </Pressable>
-          <Pressable
-            style={styles.secondary}
-            onPress={() => void pickImages("screenshot")}
-          >
-            <Ionicons name="phone-portrait-outline" size={20} color="#315FBE" />
-            <Text style={styles.secondaryText}>Add screenshots</Text>
-          </Pressable>
-        </View>
-        <View style={styles.imageGrid}>
-          {images.map((image, index) => (
-            <View key={`${image.uri}-${index}`} style={styles.imageWrap}>
-              <Image
-                source={{ uri: image.uri }}
-                style={styles.preview as any}
-                resizeMode="contain"
-              />
-              <Pressable
-                style={styles.imageRemove}
-                onPress={() =>
-                  setImages((v) => v.filter((_, i) => i !== index))
-                }
-              >
-                <Ionicons name="close" size={16} color="white" />
-              </Pressable>
-              <Text style={styles.imageType}>{image.type}</Text>
-            </View>
-          ))}
-        </View>
       </Section>
       <Pressable
         style={[styles.primary, saving && styles.disabled]}

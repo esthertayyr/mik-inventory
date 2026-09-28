@@ -131,13 +131,33 @@ export function ResellerHomeScreen({
       soft: "#EDF6F3",
     },
   ];
+  const groups = [
+    {
+      title: "Start here",
+      help: "Save products and build packages for customers.",
+      color: "#315FBE",
+      actions: actions.slice(0, 2),
+    },
+    {
+      title: "Customer orders & money",
+      help: "Track pre-orders, payments, balances and delivery.",
+      color: "#8A365B",
+      actions: actions.slice(2),
+    },
+  ];
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
   return (
     <ScrollView contentContainerStyle={s.page}>
       <View style={s.intro}>
-        <Text style={s.eyebrow}>ASTERA WORKSPACE</Text>
-        <Text style={s.title}>Reseller overview</Text>
+        <Text style={s.eyebrow}>TODAY · {today.toUpperCase()}</Text>
+        <Text style={s.title}>Business overview</Text>
         <Text style={s.help}>
-          Move from product idea to paid customer delivery, one step at a time.
+          Everything for Astera, organised by task.
         </Text>
       </View>
       {loading ? (
@@ -146,27 +166,32 @@ export function ResellerHomeScreen({
           <Text style={s.help}>Opening Astera…</Text>
         </View>
       ) : (
-        <View style={s.grid}>
-          {actions.map((action) => (
-            <Pressable
-              key={action.screen}
-              style={[s.card, { borderColor: action.color }]}
-              onPress={() => onOpen(action.screen)}
-            >
-              <View style={[s.icon, { backgroundColor: action.soft }]}>
-                <Ionicons name={action.icon} size={25} color={action.color} />
-              </View>
+        groups.map((group) => (
+          <View key={group.title} style={s.section}>
+            <View style={s.sectionHeading}>
+              <View style={[s.sectionMark, { backgroundColor: group.color }]} />
               <View style={s.flex}>
-                <Text style={s.cardTitle}>{action.title}</Text>
-                <Text style={s.cardHelp}>{action.help}</Text>
+                <Text style={s.sectionTitle}>{group.title}</Text>
+                <Text style={s.sectionHelp}>{group.help}</Text>
               </View>
-              <Text style={[s.value, { color: action.color }]}>
-                {action.value}
-              </Text>
-              <Ionicons name="arrow-forward" size={20} color={action.color} />
-            </Pressable>
-          ))}
-        </View>
+            </View>
+            <View style={s.grid}>
+              {group.actions.map((action) => (
+                <Pressable key={action.screen} style={s.card} onPress={() => onOpen(action.screen)}>
+                  <View style={[s.icon, { backgroundColor: action.soft }]}>
+                    <Ionicons name={action.icon} size={25} color={action.color} />
+                  </View>
+                  <View style={s.flex}>
+                    <Text style={s.cardTitle}>{action.title}</Text>
+                    <Text style={s.cardHelp}>{action.help}</Text>
+                  </View>
+                  <Text style={[s.value, { color: action.color }]}>{action.value}</Text>
+                  <Ionicons name="chevron-forward" size={20} color={action.color} />
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ))
       )}
       <View style={s.flow}>
         <Text style={s.flowTitle}>How Astera works</Text>
@@ -186,30 +211,36 @@ const s = StyleSheet.create({
     alignSelf: "center",
     padding: 18,
     paddingBottom: 80,
-    gap: 20,
+    gap: 16,
   },
-  intro: { gap: 5 },
+  intro: { gap: 5, paddingTop: 10, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: "#E5E7EB" },
   eyebrow: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#594C8D",
-    letterSpacing: 0.8,
+    color: "#737B89",
+    letterSpacing: 1.5,
   },
-  title: { fontSize: 30, fontWeight: "700", color: "#151924" },
+  title: { fontSize: 30, fontWeight: "600", color: "#151924", letterSpacing: -0.6 },
   help: { fontSize: 15, lineHeight: 21, color: "#626A78" },
   loading: { padding: 50, alignItems: "center", gap: 10 },
+  section: { gap: 12, marginTop: 4 },
+  sectionHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
+  sectionMark: { width: 4, minHeight: 38, borderRadius: 999 },
+  sectionTitle: { fontSize: 19, fontWeight: "700", color: "#151924" },
+  sectionHelp: { fontSize: 13, lineHeight: 18, color: "#626A78", marginTop: 2 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   card: {
     flexGrow: 1,
     flexBasis: 420,
     minWidth: 270,
-    minHeight: 118,
+    minHeight: 104,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     padding: 17,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
+    borderColor: "#E0E3EA",
     backgroundColor: "white",
   },
   icon: {
