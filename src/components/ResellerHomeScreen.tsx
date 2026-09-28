@@ -254,7 +254,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  flex: { flex: 1 },
+  flex: { flex: 1, minWidth: 0 },
   cardTitle: { fontSize: 18, fontWeight: "700", color: "#151924" },
   cardHelp: { fontSize: 13, lineHeight: 18, color: "#626A78", marginTop: 3 },
   value: { fontSize: 20, fontWeight: "700" },
