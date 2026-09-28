@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -116,6 +117,45 @@ export function SourcingScreen({
   useEffect(() => {
     void load();
   }, [load]);
+  const deleteIdea = (item: SourceItem) => {
+    const run = async () => {
+      const { data: imageRows } = await supabase
+        .from("source_product_images")
+        .select("storage_path")
+        .eq("source_product_id", item.id);
+      const { error } = await supabase
+        .from("source_products")
+        .delete()
+        .eq("id", item.id)
+        .eq("business_id", businessId);
+      if (error) {
+        return Alert.alert(
+          "Product idea not deleted",
+          error.code === "23503"
+            ? "This product is already used in a package. Remove it from the package first."
+            : error.message,
+        );
+      }
+      const paths = (imageRows ?? [])
+        .map((row) => row.storage_path as string)
+        .filter(Boolean);
+      if (paths.length) {
+        await supabase.storage.from("product-images").remove(paths);
+      }
+      await load();
+      Alert.alert("Product idea deleted", `${item.name} has been removed.`);
+    };
+    const title = "Delete this product idea?";
+    const message = `${item.name} and its saved variants will be removed. This cannot be undone.`;
+    if (Platform.OS === "web") {
+      if (window.confirm(`${title}\n\n${message}`)) void run();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: "Keep product", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => void run() },
+    ]);
+  };
   const quantity = Math.max(1, Math.floor(n(qty) || 1));
   const listedPrice = n(sourcePrice);
   const taxAmount = listedPrice * n(taxPercent) / 100;
@@ -404,6 +444,15 @@ export function SourcingScreen({
                 <Text style={styles.price}>
                   {item.source_currency} {Number(item.source_price || 0).toLocaleString()} · {money(((Number(item.source_price || 0) * (1 + Number(item.tax_percent || 0) / 100)) + Number(item.shipping_amount || 0)) * Number(item.currency_to_php_rate || 0), "PHP")}
                 </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${item.name}`}
+                  style={styles.deleteIdea}
+                  onPress={() => deleteIdea(item)}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#8A2943" />
+                  <Text style={styles.deleteIdeaText}>Delete product idea</Text>
+                </Pressable>
               </View>
             </View>
           ))
@@ -956,6 +1005,20 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   removeText: { fontSize: 14, fontWeight: "600", color: "#8A2943" },
+  deleteIdea: {
+    alignSelf: "flex-start",
+    minHeight: 38,
+    marginTop: 10,
+    paddingHorizontal: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#E8C9D2",
+    borderRadius: 10,
+    backgroundColor: "#FCF4F6",
+  },
+  deleteIdeaText: { fontSize: 13, fontWeight: "700", color: "#8A2943" },
   summary: {
     padding: 14,
     borderRadius: 14,
