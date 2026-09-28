@@ -37,10 +37,9 @@ type SourceItem = {
 };
 type OptionRow = {
   id: string;
-  type: string;
+  databaseId?: string;
   value: string;
   price: string;
-  moq: string;
 };
 type LocalImage = {
   uri: string;
@@ -48,7 +47,7 @@ type LocalImage = {
   height: number;
   type: "product" | "screenshot";
 };
-const optionTypes = ["Colour", "Size", "Type", "Quantity", "Other"];
+type SavedImage = { id: string; image_url: string; storage_path: string; image_type: LocalImage["type"] };
 const sourcingCategories = [
   "3D products",
   "Filament",
@@ -79,6 +78,7 @@ export function SourcingScreen({
   const { width } = useWindowDimensions();
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [name, setName] = useState("");
@@ -94,13 +94,13 @@ export function SourcingScreen({
   const [taxPercent, setTaxPercent] = useState("3");
   const [shippingType, setShippingType] = useState<"free" | "paid">("free");
   const [shippingAmount, setShippingAmount] = useState("");
-  const [qty, setQty] = useState("1");
   const [rate, setRate] = useState("8.1");
   const [marketPrice, setMarketPrice] = useState("");
   const [marketLink, setMarketLink] = useState("");
   const [sellingPhp, setSellingPhp] = useState("");
   const [options, setOptions] = useState<OptionRow[]>([]);
   const [images, setImages] = useState<LocalImage[]>([]);
+  const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -156,13 +156,12 @@ export function SourcingScreen({
       { text: "Delete", style: "destructive", onPress: () => void run() },
     ]);
   };
-  const quantity = Math.max(1, Math.floor(n(qty) || 1));
   const listedPrice = n(sourcePrice);
   const taxAmount = listedPrice * n(taxPercent) / 100;
   const shippingCost = shippingType === "paid" ? n(shippingAmount) : 0;
   const landedSourceTotal = listedPrice + taxAmount + shippingCost;
   const landedPhpTotal = landedSourceTotal * n(rate);
-  const unitCostPhp = landedPhpTotal / quantity;
+  const unitCostPhp = landedPhpTotal;
   const reset = () => {
     setName("");
     setCategory("Other");
@@ -177,27 +176,57 @@ export function SourcingScreen({
     setTaxPercent("3");
     setShippingType("free");
     setShippingAmount("");
-    setQty("1");
     setRate("8.1");
     setMarketPrice("");
     setMarketLink("");
     setSellingPhp("");
     setOptions([]);
     setImages([]);
+    setSavedImages([]);
+    setEditingId(null);
   };
   const addOption = () =>
     setOptions((v) => [
       ...v,
       {
         id: `${Date.now()}-${Math.random()}`,
-        type: "Colour",
         value: "",
         price: "",
-        moq: "1",
       },
     ]);
   const changeOption = (id: string, key: keyof OptionRow, value: string) =>
     setOptions((v) => v.map((x) => (x.id === id ? { ...x, [key]: value } : x)));
+  const openItem = async (item: SourceItem) => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("source_products")
+      .select("*,source_product_options(id,option_value,source_price),source_product_images(id,image_url,storage_path,image_type)")
+      .eq("id", item.id)
+      .eq("business_id", businessId)
+      .single();
+    setLoading(false);
+    if (error || !data) return Alert.alert("Product not opened", error?.message ?? "Please try again.");
+    setEditingId(data.id);
+    setName(data.name ?? "");
+    const savedCategory = data.category_name ?? "Other";
+    if (sourcingCategories.includes(savedCategory)) { setCategory(savedCategory); setCustomCategory(""); }
+    else { setCategory("Other"); setCustomCategory(savedCategory); }
+    setLink(data.product_url ?? "");
+    setPlatform(data.platform ?? "Pinduoduo");
+    setSupplier(data.supplier_name ?? "");
+    setDescription(data.original_description ?? "");
+    setEnglishDescription(data.english_description ?? "");
+    setCurrency(data.source_currency === "SGD" ? "SGD" : "RMB");
+    setSourcePrice(data.source_price ? String(data.source_price) : "");
+    setTaxPercent(String(data.tax_percent ?? 3));
+    setShippingType(data.shipping_type === "paid" ? "paid" : "free");
+    setShippingAmount(data.shipping_amount ? String(data.shipping_amount) : "");
+    setRate(String(data.currency_to_php_rate ?? (data.source_currency === "SGD" ? 45 : 8.1)));
+    setOptions((data.source_product_options ?? []).map((option: any) => ({ id: option.id, databaseId: option.id, value: option.option_value ?? "", price: option.source_price == null ? "" : String(option.source_price) })));
+    setSavedImages((data.source_product_images ?? []) as SavedImage[]);
+    setImages([]);
+    setEditing(true);
+  };
   const pickImages = async (type: LocalImage["type"]) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted)
@@ -233,6 +262,7 @@ export function SourcingScreen({
     if (next.length) setImages((current) => [...current, ...next].slice(0, 12));
   };
   const save = async () => {
+    const wasEditing = Boolean(editingId);
     if (!name.trim())
       return Alert.alert("Product name needed", "Enter the product name.");
     if (listedPrice > 0 && n(rate) <= 0)
@@ -243,13 +273,11 @@ export function SourcingScreen({
     if (options.some((x) => !x.value.trim()))
       return Alert.alert(
         "Complete the options",
-        "Enter a name for every colour, size or type, or remove the empty row.",
+        "Enter a name for every variant or choice, or remove the empty row.",
       );
     setSaving(true);
     const legacySgdCost = currency === "SGD" ? landedSourceTotal : landedPhpTotal / 45;
-    const { data, error } = await supabase
-      .from("source_products")
-      .insert({
+    const productValues = {
         business_id: businessId,
         location_id: locationId,
         name: name.trim(),
@@ -271,34 +299,50 @@ export function SourcingScreen({
         currency_to_php_rate: n(rate),
         final_cost_sgd: legacySgdCost,
         exchange_rate_sgd_php: 45,
-        order_quantity: quantity,
+        order_quantity: 1,
         deposit_percent: 50,
         market_reference_price_php: marketPrice ? n(marketPrice) : null,
         market_reference_url: marketLink.trim() || null,
         selling_price_php: null,
         status: "draft",
-      })
-      .select("id")
-      .single();
+      };
+    const productRequest = editingId
+      ? supabase.from("source_products").update(productValues).eq("id", editingId).eq("business_id", businessId)
+      : supabase.from("source_products").insert(productValues);
+    const { data, error } = await productRequest.select("id").single();
     if (error) {
       setSaving(false);
       return Alert.alert("Product not saved", error.message);
     }
     const productId = data.id as string;
-    if (options.length) {
-      const { error: optionError } = await supabase
-        .from("source_product_options")
-        .insert(
+    if (editingId) {
+      const { data: oldOptions } = await supabase.from("source_product_options").select("id").eq("source_product_id", productId);
+      const keptIds = options.map((option) => option.databaseId).filter(Boolean) as string[];
+      const removedIds = (oldOptions ?? []).map((option) => option.id).filter((id) => !keptIds.includes(id));
+      if (removedIds.length) {
+        const { error: removeError } = await supabase.from("source_product_options").delete().in("id", removedIds);
+        if (removeError) { setSaving(false); return Alert.alert("Variant not removed", removeError.code === "23503" ? "This variant is already used in a package." : removeError.message); }
+      }
+      for (let index = 0; index < options.length; index++) {
+        const option = options[index];
+        const values = { option_type: "Variant", option_value: option.value.trim(), source_price: option.price ? n(option.price) : null, price_sgd: currency === "SGD" && option.price ? n(option.price) : null, minimum_quantity: 1, sort_order: index };
+        const request = option.databaseId
+          ? supabase.from("source_product_options").update(values).eq("id", option.databaseId).eq("source_product_id", productId)
+          : supabase.from("source_product_options").insert({ source_product_id: productId, ...values });
+        const { error: optionError } = await request;
+        if (optionError) { setSaving(false); return Alert.alert("Variant not saved", optionError.message); }
+      }
+    } else if (options.length) {
+      const { error: optionError } = await supabase.from("source_product_options").insert(
           options.map((x, index) => ({
             source_product_id: productId,
-            option_type: x.type,
+            option_type: "Variant",
             option_value: x.value.trim(),
             source_price: x.price ? n(x.price) : null,
             price_sgd: currency === "SGD" && x.price ? n(x.price) : null,
-            minimum_quantity: Math.max(1, Math.floor(n(x.moq) || 1)),
+            minimum_quantity: 1,
             sort_order: index,
-          })),
-        );
+          })));
       if (optionError) {
         setSaving(false);
         return Alert.alert("Options not saved", optionError.message);
@@ -352,8 +396,8 @@ export function SourcingScreen({
     setEditing(false);
     await load();
     Alert.alert(
-      "Idea saved",
-      "The idea, category, supplier details, costs and images are now kept together.",
+      wasEditing ? "Product updated" : "Idea saved",
+      wasEditing ? "Your changes are saved." : "The idea, category, supplier details, costs and images are now kept together.",
     );
   };
   const itemCategories = Array.from(
@@ -437,22 +481,21 @@ export function SourcingScreen({
                 </View>
                 <Text style={styles.help}>
                   {item.product_url ? `${item.platform} · ` : ""}
-                  {item.final_cost_sgd > 0
-                    ? `${item.order_quantity} item${item.order_quantity === 1 ? "" : "s"}`
-                    : "Details can be added later"}
+                  {item.source_price > 0 ? "Cost saved" : "Details can be added later"}
                 </Text>
                 <Text style={styles.price}>
                   {item.source_currency} {Number(item.source_price || 0).toLocaleString()} · {money(((Number(item.source_price || 0) * (1 + Number(item.tax_percent || 0) / 100)) + Number(item.shipping_amount || 0)) * Number(item.currency_to_php_rate || 0), "PHP")}
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Delete ${item.name}`}
-                  style={styles.deleteIdea}
-                  onPress={() => deleteIdea(item)}
-                >
-                  <Ionicons name="trash-outline" size={16} color="#8A2943" />
-                  <Text style={styles.deleteIdeaText}>Delete product idea</Text>
-                </Pressable>
+                <View style={styles.itemActions}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`View or edit ${item.name}`} style={styles.editIdea} onPress={() => void openItem(item)}>
+                    <Ionicons name="create-outline" size={16} color="#315FBE" />
+                    <Text style={styles.editIdeaText}>View / edit</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${item.name}`} style={styles.deleteIdea} onPress={() => deleteIdea(item)}>
+                    <Ionicons name="trash-outline" size={16} color="#8A2943" />
+                    <Text style={styles.deleteIdeaText}>Delete</Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
           ))
@@ -465,7 +508,7 @@ export function SourcingScreen({
       keyboardShouldPersistTaps="handled"
     >
       <Header
-        title="Add product idea"
+        title={editingId ? "View or edit product" : "Add product idea"}
         onBack={() => {
           reset();
           setEditing(false);
@@ -540,6 +583,12 @@ export function SourcingScreen({
           </Pressable>
         </View>
         <View style={styles.imageGrid}>
+          {savedImages.map((image) => (
+            <View key={image.id} style={styles.imageWrap}>
+              <Image source={{ uri: image.image_url }} style={styles.preview as any} resizeMode="contain" />
+              <Text style={styles.imageType}>{image.image_type}</Text>
+            </View>
+          ))}
           {images.map((image, index) => (
             <View key={`${image.uri}-${index}`} style={styles.imageWrap}>
               <Image source={{ uri: image.uri }} style={styles.preview as any} resizeMode="contain" />
@@ -556,9 +605,9 @@ export function SourcingScreen({
         <Field label="Chinese details · Optional" value={description} setValue={setDescription} placeholder="Paste the original description" multiline />
         <Field label="English details · Optional" value={englishDescription} setValue={setEnglishDescription} placeholder="Add the translated description" multiline />
       </Section>
-      <Section number="4" title="Variants, colours and choices">
+      <Section number="4" title="Variants and choices">
         <Text style={styles.help}>
-          Add every colour, size or type. Each choice can have its own {currency} price.
+          Add each choice exactly as the supplier shows it, such as Pink, Large Blue or Pack of 50. Each choice can have its own price.
         </Text>
         <Text style={styles.label}>Variant price currency</Text>
         <View style={styles.chips}>
@@ -567,43 +616,20 @@ export function SourcingScreen({
         </View>
         {options.map((row) => (
           <View key={row.id} style={styles.optionCard}>
-            <View style={styles.chips}>
-              {optionTypes.map((x) => (
-                <Chip
-                  key={x}
-                  label={x}
-                  active={row.type === x}
-                  onPress={() => changeOption(row.id, "type", x)}
-                />
-              ))}
-            </View>
             <Field
-              label={`${row.type} name · Required`}
+              label="Variant or choice · Required"
               value={row.value}
               setValue={(v) => changeOption(row.id, "value", v)}
-              placeholder={`Example ${row.type.toLowerCase()}`}
+              placeholder="Example: Pink, Large Blue or Pack of 50"
             />
-            <View style={styles.two}>
-              <View style={styles.half}>
-                <Field
-                  label={`Listed price · ${currency}`}
-                  value={row.price}
-                  setValue={(v) => changeOption(row.id, "price", v)}
-                  keyboardType="decimal-pad"
-                  placeholder="If different"
-                />
-              </View>
-              <View style={styles.half}>
-                <Field
-                  label="Minimum quantity"
-                  value={row.moq}
-                  setValue={(v) => changeOption(row.id, "moq", v)}
-                  keyboardType="number-pad"
-                  placeholder="1"
-                />
-              </View>
-            </View>
-            {row.price ? <Text style={styles.variantCost}>Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost / quantity) * n(rate), "PHP")} each</Text> : null}
+            <Field
+              label={`Price shown · ${currency}`}
+              value={row.price}
+              setValue={(v) => changeOption(row.id, "price", v)}
+              keyboardType="decimal-pad"
+              placeholder="Example: 50"
+            />
+            {row.price ? <Text style={styles.variantCost}>Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")}</Text> : null}
             <Pressable
               style={styles.remove}
               onPress={() =>
@@ -617,7 +643,7 @@ export function SourcingScreen({
         ))}
         <Pressable style={styles.secondary} onPress={addOption}>
           <Ionicons name="add" size={20} color="#315FBE" />
-          <Text style={styles.secondaryText}>Add colour, size or type</Text>
+          <Text style={styles.secondaryText}>Add another variant or choice</Text>
         </Pressable>
       </Section>
       <Section number="5" title="Source cost">
@@ -629,26 +655,13 @@ export function SourcingScreen({
           <Chip label="RMB · China yuan" active={currency === "RMB"} onPress={() => { setCurrency("RMB"); setRate("8.1"); }} />
           <Chip label="SGD · Singapore dollar" active={currency === "SGD"} onPress={() => { setCurrency("SGD"); setRate("45"); }} />
         </View>
-        <View style={styles.two}>
-          <View style={styles.half}>
-            <Field
-              label={`Listed product price · ${currency}`}
-              value={sourcePrice}
-              setValue={setSourcePrice}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-            />
-          </View>
-          <View style={styles.half}>
-            <Field
-              label="Minimum order quantity"
-              value={qty}
-              setValue={setQty}
-              keyboardType="number-pad"
-              placeholder="1"
-            />
-          </View>
-        </View>
+        <Field
+          label={`Product price shown · ${currency}`}
+          value={sourcePrice}
+          setValue={setSourcePrice}
+          keyboardType="decimal-pad"
+          placeholder="Example: 50"
+        />
         <Field
           label={`1 ${currency} equals PHP`}
           value={rate}
@@ -669,7 +682,7 @@ export function SourcingScreen({
         {shippingType === "paid" ? <Field label={`Estimated shipping · ${currency}`} value={shippingAmount} setValue={setShippingAmount} keyboardType="decimal-pad" placeholder="0.00" /> : null}
         <View style={styles.summary}>
           <Summary
-            label="Listed price"
+            label="Product price shown"
             value={`${currency} ${listedPrice.toLocaleString()}`}
           />
           <Summary
@@ -700,7 +713,7 @@ export function SourcingScreen({
         ) : (
           <Ionicons name="checkmark" size={22} color="white" />
         )}
-        <Text style={styles.primaryText}>{saving ? "Saving…" : "Save idea"}</Text>
+        <Text style={styles.primaryText}>{saving ? "Saving…" : editingId ? "Save changes" : "Save product idea"}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -1005,10 +1018,21 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   removeText: { fontSize: 14, fontWeight: "600", color: "#8A2943" },
-  deleteIdea: {
-    alignSelf: "flex-start",
+  itemActions: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  editIdea: {
     minHeight: 38,
-    marginTop: 10,
+    paddingHorizontal: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "#C8D6F2",
+    borderRadius: 10,
+    backgroundColor: "#F5F8FF",
+  },
+  editIdeaText: { fontSize: 13, fontWeight: "700", color: "#315FBE" },
+  deleteIdea: {
+    minHeight: 38,
     paddingHorizontal: 11,
     flexDirection: "row",
     alignItems: "center",
