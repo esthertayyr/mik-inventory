@@ -18,12 +18,19 @@ type Product = {
   final_cost_sgd: number;
   exchange_rate_sgd_php: number;
   order_quantity: number;
+  source_currency: "RMB" | "SGD";
+  source_price: number;
+  tax_percent: number;
+  shipping_amount: number;
+  currency_to_php_rate: number;
+  source_product_options: { id: string; option_type: string; option_value: string; source_price: number | null }[] | null;
 };
 type PackageItem = {
   id: string;
   quantity: number;
   choices_note: string | null;
   source_products: { id: string; name: string; selling_price_php: number | null } | null;
+  source_product_options: { id: string; option_value: string } | null;
 };
 type Package = {
   id: string;
@@ -38,7 +45,7 @@ type Package = {
   active: boolean;
   reseller_package_items: PackageItem[] | null;
 };
-type DraftItem = { productId: string; quantity: string; note: string };
+type DraftItem = { productId: string; optionId: string; quantity: string; note: string };
 
 const money = (value: number) =>
   new Intl.NumberFormat("en-PH", {
@@ -89,12 +96,12 @@ export function ResellerPackagesScreen({
     const [{ data: packageRows, error }, { data: productRows }] = await Promise.all([
       supabase
         .from("reseller_packages")
-        .select("id,name,tier,description,package_price_php,deposit_required_php,suggested_retail_total_php,availability,lead_time_text,active,reseller_package_items(id,quantity,choices_note,source_products(id,name,selling_price_php))")
+        .select("id,name,tier,description,package_price_php,deposit_required_php,suggested_retail_total_php,availability,lead_time_text,active,reseller_package_items(id,quantity,choices_note,source_products(id,name,selling_price_php),source_product_options(id,option_value))")
         .eq("business_id", businessId)
         .order("created_at", { ascending: false }),
       supabase
         .from("source_products")
-        .select("id,name,selling_price_php,final_cost_sgd,exchange_rate_sgd_php,order_quantity")
+        .select("id,name,selling_price_php,final_cost_sgd,exchange_rate_sgd_php,order_quantity,source_currency,source_price,tax_percent,shipping_amount,currency_to_php_rate,source_product_options(id,option_type,option_value,source_price)")
         .eq("business_id", businessId)
         .neq("idea_stage", "not_proceeding")
         .order("name"),
@@ -106,30 +113,23 @@ export function ResellerPackagesScreen({
   }, [businessId]);
   useEffect(() => void load(), [load]);
 
-  const selectedRetail = useMemo(
-    () =>
-      items.reduce((sum, item) => {
-        const product = products.find((p) => p.id === item.productId);
-        return sum + Number(product?.selling_price_php || 0) * Math.max(1, Math.floor(n(item.quantity) || 1));
-      }, 0),
-    [items, products],
-  );
+  const itemUnitCost = (item: DraftItem) => {
+    const product = products.find((entry) => entry.id === item.productId);
+    if (!product) return 0;
+    const option = product.source_product_options?.find((entry) => entry.id === item.optionId);
+    const source = Number(option?.source_price ?? product.source_price ?? 0);
+    const taxed = source * (1 + Number(product.tax_percent || 0) / 100);
+    const shippingPerItem = Number(product.shipping_amount || 0) / Math.max(1, Number(product.order_quantity || 1));
+    return (taxed + shippingPerItem) * Number(product.currency_to_php_rate || 0);
+  };
   const selectedCost = useMemo(
     () =>
       items.reduce((sum, item) => {
-        const product = products.find((p) => p.id === item.productId);
-        const unitCost = product
-          ? (Number(product.final_cost_sgd || 0) /
-              Math.max(1, Number(product.order_quantity || 1))) *
-            Number(product.exchange_rate_sgd_php || 0)
-          : 0;
-        return (
-          sum +
-          unitCost * Math.max(1, Math.floor(n(item.quantity) || 1))
-        );
+        return sum + itemUnitCost(item) * Math.max(1, Math.floor(n(item.quantity) || 1));
       }, 0),
     [items, products],
   );
+  const selectedRetail = selectedCost * 2;
   const reset = () => {
     setName("");
     setTier("reseller");
@@ -155,6 +155,7 @@ export function ResellerPackagesScreen({
     setItems(
       (item.reseller_package_items ?? []).map((line) => ({
         productId: line.source_products?.id ?? "",
+        optionId: line.source_product_options?.id ?? "",
         quantity: `${line.quantity}`,
         note: line.choices_note ?? "",
       })).filter((line) => line.productId),
@@ -165,9 +166,9 @@ export function ResellerPackagesScreen({
     setItems((current) =>
       current.some((item) => item.productId === productId)
         ? current.filter((item) => item.productId !== productId)
-        : [...current, { productId, quantity: "1", note: "" }],
+        : [...current, { productId, optionId: "", quantity: "1", note: "" }],
     );
-  const changeItem = (productId: string, field: "quantity" | "note", value: string) =>
+  const changeItem = (productId: string, field: "quantity" | "note" | "optionId", value: string) =>
     setItems((current) =>
       current.map((item) => (item.productId === productId ? { ...item, [field]: value } : item)),
     );
@@ -175,19 +176,8 @@ export function ResellerPackagesScreen({
     if (!items.length)
       return Alert.alert("Choose products first", "Select what should be inside this package.");
     const next = items.map((item) => ({ ...item, quantity: `${suggestion.quantity}` }));
-    const retailTotal = next.reduce((sum, item) => {
-      const product = products.find((p) => p.id === item.productId);
-      return sum + Number(product?.selling_price_php || 0) * suggestion.quantity;
-    }, 0);
-    const packageCost = next.reduce((sum, item) => {
-      const product = products.find((p) => p.id === item.productId);
-      const unitCost = product
-        ? (Number(product.final_cost_sgd || 0) /
-            Math.max(1, Number(product.order_quantity || 1))) *
-          Number(product.exchange_rate_sgd_php || 0)
-        : 0;
-      return sum + unitCost * suggestion.quantity;
-    }, 0);
+    const packageCost = next.reduce((sum, item) => sum + itemUnitCost(item) * suggestion.quantity, 0);
+    const retailTotal = packageCost * 2;
     const packagePrice = Math.round(retailTotal * (1 - suggestion.discount));
     setItems(next);
     setTier(suggestion.tier);
@@ -201,6 +191,11 @@ export function ResellerPackagesScreen({
   const save = async () => {
     if (!name.trim()) return Alert.alert("Package name needed");
     if (!items.length) return Alert.alert("Choose at least one product");
+    const missingVariant = items.find((item) => {
+      const product = products.find((entry) => entry.id === item.productId);
+      return Boolean(product?.source_product_options?.length) && !item.optionId;
+    });
+    if (missingVariant) return Alert.alert("Choose a variant", "Select the exact colour, size or type for every package item.");
     if (n(price) <= 0) return Alert.alert("Package price needed");
     const requiredDeposit = deposit ? n(deposit) : n(price) / 2;
     if (requiredDeposit <= 0 || requiredDeposit > n(price))
@@ -249,6 +244,7 @@ export function ResellerPackagesScreen({
         package_id: data.id,
         business_id: businessId,
         source_product_id: item.productId,
+        source_product_option_id: item.optionId || null,
         quantity: Math.max(1, Math.floor(n(item.quantity) || 1)),
         choices_note: item.note.trim() || null,
         sort_order: index,
@@ -285,7 +281,7 @@ export function ResellerPackagesScreen({
             return <View key={item.id} style={[s.card, !item.active && s.inactive]}>
               <View style={s.cardHead}><View style={s.flex}><Text style={s.cardTitle}>{item.name}</Text><Text style={s.tier}>{tierNames[item.tier] ?? "Custom Package"}</Text></View><Text style={s.price}>{money(Number(item.package_price_php))}</Text></View>
               {item.description ? <Text style={s.help}>{item.description}</Text> : null}
-              <View style={s.itemList}>{item.reseller_package_items?.map((line) => <Text key={line.id} style={s.itemText}>{line.quantity} × {line.source_products?.name ?? "Product"}{line.choices_note ? ` · ${line.choices_note}` : ""}</Text>)}</View>
+              <View style={s.itemList}>{item.reseller_package_items?.map((line) => <Text key={line.id} style={s.itemText}>{line.quantity} × {line.source_products?.name ?? "Product"}{line.source_product_options?.option_value ? ` · ${line.source_product_options.option_value}` : ""}{line.choices_note ? ` · ${line.choices_note}` : ""}</Text>)}</View>
               <View style={s.metrics}><Metric label="Deposit" value={money(Number(item.deposit_required_php))} /><Metric label="Suggested resale" value={money(Number(item.suggested_retail_total_php || 0))} /><Metric label="Possible profit" value={money(Math.max(0, profit))} /></View>
               <View style={s.notice}><Ionicons name={item.availability === "ready_stock" ? "checkmark-circle-outline" : "time-outline"} size={18} color="#594C8D" /><Text style={s.noticeText}>{item.lead_time_text}. Local delivery is charged separately.</Text></View>
               <View style={s.two}><Pressable style={s.secondary} onPress={() => editPackage(item)}><Text style={s.secondaryText}>Edit package</Text></Pressable><Pressable style={s.secondary} onPress={() => void setActive(item, !item.active)}><Text style={s.secondaryText}>{item.active ? "Hide package" : "Show package"}</Text></Pressable></View>
@@ -300,8 +296,8 @@ export function ResellerPackagesScreen({
           <Field label="What is included · Optional" value={description} setValue={setDescription} placeholder="A short customer-friendly package description" multiline />
           <Text style={s.sectionTitle}>1. Choose products</Text>
           {products.length === 0 ? <Text style={s.help}>Add product ideas first, then return here.</Text> : <View style={s.chips}>{products.map((product) => <Chip key={product.id} label={product.name} active={items.some((item) => item.productId === product.id)} onPress={() => toggleProduct(product.id)} />)}</View>}
-          {items.map((item) => { const product = products.find((p) => p.id === item.productId); return <View key={item.productId} style={s.productRow}><View style={s.flex}><Text style={s.productName}>{product?.name}</Text><Text style={s.help}>{product?.selling_price_php ? `${money(Number(product.selling_price_php))} suggested retail each` : "Add price manually below"}</Text></View><View style={s.qty}><Text style={s.label}>Qty</Text><TextInput style={s.qtyInput} value={item.quantity} onChangeText={(value) => changeItem(item.productId, "quantity", value)} keyboardType="number-pad" /></View><Field label="Choices" value={item.note} setValue={(value) => changeItem(item.productId, "note", value)} placeholder="Optional" compact /></View>; })}
-          <Text style={s.sectionTitle}>2. Let MIK suggest a tier</Text><Text style={s.help}>Suggestions use the saved retail prices. Review and edit every number before saving.</Text>
+          {items.map((item) => { const product = products.find((p) => p.id === item.productId); const variants=product?.source_product_options??[]; return <View key={item.productId} style={s.productRow}><View style={s.full}><Text style={s.productName}>{product?.name}</Text><Text style={s.help}>{money(itemUnitCost(item))} estimated cost each</Text>{variants.length?<><Text style={s.label}>Choose exact variant</Text><View style={s.chips}>{variants.map((variant)=><Chip key={variant.id} label={`${variant.option_value}${variant.source_price!=null?` · ${product?.source_currency} ${variant.source_price}`:""}`} active={item.optionId===variant.id} onPress={()=>changeItem(item.productId,"optionId",variant.id)}/>)}</View></>:<Text style={s.help}>No variants saved for this product.</Text>}</View><View style={s.qty}><Text style={s.label}>Qty</Text><TextInput style={s.qtyInput} value={item.quantity} onChangeText={(value) => changeItem(item.productId, "quantity", value)} keyboardType="number-pad" /></View><Field label="Note · Optional" value={item.note} setValue={(value) => changeItem(item.productId, "note", value)} placeholder="Any special request" compact /></View>; })}
+          <Text style={s.sectionTitle}>2. Let MIK suggest a tier</Text><Text style={s.help}>Suggestions use each selected variant's converted cost. Review every number before saving.</Text>
           <View style={s.suggestions}>{suggestions.map((item) => <Pressable key={item.tier} style={s.suggestion} onPress={() => useSuggestion(item)}><Text style={s.suggestionText}>{item.label}</Text><Text style={s.suggestionHelp}>{Math.round(item.discount * 100)}% package discount</Text></Pressable>)}</View>
           <Text style={s.sectionTitle}>3. Price and availability</Text>
           <View style={s.two}><View style={s.flex}><Field label="Package price · PHP" value={price} setValue={setPrice} placeholder="0" numeric /></View><View style={s.flex}><Field label="Deposit · PHP" value={deposit} setValue={setDeposit} placeholder={price ? `${n(price) / 2}` : "50%"} numeric /></View></View>
@@ -327,6 +323,7 @@ const s = StyleSheet.create({
   page: { padding: 18, paddingBottom: 80, width: "100%", maxWidth: 980, alignSelf: "center", gap: 15 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
   flex: { flex: 1 }, header: { flexDirection: "row", alignItems: "center", gap: 12 },
+  full: { width: "100%", gap: 7 },
   back: { width: 42, height: 42, borderRadius: 13, borderWidth: 1, borderColor: "#E0E3EA", alignItems: "center", justifyContent: "center", backgroundColor: "white" },
   title: { fontSize: 23, fontWeight: "700", color: "#151924" }, help: { fontSize: 14, lineHeight: 20, color: "#626A78" },
   primary: { minHeight: 50, borderRadius: 14, backgroundColor: "#594C8D", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, paddingHorizontal: 16 },

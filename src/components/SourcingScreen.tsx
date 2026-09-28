@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +23,12 @@ type SourceItem = {
   final_cost_sgd: number;
   order_quantity: number;
   selling_price_php: number | null;
+  source_currency: "RMB" | "SGD";
+  source_price: number;
+  tax_percent: number;
+  shipping_type: "free" | "paid";
+  shipping_amount: number;
+  currency_to_php_rate: number;
   category_name: string;
   idea_stage: string;
   created_at: string;
@@ -68,6 +75,7 @@ export function SourcingScreen({
   onBack: () => void;
 }) {
   const [items, setItems] = useState<SourceItem[]>([]);
+  const { width } = useWindowDimensions();
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,9 +88,13 @@ export function SourcingScreen({
   const [supplier, setSupplier] = useState("");
   const [description, setDescription] = useState("");
   const [englishDescription, setEnglishDescription] = useState("");
-  const [unitSgd, setUnitSgd] = useState("");
+  const [currency, setCurrency] = useState<"RMB" | "SGD">("RMB");
+  const [sourcePrice, setSourcePrice] = useState("");
+  const [taxPercent, setTaxPercent] = useState("3");
+  const [shippingType, setShippingType] = useState<"free" | "paid">("free");
+  const [shippingAmount, setShippingAmount] = useState("");
   const [qty, setQty] = useState("1");
-  const [rate, setRate] = useState("45");
+  const [rate, setRate] = useState("8.1");
   const [marketPrice, setMarketPrice] = useState("");
   const [marketLink, setMarketLink] = useState("");
   const [sellingPhp, setSellingPhp] = useState("");
@@ -93,7 +105,7 @@ export function SourcingScreen({
     const { data, error } = await supabase
       .from("source_products")
       .select(
-        "id,name,product_url,platform,final_cost_sgd,order_quantity,selling_price_php,category_name,idea_stage,created_at,source_product_images(image_url)",
+        "id,name,product_url,platform,final_cost_sgd,order_quantity,selling_price_php,source_currency,source_price,tax_percent,shipping_type,shipping_amount,currency_to_php_rate,category_name,idea_stage,created_at,source_product_images(image_url)",
       )
       .eq("business_id", businessId)
       .order("created_at", { ascending: false });
@@ -105,13 +117,12 @@ export function SourcingScreen({
     void load();
   }, [load]);
   const quantity = Math.max(1, Math.floor(n(qty) || 1));
-  const totalSgd = n(unitSgd);
-  const unitCostSgd = totalSgd / quantity;
-  const unitCostPhp = unitCostSgd * n(rate);
-  const suggestedPhp = unitCostPhp * 2;
-  const chosenPrice = n(sellingPhp) || suggestedPhp;
-  const depositAmount = chosenPrice * 0.5;
-  const expectedProfit = chosenPrice - unitCostPhp;
+  const listedPrice = n(sourcePrice);
+  const taxAmount = listedPrice * n(taxPercent) / 100;
+  const shippingCost = shippingType === "paid" ? n(shippingAmount) : 0;
+  const landedSourceTotal = listedPrice + taxAmount + shippingCost;
+  const landedPhpTotal = landedSourceTotal * n(rate);
+  const unitCostPhp = landedPhpTotal / quantity;
   const reset = () => {
     setName("");
     setCategory("Other");
@@ -121,9 +132,13 @@ export function SourcingScreen({
     setSupplier("");
     setDescription("");
     setEnglishDescription("");
-    setUnitSgd("");
+    setCurrency("RMB");
+    setSourcePrice("");
+    setTaxPercent("3");
+    setShippingType("free");
+    setShippingAmount("");
     setQty("1");
-    setRate("45");
+    setRate("8.1");
     setMarketPrice("");
     setMarketLink("");
     setSellingPhp("");
@@ -169,18 +184,21 @@ export function SourcingScreen({
         ].slice(0, 12),
       );
   };
+  const addDroppedImages = (event: any) => {
+    event?.preventDefault?.();
+    const files = Array.from(event?.dataTransfer?.files ?? []) as File[];
+    const next = files.filter((file) => file.type.startsWith("image/")).map((file) => ({
+      uri: URL.createObjectURL(file), width: 1400, height: 1400, type: "product" as const,
+    }));
+    if (next.length) setImages((current) => [...current, ...next].slice(0, 12));
+  };
   const save = async () => {
     if (!name.trim())
       return Alert.alert("Product name needed", "Enter the product name.");
-    if (n(unitSgd) > 0 && n(rate) <= 0)
+    if (listedPrice > 0 && n(rate) <= 0)
       return Alert.alert(
         "Conversion rate needed",
-        "Enter how many Philippine pesos equal S$1.",
-      );
-    if (n(unitSgd) > 0 && n(sellingPhp) > 0 && n(sellingPhp) < suggestedPhp)
-      return Alert.alert(
-        "Deposit will not cover the cost",
-        `At ${money(n(sellingPhp), "PHP")}, the 50% deposit is only ${money(n(sellingPhp) * 0.5, "PHP")}. Set at least ${money(suggestedPhp, "PHP")} or change the payment plan.`,
+        `Enter how many Philippine pesos equal 1 ${currency}.`,
       );
     if (options.some((x) => !x.value.trim()))
       return Alert.alert(
@@ -188,7 +206,7 @@ export function SourcingScreen({
         "Enter a name for every colour, size or type, or remove the empty row.",
       );
     setSaving(true);
-    const finalPrice = n(unitSgd) > 0 ? n(sellingPhp) || suggestedPhp : null;
+    const legacySgdCost = currency === "SGD" ? landedSourceTotal : landedPhpTotal / 45;
     const { data, error } = await supabase
       .from("source_products")
       .insert({
@@ -205,13 +223,19 @@ export function SourcingScreen({
         supplier_name: supplier.trim() || null,
         original_description: description.trim() || null,
         english_description: englishDescription.trim() || null,
-        final_cost_sgd: n(unitSgd),
-        exchange_rate_sgd_php: n(rate),
+        source_currency: currency,
+        source_price: listedPrice,
+        tax_percent: n(taxPercent),
+        shipping_type: shippingType,
+        shipping_amount: shippingCost,
+        currency_to_php_rate: n(rate),
+        final_cost_sgd: legacySgdCost,
+        exchange_rate_sgd_php: 45,
         order_quantity: quantity,
         deposit_percent: 50,
         market_reference_price_php: marketPrice ? n(marketPrice) : null,
         market_reference_url: marketLink.trim() || null,
-        selling_price_php: finalPrice,
+        selling_price_php: null,
         status: "draft",
       })
       .select("id")
@@ -229,7 +253,8 @@ export function SourcingScreen({
             source_product_id: productId,
             option_type: x.type,
             option_value: x.value.trim(),
-            price_sgd: x.price ? n(x.price) : null,
+            source_price: x.price ? n(x.price) : null,
+            price_sgd: currency === "SGD" && x.price ? n(x.price) : null,
             minimum_quantity: Math.max(1, Math.floor(n(x.moq) || 1)),
             sort_order: index,
           })),
@@ -377,9 +402,7 @@ export function SourcingScreen({
                     : "Details can be added later"}
                 </Text>
                 <Text style={styles.price}>
-                  {item.selling_price_php
-                    ? `${money(Number(item.selling_price_php), "PHP")} selling price`
-                    : money(Number(item.final_cost_sgd), "SGD")}
+                  {item.source_currency} {Number(item.source_price || 0).toLocaleString()} · {money(((Number(item.source_price || 0) * (1 + Number(item.tax_percent || 0) / 100)) + Number(item.shipping_amount || 0)) * Number(item.currency_to_php_rate || 0), "PHP")}
                 </Text>
               </View>
             </View>
@@ -445,8 +468,18 @@ export function SourcingScreen({
       </Section>
       <Section number="2" title="Photos">
         <Text style={styles.help}>
-          Add product pictures or listing screenshots. MIK makes the files smaller before saving.
+          {width >= 700 ? "Drag product images here, or use the buttons below." : "Tap below to upload product images or screenshots from your phone."} MIK makes the files smaller before saving.
         </Text>
+        {width >= 700 ? (
+          <View
+            style={styles.dropZone}
+            {...({ onDragOver: (event: any) => event.preventDefault(), onDrop: addDroppedImages } as any)}
+          >
+            <Ionicons name="cloud-upload-outline" size={30} color="#315FBE" />
+            <Text style={styles.dropTitle}>Drop images here</Text>
+            <Text style={styles.help}>JPG, PNG or downloaded supplier screenshots</Text>
+          </View>
+        ) : null}
         <View style={styles.imageButtons}>
           <Pressable style={styles.secondary} onPress={() => void pickImages("product")}>
             <Ionicons name="images-outline" size={20} color="#315FBE" />
@@ -474,11 +507,15 @@ export function SourcingScreen({
         <Field label="Chinese details · Optional" value={description} setValue={setDescription} placeholder="Paste the original description" multiline />
         <Field label="English details · Optional" value={englishDescription} setValue={setEnglishDescription} placeholder="Add the translated description" multiline />
       </Section>
-      <Section number="4" title="Customer choices">
+      <Section number="4" title="Variants, colours and choices">
         <Text style={styles.help}>
-          Add every choice the customer can select, such as colours, sizes,
-          types or pack quantities.
+          Add every colour, size or type. Each choice can have its own {currency} price.
         </Text>
+        <Text style={styles.label}>Variant price currency</Text>
+        <View style={styles.chips}>
+          <Chip label="RMB" active={currency === "RMB"} onPress={() => { setCurrency("RMB"); setRate("8.1"); }} />
+          <Chip label="SGD" active={currency === "SGD"} onPress={() => { setCurrency("SGD"); setRate("45"); }} />
+        </View>
         {options.map((row) => (
           <View key={row.id} style={styles.optionCard}>
             <View style={styles.chips}>
@@ -498,16 +535,16 @@ export function SourcingScreen({
               placeholder={`Example ${row.type.toLowerCase()}`}
             />
             <View style={styles.two}>
-              <View style={styles.flex}>
+              <View style={styles.half}>
                 <Field
-                  label="Price SGD · Optional"
+                  label={`Listed price · ${currency}`}
                   value={row.price}
                   setValue={(v) => changeOption(row.id, "price", v)}
                   keyboardType="decimal-pad"
                   placeholder="If different"
                 />
               </View>
-              <View style={styles.flex}>
+              <View style={styles.half}>
                 <Field
                   label="Minimum quantity"
                   value={row.moq}
@@ -517,6 +554,7 @@ export function SourcingScreen({
                 />
               </View>
             </View>
+            {row.price ? <Text style={styles.variantCost}>Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost / quantity) * n(rate), "PHP")} each</Text> : null}
             <Pressable
               style={styles.remove}
               onPress={() =>
@@ -533,24 +571,28 @@ export function SourcingScreen({
           <Text style={styles.secondaryText}>Add colour, size or type</Text>
         </Pressable>
       </Section>
-      <Section number="5" title="Cost and selling price">
+      <Section number="5" title="Source cost">
         <Text style={styles.help}>
-          Optional while this is only an idea. Enter the final SGD amount once
-          the supplier shows the full item, tax and shipping total.
+          Enter the price shown by the supplier. MIK adds tax and shipping, then converts the cost to Philippine pesos.
         </Text>
+        <Text style={styles.label}>Price currency</Text>
+        <View style={styles.chips}>
+          <Chip label="RMB · China yuan" active={currency === "RMB"} onPress={() => { setCurrency("RMB"); setRate("8.1"); }} />
+          <Chip label="SGD · Singapore dollar" active={currency === "SGD"} onPress={() => { setCurrency("SGD"); setRate("45"); }} />
+        </View>
         <View style={styles.two}>
-          <View style={styles.flex}>
+          <View style={styles.half}>
             <Field
-              label="Final amount to pay · SGD"
-              value={unitSgd}
-              setValue={setUnitSgd}
+              label={`Listed product price · ${currency}`}
+              value={sourcePrice}
+              setValue={setSourcePrice}
               keyboardType="decimal-pad"
               placeholder="0.00"
             />
           </View>
-          <View style={styles.flex}>
+          <View style={styles.half}>
             <Field
-              label="Total items in this order"
+              label="Minimum order quantity"
               value={qty}
               setValue={setQty}
               keyboardType="number-pad"
@@ -559,56 +601,45 @@ export function SourcingScreen({
           </View>
         </View>
         <Field
-          label="S$1 equals PHP"
+          label={`1 ${currency} equals PHP`}
           value={rate}
           setValue={setRate}
           keyboardType="decimal-pad"
-          placeholder="45"
+          placeholder={currency === "RMB" ? "8.1" : "45"}
         />
+        <Text style={styles.label}>China tax</Text>
+        <View style={styles.chips}>
+          <Chip label="3% tax" active={taxPercent === "3"} onPress={() => setTaxPercent("3")} />
+          <Chip label="No tax" active={taxPercent === "0"} onPress={() => setTaxPercent("0")} />
+        </View>
+        <Text style={styles.label}>Supplier shipping</Text>
+        <View style={styles.chips}>
+          <Chip label="Free shipping" active={shippingType === "free"} onPress={() => { setShippingType("free"); setShippingAmount(""); }} />
+          <Chip label="Paid shipping" active={shippingType === "paid"} onPress={() => setShippingType("paid")} />
+        </View>
+        {shippingType === "paid" ? <Field label={`Estimated shipping · ${currency}`} value={shippingAmount} setValue={setShippingAmount} keyboardType="decimal-pad" placeholder="0.00" /> : null}
         <View style={styles.summary}>
           <Summary
-            label="Final cost per item"
-            value={`${money(unitCostSgd, "SGD")} · ${money(unitCostPhp, "PHP")}`}
+            label="Listed price"
+            value={`${currency} ${listedPrice.toLocaleString()}`}
           />
           <Summary
-            label="Minimum price for 50% deposit"
-            value={money(suggestedPhp, "PHP")}
+            label={`Tax · ${taxPercent}%`}
+            value={`${currency} ${taxAmount.toFixed(2)}`}
+          />
+          <Summary
+            label="Shipping"
+            value={shippingType === "free" ? "Free" : `${currency} ${shippingCost.toFixed(2)}`}
+          />
+          <Summary
+            label="Converted cost per item"
+            value={money(unitCostPhp, "PHP")}
             strong
-          />
-          <Summary
-            label="Customer pays now (50%)"
-            value={money(depositAmount, "PHP")}
-          />
-          <Summary
-            label="Estimated gross profit per item"
-            value={money(expectedProfit, "PHP")}
           />
         </View>
         <Text style={styles.note}>
-          The minimum price is twice your cost. This makes the customer's 50%
-          deposit enough to cover the item cost. Local delivery remains
-          separate.
+          Selling prices are set later when you build a reseller package.
         </Text>
-        <Field
-          label="Philippine market price · Optional"
-          value={marketPrice}
-          setValue={setMarketPrice}
-          keyboardType="decimal-pad"
-          placeholder="Price seen on Shopee or another shop"
-        />
-        <Field
-          label="Market listing link · Optional"
-          value={marketLink}
-          setValue={setMarketLink}
-          placeholder="Paste the Shopee or other shop link"
-        />
-        <Field
-          label="Your final selling price · PHP"
-          value={sellingPhp}
-          setValue={setSellingPhp}
-          keyboardType="decimal-pad"
-          placeholder={`${Math.ceil(suggestedPhp || 0)}`}
-        />
       </Section>
       <Pressable
         style={[styles.primary, saving && styles.disabled]}
@@ -900,7 +931,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E6E8ED",
   },
+  variantCost: { fontSize: 13, fontWeight: "700", color: "#315FBE" },
   two: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  half: { flexGrow: 1, flexBasis: 230, minWidth: 0 },
   secondary: {
     minHeight: 45,
     paddingHorizontal: 14,
@@ -947,6 +980,19 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   note: { fontSize: 13, lineHeight: 18, color: "#626A78" },
+  dropZone: {
+    minHeight: 124,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "#AFC2E7",
+    borderRadius: 16,
+    backgroundColor: "#F7F9FD",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    padding: 18,
+  },
+  dropTitle: { fontSize: 16, fontWeight: "700", color: "#315FBE" },
   imageButtons: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   imageGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   imageWrap: { width: 112 },
