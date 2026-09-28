@@ -5167,6 +5167,7 @@ const s = StyleSheet.create({
     borderColor: C.border,
     backgroundColor: C.white,
     width: "100%",
+    boxSizing: "border-box",
     maxWidth: 1180,
     alignSelf: "center",
   },

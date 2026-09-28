@@ -845,6 +845,7 @@ const s = StyleSheet.create({
     padding: 18,
     paddingBottom: 80,
     width: "100%",
+    boxSizing: "border-box",
     maxWidth: 980,
     alignSelf: "center",
     gap: 15,

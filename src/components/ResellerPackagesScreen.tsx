@@ -320,7 +320,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 function Metric({ label, value }: { label: string; value: string }) { return <View style={s.metric}><Text style={s.metricLabel}>{label}</Text><Text style={s.metricValue}>{value}</Text></View>; }
 
 const s = StyleSheet.create({
-  page: { padding: 18, paddingBottom: 80, width: "100%", maxWidth: 980, alignSelf: "center", gap: 15 },
+  page: { padding: 18, paddingBottom: 80, width: "100%", boxSizing: "border-box", maxWidth: 980, alignSelf: "center", gap: 15 },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
   flex: { flex: 1 }, header: { flexDirection: "row", alignItems: "center", gap: 12 },
   full: { width: "100%", gap: 7 },

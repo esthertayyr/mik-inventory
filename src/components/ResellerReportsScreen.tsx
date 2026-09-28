@@ -311,7 +311,7 @@ function Metric({ label, value, tone, help }: { label: string; value: string; to
 }
 
 const s = StyleSheet.create({
-  page: { padding: 18, paddingBottom: 80, width: "100%", maxWidth: 1050, alignSelf: "center", gap: 15 },
+  page: { padding: 18, paddingBottom: 80, width: "100%", boxSizing: "border-box", maxWidth: 1050, alignSelf: "center", gap: 15 },
   flex: { flex: 1 }, header: { flexDirection: "row", alignItems: "center", gap: 12 },
   back: { width: 42, height: 42, borderRadius: 13, borderWidth: 1, borderColor: "#E0E3EA", alignItems: "center", justifyContent: "center", backgroundColor: "white" },
   title: { fontSize: 23, fontWeight: "700", color: "#151924" }, help: { fontSize: 14, lineHeight: 20, color: "#626A78" },

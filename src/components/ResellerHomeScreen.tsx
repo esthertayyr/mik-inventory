@@ -211,6 +211,7 @@ export function ResellerHomeScreen({
 const s = StyleSheet.create({
   page: {
     width: "100%",
+    boxSizing: "border-box",
     maxWidth: 1080,
     alignSelf: "center",
     padding: 18,
