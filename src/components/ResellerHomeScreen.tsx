@@ -180,7 +180,7 @@ export function ResellerHomeScreen({
             </View>
             <View style={s.grid}>
               {group.actions.map((action) => (
-                <Pressable key={action.screen} style={s.card} onPress={() => onOpen(action.screen)}>
+                <Pressable key={action.screen} style={[s.card, compact && s.cardCompact]} onPress={() => onOpen(action.screen)}>
                   <View style={[s.icon, { backgroundColor: action.soft }]}>
                     <Ionicons name={action.icon} size={25} color={action.color} />
                   </View>
@@ -248,6 +248,7 @@ const s = StyleSheet.create({
     borderColor: "#E0E3EA",
     backgroundColor: "white",
   },
+  cardCompact: { marginRight: 12 },
   icon: {
     width: 48,
     height: 48,
