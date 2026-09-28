@@ -238,6 +238,7 @@ const s = StyleSheet.create({
     flexGrow: 1,
     flexBasis: 420,
     minWidth: 270,
+    boxSizing: "border-box",
     minHeight: 104,
     flexDirection: "row",
     alignItems: "center",
@@ -248,7 +249,7 @@ const s = StyleSheet.create({
     borderColor: "#E0E3EA",
     backgroundColor: "white",
   },
-  cardCompact: { marginRight: 12 },
+  cardCompact: { flexBasis: "100%", minWidth: 0 },
   icon: {
     width: 48,
     height: 48,
