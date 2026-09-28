@@ -4,6 +4,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,6 +32,8 @@ export function ResellerHomeScreen({
   businessId: string;
   onOpen: (screen: Screen) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const compact = width < 600;
   const [loading, setLoading] = useState(true);
   const [ideas, setIdeas] = useState(0);
   const [packages, setPackages] = useState(0);
@@ -183,9 +186,10 @@ export function ResellerHomeScreen({
                   </View>
                   <View style={s.flex}>
                     <Text style={s.cardTitle}>{action.title}</Text>
-                    <Text style={s.cardHelp}>{action.help}</Text>
+                    <Text style={s.cardHelp} numberOfLines={compact ? 2 : undefined}>{action.help}</Text>
+                    {compact ? <Text style={[s.compactValue, { color: action.color }]}>{action.value}</Text> : null}
                   </View>
-                  <Text style={[s.value, { color: action.color }]}>{action.value}</Text>
+                  {!compact ? <Text style={[s.value, { color: action.color }]}>{action.value}</Text> : null}
                   <Ionicons name="chevron-forward" size={20} color={action.color} />
                 </Pressable>
               ))}
@@ -254,6 +258,7 @@ const s = StyleSheet.create({
   cardTitle: { fontSize: 18, fontWeight: "700", color: "#151924" },
   cardHelp: { fontSize: 13, lineHeight: 18, color: "#626A78", marginTop: 3 },
   value: { fontSize: 20, fontWeight: "700" },
+  compactValue: { fontSize: 15, fontWeight: "700", marginTop: 5 },
   flow: {
     padding: 17,
     borderRadius: 17,
