@@ -157,13 +157,13 @@ export function ResellerHomeScreen({
         <Text style={s.eyebrow}>TODAY · {today.toUpperCase()}</Text>
         <Text style={s.title}>Business overview</Text>
         <Text style={s.help}>
-          Everything for Astera, organised by task.
+          Everything for VIAE, organised by task.
         </Text>
       </View>
       {loading ? (
         <View style={s.loading}>
           <ActivityIndicator color="#594C8D" />
-          <Text style={s.help}>Opening Astera…</Text>
+          <Text style={s.help}>Opening VIAE…</Text>
         </View>
       ) : (
         groups.map((group) => (
@@ -194,7 +194,7 @@ export function ResellerHomeScreen({
         ))
       )}
       <View style={s.flow}>
-        <Text style={s.flowTitle}>How Astera works</Text>
+        <Text style={s.flowTitle}>How VIAE works</Text>
         <Text style={s.flowText}>
           Product idea → Reseller package → Customer pre-order → Deposit →
           Arrival → Final payment → Delivery
