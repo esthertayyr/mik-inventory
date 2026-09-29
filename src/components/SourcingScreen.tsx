@@ -34,6 +34,7 @@ type SourceItem = {
   idea_stage: string;
   created_at: string;
   source_product_images: { image_url: string }[] | null;
+  source_product_options: { source_price: number | null }[] | null;
 };
 type OptionRow = {
   id: string;
@@ -90,7 +91,6 @@ export function SourcingScreen({
   const [description, setDescription] = useState("");
   const [englishDescription, setEnglishDescription] = useState("");
   const [currency, setCurrency] = useState<"RMB" | "SGD">("RMB");
-  const [sourcePrice, setSourcePrice] = useState("");
   const [taxPercent, setTaxPercent] = useState("3");
   const [shippingType, setShippingType] = useState<"free" | "paid">("free");
   const [shippingAmount, setShippingAmount] = useState("");
@@ -106,12 +106,29 @@ export function SourcingScreen({
     const { data, error } = await supabase
       .from("source_products")
       .select(
-        "id,name,product_url,platform,final_cost_sgd,order_quantity,selling_price_php,source_currency,source_price,tax_percent,shipping_type,shipping_amount,currency_to_php_rate,category_name,idea_stage,created_at,source_product_images(image_url)",
+        "id,name,product_url,platform,final_cost_sgd,order_quantity,selling_price_php,source_currency,source_price,tax_percent,shipping_type,shipping_amount,currency_to_php_rate,category_name,idea_stage,created_at,source_product_options(source_price)",
       )
       .eq("business_id", businessId)
       .order("created_at", { ascending: false });
     if (error) Alert.alert("Products not loaded", error.message);
-    setItems((data ?? []) as SourceItem[]);
+    const products = (data ?? []) as Omit<SourceItem, "source_product_images">[];
+    const productIds = products.map((item) => item.id);
+    let imageMap = new Map<string, { image_url: string }[]>();
+    if (productIds.length) {
+      const { data: imageRows, error: imageError } = await supabase
+        .from("source_product_images")
+        .select("source_product_id,image_url,sort_order")
+        .in("source_product_id", productIds)
+        .order("sort_order", { ascending: true });
+      if (imageError) Alert.alert("Product photos not loaded", imageError.message);
+      imageMap = (imageRows ?? []).reduce((map, row) => {
+        const current = map.get(row.source_product_id) ?? [];
+        current.push({ image_url: row.image_url });
+        map.set(row.source_product_id, current);
+        return map;
+      }, new Map<string, { image_url: string }[]>());
+    }
+    setItems(products.map((item) => ({ ...item, source_product_images: imageMap.get(item.id) ?? [] })) as SourceItem[]);
     setLoading(false);
   }, [businessId]);
   useEffect(() => {
@@ -156,12 +173,11 @@ export function SourcingScreen({
       { text: "Delete", style: "destructive", onPress: () => void run() },
     ]);
   };
-  const listedPrice = n(sourcePrice);
-  const taxAmount = listedPrice * n(taxPercent) / 100;
   const shippingCost = shippingType === "paid" ? n(shippingAmount) : 0;
-  const landedSourceTotal = listedPrice + taxAmount + shippingCost;
-  const landedPhpTotal = landedSourceTotal * n(rate);
-  const unitCostPhp = landedPhpTotal;
+  const pricedOptions = options.map((option) => n(option.price)).filter((price) => price > 0);
+  const lowestVariantPrice = pricedOptions.length ? Math.min(...pricedOptions) : 0;
+  const lowestVariantSourceCost = lowestVariantPrice * (1 + n(taxPercent) / 100) + shippingCost;
+  const lowestVariantPhpCost = lowestVariantSourceCost * n(rate);
   const reset = () => {
     setName("");
     setCategory("Other");
@@ -172,7 +188,6 @@ export function SourcingScreen({
     setDescription("");
     setEnglishDescription("");
     setCurrency("RMB");
-    setSourcePrice("");
     setTaxPercent("3");
     setShippingType("free");
     setShippingAmount("");
@@ -217,7 +232,6 @@ export function SourcingScreen({
     setDescription(data.original_description ?? "");
     setEnglishDescription(data.english_description ?? "");
     setCurrency(data.source_currency === "SGD" ? "SGD" : "RMB");
-    setSourcePrice(data.source_price ? String(data.source_price) : "");
     setTaxPercent(String(data.tax_percent ?? 3));
     setShippingType(data.shipping_type === "paid" ? "paid" : "free");
     setShippingAmount(data.shipping_amount ? String(data.shipping_amount) : "");
@@ -265,7 +279,7 @@ export function SourcingScreen({
     const wasEditing = Boolean(editingId);
     if (!name.trim())
       return Alert.alert("Product name needed", "Enter the product name.");
-    if (listedPrice > 0 && n(rate) <= 0)
+    if (pricedOptions.length > 0 && n(rate) <= 0)
       return Alert.alert(
         "Conversion rate needed",
         `Enter how many Philippine pesos equal 1 ${currency}.`,
@@ -276,7 +290,7 @@ export function SourcingScreen({
         "Enter a name for every variant or choice, or remove the empty row.",
       );
     setSaving(true);
-    const legacySgdCost = currency === "SGD" ? landedSourceTotal : landedPhpTotal / 45;
+    const legacySgdCost = currency === "SGD" ? lowestVariantSourceCost : lowestVariantPhpCost / 45;
     const productValues = {
         business_id: businessId,
         location_id: locationId,
@@ -292,7 +306,7 @@ export function SourcingScreen({
         original_description: description.trim() || null,
         english_description: englishDescription.trim() || null,
         source_currency: currency,
-        source_price: listedPrice,
+        source_price: 0,
         tax_percent: n(taxPercent),
         shipping_type: shippingType,
         shipping_amount: shippingCost,
@@ -462,12 +476,22 @@ export function SourcingScreen({
             </Text>
           </View>
         ) : (
-          shownItems.map((item) => (
+          shownItems.map((item) => {
+            const variantPrices = (item.source_product_options ?? [])
+              .map((option) => Number(option.source_price || 0))
+              .filter((price) => price > 0);
+            const lowestPrice = variantPrices.length ? Math.min(...variantPrices) : 0;
+            const convertedCost =
+              (lowestPrice * (1 + Number(item.tax_percent || 0) / 100) +
+                Number(item.shipping_amount || 0)) *
+              Number(item.currency_to_php_rate || 0);
+            return (
             <View key={item.id} style={styles.item}>
               {item.source_product_images?.[0]?.image_url ? (
                 <Image
                   source={{ uri: item.source_product_images[0].image_url }}
                   style={styles.thumb as any}
+                  resizeMode="cover"
                 />
               ) : (
                 <View style={styles.thumbEmpty}>
@@ -481,11 +505,13 @@ export function SourcingScreen({
                 </View>
                 <Text style={styles.help}>
                   {item.product_url ? `${item.platform} · ` : ""}
-                  {item.source_price > 0 ? "Cost saved" : "Details can be added later"}
+                  {variantPrices.length ? `${variantPrices.length} priced ${variantPrices.length === 1 ? "variant" : "variants"}` : "Add a variant price"}
                 </Text>
-                <Text style={styles.price}>
-                  {item.source_currency} {Number(item.source_price || 0).toLocaleString()} · {money(((Number(item.source_price || 0) * (1 + Number(item.tax_percent || 0) / 100)) + Number(item.shipping_amount || 0)) * Number(item.currency_to_php_rate || 0), "PHP")}
-                </Text>
+                {lowestPrice > 0 ? (
+                  <Text style={styles.price}>
+                    From {item.source_currency} {lowestPrice.toLocaleString()} · {money(convertedCost, "PHP")}
+                  </Text>
+                ) : null}
                 <View style={styles.itemActions}>
                   <Pressable accessibilityRole="button" accessibilityLabel={`View or edit ${item.name}`} style={styles.editIdea} onPress={() => void openItem(item)}>
                     <Ionicons name="create-outline" size={16} color="#315FBE" />
@@ -498,7 +524,8 @@ export function SourcingScreen({
                 </View>
               </View>
             </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
     );
@@ -605,7 +632,7 @@ export function SourcingScreen({
         <Field label="Chinese details · Optional" value={description} setValue={setDescription} placeholder="Paste the original description" multiline />
         <Field label="English details · Optional" value={englishDescription} setValue={setEnglishDescription} placeholder="Add the translated description" multiline />
       </Section>
-      <Section number="4" title="Variants and choices">
+      <Section number="4" title="Variants and costs">
         <Text style={styles.help}>
           Add each choice exactly as the supplier shows it, such as Pink, Large Blue or Pack of 50. Each choice can have its own price.
         </Text>
@@ -614,6 +641,25 @@ export function SourcingScreen({
           <Chip label="RMB" active={currency === "RMB"} onPress={() => { setCurrency("RMB"); setRate("8.1"); }} />
           <Chip label="SGD" active={currency === "SGD"} onPress={() => { setCurrency("SGD"); setRate("45"); }} />
         </View>
+        <Field
+          label={`1 ${currency} equals PHP`}
+          value={rate}
+          setValue={setRate}
+          keyboardType="decimal-pad"
+          placeholder={currency === "RMB" ? "8.1" : "45"}
+        />
+        <Text style={styles.label}>China tax</Text>
+        <View style={styles.chips}>
+          <Chip label="3% tax" active={taxPercent === "3"} onPress={() => setTaxPercent("3")} />
+          <Chip label="No tax" active={taxPercent === "0"} onPress={() => setTaxPercent("0")} />
+        </View>
+        <Text style={styles.label}>Supplier shipping</Text>
+        <View style={styles.chips}>
+          <Chip label="Free shipping" active={shippingType === "free"} onPress={() => { setShippingType("free"); setShippingAmount(""); }} />
+          <Chip label="Paid shipping" active={shippingType === "paid"} onPress={() => setShippingType("paid")} />
+        </View>
+        {shippingType === "paid" ? <Field label={`Estimated shipping · ${currency}`} value={shippingAmount} setValue={setShippingAmount} keyboardType="decimal-pad" placeholder="0.00" /> : null}
+        <Text style={styles.note}>These settings apply to every variant below.</Text>
         {options.map((row) => (
           <View key={row.id} style={styles.optionCard}>
             <Field
@@ -645,60 +691,6 @@ export function SourcingScreen({
           <Ionicons name="add" size={20} color="#315FBE" />
           <Text style={styles.secondaryText}>Add another variant or choice</Text>
         </Pressable>
-      </Section>
-      <Section number="5" title="Source cost">
-        <Text style={styles.help}>
-          Enter the price shown by the supplier. MIK adds tax and shipping, then converts the cost to Philippine pesos.
-        </Text>
-        <Text style={styles.label}>Price currency</Text>
-        <View style={styles.chips}>
-          <Chip label="RMB · China yuan" active={currency === "RMB"} onPress={() => { setCurrency("RMB"); setRate("8.1"); }} />
-          <Chip label="SGD · Singapore dollar" active={currency === "SGD"} onPress={() => { setCurrency("SGD"); setRate("45"); }} />
-        </View>
-        <Field
-          label={`Product price shown · ${currency}`}
-          value={sourcePrice}
-          setValue={setSourcePrice}
-          keyboardType="decimal-pad"
-          placeholder="Example: 50"
-        />
-        <Field
-          label={`1 ${currency} equals PHP`}
-          value={rate}
-          setValue={setRate}
-          keyboardType="decimal-pad"
-          placeholder={currency === "RMB" ? "8.1" : "45"}
-        />
-        <Text style={styles.label}>China tax</Text>
-        <View style={styles.chips}>
-          <Chip label="3% tax" active={taxPercent === "3"} onPress={() => setTaxPercent("3")} />
-          <Chip label="No tax" active={taxPercent === "0"} onPress={() => setTaxPercent("0")} />
-        </View>
-        <Text style={styles.label}>Supplier shipping</Text>
-        <View style={styles.chips}>
-          <Chip label="Free shipping" active={shippingType === "free"} onPress={() => { setShippingType("free"); setShippingAmount(""); }} />
-          <Chip label="Paid shipping" active={shippingType === "paid"} onPress={() => setShippingType("paid")} />
-        </View>
-        {shippingType === "paid" ? <Field label={`Estimated shipping · ${currency}`} value={shippingAmount} setValue={setShippingAmount} keyboardType="decimal-pad" placeholder="0.00" /> : null}
-        <View style={styles.summary}>
-          <Summary
-            label="Product price shown"
-            value={`${currency} ${listedPrice.toLocaleString()}`}
-          />
-          <Summary
-            label={`Tax · ${taxPercent}%`}
-            value={`${currency} ${taxAmount.toFixed(2)}`}
-          />
-          <Summary
-            label="Shipping"
-            value={shippingType === "free" ? "Free" : `${currency} ${shippingCost.toFixed(2)}`}
-          />
-          <Summary
-            label="Converted cost per item"
-            value={money(unitCostPhp, "PHP")}
-            strong
-          />
-        </View>
         <Text style={styles.note}>
           Selling prices are set later when you build a reseller package.
         </Text>
@@ -796,24 +788,6 @@ function Chip({
         {label}
       </Text>
     </Pressable>
-  );
-}
-function Summary({
-  label,
-  value,
-  strong = false,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-}) {
-  return (
-    <View style={styles.summaryRow}>
-      <Text style={styles.help}>{label}</Text>
-      <Text style={strong ? styles.summaryStrong : styles.summaryValue}>
-        {value}
-      </Text>
-    </View>
   );
 }
 const styles = StyleSheet.create({
