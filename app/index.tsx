@@ -227,7 +227,7 @@ const ownerNav: {
 ];
 const resellerNav: typeof ownerNav = [
   { id: "home", label: "Home", icon: "home-outline", color: "#4F5664", soft: "#F3F4F6" },
-  { id: "sourcing", label: "Ideas", icon: "bag-handle-outline", color: "#315FBE", soft: "#EDF3FB" },
+  { id: "sourcing", label: "Products", icon: "bag-handle-outline", color: "#315FBE", soft: "#EDF3FB" },
   { id: "reseller_packages", label: "Packages", icon: "layers-outline", color: "#594C8D", soft: "#F3F0F8" },
   { id: "preorders", label: "Pre-orders", icon: "receipt-outline", color: "#8A365B", soft: "#FAEFF4" },
   { id: "reseller_reports", label: "Reports", icon: "bar-chart-outline", color: "#1B685C", soft: "#EDF6F3" },
@@ -2440,7 +2440,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
     },
     ...(visibleModules.includes("sourcing") ? [{
       title: "Reseller business", help: "Plan products, build packages and fulfil customer pre-orders.", color: "#594C8D", soft: "#F3F0F8", border: "#D8D0E7", actions: [
-        { title: "Product ideas", help: "Save links, choices, costs and images", icon: "bag-handle" as Icon, screen: "sourcing" as Screen },
+        { title: "Products", help: "Save links, choices, costs and photos", icon: "bag-handle" as Icon, screen: "sourcing" as Screen },
         { title: "Reseller packages", help: "Choose products and set tiered prices", icon: "layers" as Icon, screen: "reseller_packages" as Screen },
         { title: "Customer pre-orders", help: "Track deposits, arrival, final payment and delivery", icon: "receipt" as Icon, screen: "preorders" as Screen },
         { title: "Reseller reports", help: "See customer payments, balances and popular packages", icon: "bar-chart" as Icon, screen: "reseller_reports" as Screen },

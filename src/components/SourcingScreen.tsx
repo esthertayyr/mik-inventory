@@ -46,7 +46,7 @@ type LocalImage = {
   uri: string;
   width: number;
   height: number;
-  type: "product" | "screenshot";
+  type: "product";
 };
 type SavedImage = { id: string; image_url: string; storage_path: string; image_type: LocalImage["type"] };
 const sourcingCategories = [
@@ -88,13 +88,12 @@ export function SourcingScreen({
   const [link, setLink] = useState("");
   const [platform, setPlatform] = useState("Pinduoduo");
   const [supplier, setSupplier] = useState("");
-  const [description, setDescription] = useState("");
   const [englishDescription, setEnglishDescription] = useState("");
-  const [currency, setCurrency] = useState<"RMB" | "SGD">("RMB");
+  const currency = "SGD" as const;
   const [taxPercent, setTaxPercent] = useState("3");
   const [shippingType, setShippingType] = useState<"free" | "paid">("free");
   const [shippingAmount, setShippingAmount] = useState("");
-  const [rate, setRate] = useState("8.1");
+  const [rate, setRate] = useState("45");
   const [marketPrice, setMarketPrice] = useState("");
   const [marketLink, setMarketLink] = useState("");
   const [sellingPhp, setSellingPhp] = useState("");
@@ -185,13 +184,11 @@ export function SourcingScreen({
     setLink("");
     setPlatform("Pinduoduo");
     setSupplier("");
-    setDescription("");
     setEnglishDescription("");
-    setCurrency("RMB");
     setTaxPercent("3");
     setShippingType("free");
     setShippingAmount("");
-    setRate("8.1");
+    setRate("45");
     setMarketPrice("");
     setMarketLink("");
     setSellingPhp("");
@@ -229,19 +226,17 @@ export function SourcingScreen({
     setLink(data.product_url ?? "");
     setPlatform(data.platform ?? "Pinduoduo");
     setSupplier(data.supplier_name ?? "");
-    setDescription(data.original_description ?? "");
     setEnglishDescription(data.english_description ?? "");
-    setCurrency(data.source_currency === "SGD" ? "SGD" : "RMB");
     setTaxPercent(String(data.tax_percent ?? 3));
     setShippingType(data.shipping_type === "paid" ? "paid" : "free");
     setShippingAmount(data.shipping_amount ? String(data.shipping_amount) : "");
-    setRate(String(data.currency_to_php_rate ?? (data.source_currency === "SGD" ? 45 : 8.1)));
+    setRate(String(data.source_currency === "SGD" ? (data.currency_to_php_rate ?? 45) : 45));
     setOptions((data.source_product_options ?? []).map((option: any) => ({ id: option.id, databaseId: option.id, value: option.option_value ?? "", price: option.source_price == null ? "" : String(option.source_price) })));
     setSavedImages((data.source_product_images ?? []) as SavedImage[]);
     setImages([]);
     setEditing(true);
   };
-  const pickImages = async (type: LocalImage["type"]) => {
+  const pickImages = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted)
       return Alert.alert(
@@ -262,7 +257,7 @@ export function SourcingScreen({
             uri: a.uri,
             width: a.width,
             height: a.height,
-            type,
+            type: "product" as const,
           })),
         ].slice(0, 12),
       );
@@ -303,7 +298,7 @@ export function SourcingScreen({
         idea_stage: "idea",
         platform,
         supplier_name: supplier.trim() || null,
-        original_description: description.trim() || null,
+        original_description: null,
         english_description: englishDescription.trim() || null,
         source_currency: currency,
         source_price: 0,
@@ -430,13 +425,13 @@ export function SourcingScreen({
   if (!editing)
     return (
       <ScrollView contentContainerStyle={styles.page}>
-        <Header title="Product ideas" onBack={onBack} />
+        <Header title="Products" onBack={onBack} />
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
             <Ionicons name="bag-handle-outline" size={25} color="#315FBE" />
           </View>
           <View style={styles.flex}>
-            <Text style={styles.title}>Ideas and products to resell</Text>
+            <Text style={styles.title}>Products to resell</Text>
             <Text style={styles.help}>
               Save an idea first. Add links, choices, costs and images when you
               find them.
@@ -445,7 +440,7 @@ export function SourcingScreen({
         </View>
         <Pressable style={styles.primary} onPress={() => setEditing(true)}>
           <Ionicons name="add" size={22} color="white" />
-          <Text style={styles.primaryText}>Add product idea</Text>
+          <Text style={styles.primaryText}>Add product</Text>
         </Pressable>
         <ScrollView
           horizontal
@@ -469,7 +464,7 @@ export function SourcingScreen({
         {shownItems.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.cardTitle}>
-              {items.length ? "No ideas in this category" : "No product ideas yet"}
+              {items.length ? "No products in this category" : "No products yet"}
             </Text>
             <Text style={styles.help}>
               Add the first item you may buy and resell.
@@ -535,7 +530,7 @@ export function SourcingScreen({
       keyboardShouldPersistTaps="handled"
     >
       <Header
-        title={editingId ? "View or edit product" : "Add product idea"}
+        title={editingId ? "View or edit product" : "Add product"}
         onBack={() => {
           reset();
           setEditing(false);
@@ -587,7 +582,7 @@ export function SourcingScreen({
       </Section>
       <Section number="2" title="Photos">
         <Text style={styles.help}>
-          {width >= 700 ? "Drag product images here, or use the buttons below." : "Tap below to upload product images or screenshots from your phone."} MIK makes the files smaller before saving.
+          {width >= 700 ? "Drag product photos here, or use the button below." : "Tap below to add product photos from your phone."} MIK makes the files smaller before saving.
         </Text>
         {width >= 700 ? (
           <View
@@ -596,24 +591,19 @@ export function SourcingScreen({
           >
             <Ionicons name="cloud-upload-outline" size={30} color="#315FBE" />
             <Text style={styles.dropTitle}>Drop images here</Text>
-            <Text style={styles.help}>JPG, PNG or downloaded supplier screenshots</Text>
+            <Text style={styles.help}>JPG, PNG or a downloaded supplier photo</Text>
           </View>
         ) : null}
         <View style={styles.imageButtons}>
-          <Pressable style={styles.secondary} onPress={() => void pickImages("product")}>
+          <Pressable style={styles.secondary} onPress={() => void pickImages()}>
             <Ionicons name="images-outline" size={20} color="#315FBE" />
-            <Text style={styles.secondaryText}>Add product photos</Text>
-          </Pressable>
-          <Pressable style={styles.secondary} onPress={() => void pickImages("screenshot")}>
-            <Ionicons name="phone-portrait-outline" size={20} color="#315FBE" />
-            <Text style={styles.secondaryText}>Add screenshots</Text>
+            <Text style={styles.secondaryText}>Add photos</Text>
           </Pressable>
         </View>
         <View style={styles.imageGrid}>
           {savedImages.map((image) => (
             <View key={image.id} style={styles.imageWrap}>
               <Image source={{ uri: image.image_url }} style={styles.preview as any} resizeMode="contain" />
-              <Text style={styles.imageType}>{image.image_type}</Text>
             </View>
           ))}
           {images.map((image, index) => (
@@ -622,33 +612,27 @@ export function SourcingScreen({
               <Pressable style={styles.imageRemove} onPress={() => setImages((v) => v.filter((_, i) => i !== index))}>
                 <Ionicons name="close" size={16} color="white" />
               </Pressable>
-              <Text style={styles.imageType}>{image.type}</Text>
             </View>
           ))}
         </View>
       </Section>
-      <Section number="3" title="Supplier and description">
+      <Section number="3" title="Shop and product details">
         <Field label="Supplier or shop name · Optional" value={supplier} setValue={setSupplier} placeholder="Shop or seller name" />
-        <Field label="Chinese details · Optional" value={description} setValue={setDescription} placeholder="Paste the original description" multiline />
-        <Field label="English details · Optional" value={englishDescription} setValue={setEnglishDescription} placeholder="Add the translated description" multiline />
+        <Field label="Product details · Optional" value={englishDescription} setValue={setEnglishDescription} placeholder="Add useful product information" multiline />
       </Section>
       <Section number="4" title="Variants and costs">
         <Text style={styles.help}>
           Add each choice exactly as the supplier shows it, such as Pink, Large Blue or Pack of 50. Each choice can have its own price.
         </Text>
-        <Text style={styles.label}>Variant price currency</Text>
-        <View style={styles.chips}>
-          <Chip label="RMB" active={currency === "RMB"} onPress={() => { setCurrency("RMB"); setRate("8.1"); }} />
-          <Chip label="SGD" active={currency === "SGD"} onPress={() => { setCurrency("SGD"); setRate("45"); }} />
-        </View>
+        <Text style={styles.label}>Variant prices are in SGD</Text>
         <Field
           label={`1 ${currency} equals PHP`}
           value={rate}
           setValue={setRate}
           keyboardType="decimal-pad"
-          placeholder={currency === "RMB" ? "8.1" : "45"}
+          placeholder="45"
         />
-        <Text style={styles.label}>China tax</Text>
+        <Text style={styles.label}>Tax</Text>
         <View style={styles.chips}>
           <Chip label="3% tax" active={taxPercent === "3"} onPress={() => setTaxPercent("3")} />
           <Chip label="No tax" active={taxPercent === "0"} onPress={() => setTaxPercent("0")} />
@@ -675,7 +659,7 @@ export function SourcingScreen({
               keyboardType="decimal-pad"
               placeholder="Example: 50"
             />
-            {row.price ? <Text style={styles.variantCost}>Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")}</Text> : null}
+            {row.price ? <Text style={styles.variantCost}>Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")} · includes selected tax and shipping</Text> : null}
             <Pressable
               style={styles.remove}
               onPress={() =>
@@ -705,7 +689,7 @@ export function SourcingScreen({
         ) : (
           <Ionicons name="checkmark" size={22} color="white" />
         )}
-        <Text style={styles.primaryText}>{saving ? "Saving…" : editingId ? "Save changes" : "Save product idea"}</Text>
+        <Text style={styles.primaryText}>{saving ? "Saving…" : editingId ? "Save changes" : "Save product"}</Text>
       </Pressable>
     </ScrollView>
   );

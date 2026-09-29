@@ -93,16 +93,14 @@ export function ResellerHomeScreen({
     title: string;
     help: string;
     icon: keyof typeof Ionicons.glyphMap;
-    value: string;
     color: string;
     soft: string;
   }[] = [
     {
       screen: "sourcing",
-      title: "Product Ideas",
-      help: "Research products, links, images and costs",
+      title: "Products",
+      help: "Save products, links, photos and costs",
       icon: "bag-handle-outline",
-      value: `${ideas}`,
       color: "#315FBE",
       soft: "#EDF3FB",
     },
@@ -111,7 +109,6 @@ export function ResellerHomeScreen({
       title: "Packages",
       help: "Create reseller tiers and package prices",
       icon: "layers-outline",
-      value: `${packages}`,
       color: "#594C8D",
       soft: "#F3F0F8",
     },
@@ -120,7 +117,6 @@ export function ResellerHomeScreen({
       title: "Pre-orders",
       help: `${summary.awaitingDeposit} waiting for deposit`,
       icon: "receipt-outline",
-      value: `${summary.active}`,
       color: "#8A365B",
       soft: "#FAEFF4",
     },
@@ -129,7 +125,6 @@ export function ResellerHomeScreen({
       title: "Reports",
       help: "Payments, balances and popular packages",
       icon: "bar-chart-outline",
-      value: peso(summary.toCollect),
       color: "#1B685C",
       soft: "#EDF6F3",
     },
@@ -169,7 +164,14 @@ export function ResellerHomeScreen({
           <Text style={s.help}>Opening VIAE…</Text>
         </View>
       ) : (
-        groups.map((group) => (
+        <>
+          <View style={s.summaryGrid}>
+            <OverviewCard compact={compact} label="Products" value={`${ideas}`} help="Saved products" color="#315FBE" soft="#EDF3FB" onPress={() => onOpen("sourcing")} />
+            <OverviewCard compact={compact} label="Active packages" value={`${packages}`} help="Packages for customers" color="#594C8D" soft="#F3F0F8" onPress={() => onOpen("reseller_packages")} />
+            <OverviewCard compact={compact} label="Open pre-orders" value={`${summary.active}`} help={`${summary.awaitingDeposit} awaiting deposit`} color="#8A365B" soft="#FAEFF4" onPress={() => onOpen("preorders")} />
+            <OverviewCard compact={compact} label="Still to collect" value={peso(summary.toCollect)} help="Customer balances" color="#1B685C" soft="#EDF6F3" onPress={() => onOpen("reseller_reports")} />
+          </View>
+          {groups.map((group) => (
           <View key={group.title} style={s.section}>
             <View style={s.sectionHeading}>
               <View style={[s.sectionMark, { backgroundColor: group.color }]} />
@@ -187,15 +189,14 @@ export function ResellerHomeScreen({
                   <View style={s.flex}>
                     <Text style={s.cardTitle}>{action.title}</Text>
                     <Text style={s.cardHelp} numberOfLines={compact ? 2 : undefined}>{action.help}</Text>
-                    {compact ? <Text style={[s.compactValue, { color: action.color }]}>{action.value}</Text> : null}
                   </View>
-                  {!compact ? <Text style={[s.value, { color: action.color }]}>{action.value}</Text> : null}
                   <Ionicons name="chevron-forward" size={20} color={action.color} />
                 </Pressable>
               ))}
             </View>
           </View>
-        ))
+          ))}
+        </>
       )}
       <View style={s.flow}>
         <Text style={s.flowTitle}>How VIAE works</Text>
@@ -205,6 +206,16 @@ export function ResellerHomeScreen({
         </Text>
       </View>
     </ScrollView>
+  );
+}
+
+function OverviewCard({ compact, label, value, help, color, soft, onPress }: { compact: boolean; label: string; value: string; help: string; color: string; soft: string; onPress: () => void }) {
+  return (
+    <Pressable style={[s.summaryCard, compact && s.summaryCardCompact, { backgroundColor: soft, borderColor: `${color}33` }]} onPress={onPress}>
+      <Text style={[s.summaryLabel, { color }]}>{label}</Text>
+      <Text style={s.summaryValue} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+      <Text style={[s.summaryHelp, { color }]}>{help}</Text>
+    </Pressable>
   );
 }
 
@@ -228,6 +239,12 @@ const s = StyleSheet.create({
   title: { fontSize: 30, fontWeight: "600", color: "#151924", letterSpacing: -0.6 },
   help: { fontSize: 15, lineHeight: 21, color: "#626A78" },
   loading: { padding: 50, alignItems: "center", gap: 10 },
+  summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  summaryCard: { flexGrow: 1, flexBasis: 220, minWidth: 145, minHeight: 112, padding: 14, borderRadius: 14, borderWidth: 1, justifyContent: "space-between" },
+  summaryCardCompact: { flexBasis: "45%", minWidth: 0, minHeight: 100, padding: 12 },
+  summaryLabel: { fontSize: 13, lineHeight: 18, fontWeight: "700" },
+  summaryValue: { marginVertical: 4, fontSize: 25, lineHeight: 31, fontWeight: "700", color: "#151924" },
+  summaryHelp: { fontSize: 12, lineHeight: 17, fontWeight: "600" },
   section: { gap: 12, marginTop: 4 },
   sectionHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
   sectionMark: { width: 4, minHeight: 38, borderRadius: 999 },
@@ -260,8 +277,6 @@ const s = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   cardTitle: { fontSize: 18, fontWeight: "700", color: "#151924" },
   cardHelp: { fontSize: 13, lineHeight: 18, color: "#626A78", marginTop: 3 },
-  value: { fontSize: 20, fontWeight: "700" },
-  compactValue: { fontSize: 15, fontWeight: "700", marginTop: 5 },
   flow: {
     padding: 17,
     borderRadius: 17,
