@@ -33,15 +33,19 @@ type SourceItem = {
   currency_to_php_rate: number;
   category_name: string;
   idea_stage: string;
+  status: "draft" | "active" | "archived";
+  lead_time_text: string;
+  featured: boolean;
   created_at: string;
   source_product_images: { image_url: string }[] | null;
-  source_product_options: { source_price: number | null }[] | null;
+  source_product_options: { source_price: number | null; selling_price_php: number | null }[] | null;
 };
 type OptionRow = {
   id: string;
   databaseId?: string;
   value: string;
   price: string;
+  publicPrice: string;
 };
 type LocalImage = {
   uri: string;
@@ -98,6 +102,9 @@ export function SourcingScreen({
   const [marketPrice, setMarketPrice] = useState("");
   const [marketLink, setMarketLink] = useState("");
   const [sellingPhp, setSellingPhp] = useState("");
+  const [leadTime, setLeadTime] = useState("Estimated 1–2 months");
+  const [publishOnWebsite, setPublishOnWebsite] = useState(false);
+  const [featured, setFeatured] = useState(false);
   const [options, setOptions] = useState<OptionRow[]>([]);
   const [images, setImages] = useState<LocalImage[]>([]);
   const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
@@ -107,7 +114,7 @@ export function SourcingScreen({
     const { data, error } = await supabase
       .from("source_products")
       .select(
-        "id,name,product_url,platform,final_cost_sgd,order_quantity,selling_price_php,source_currency,source_price,tax_percent,shipping_type,shipping_amount,currency_to_php_rate,category_name,idea_stage,created_at,source_product_options(source_price)",
+        "id,name,product_url,platform,final_cost_sgd,order_quantity,selling_price_php,source_currency,source_price,tax_percent,shipping_type,shipping_amount,currency_to_php_rate,category_name,idea_stage,status,lead_time_text,featured,created_at,source_product_options(source_price,selling_price_php)",
       )
       .eq("business_id", businessId)
       .order("created_at", { ascending: false });
@@ -194,6 +201,9 @@ export function SourcingScreen({
     setMarketPrice("");
     setMarketLink("");
     setSellingPhp("");
+    setLeadTime("Estimated 1–2 months");
+    setPublishOnWebsite(false);
+    setFeatured(false);
     setOptions([]);
     setImages([]);
     setSavedImages([]);
@@ -206,6 +216,7 @@ export function SourcingScreen({
         id: `${Date.now()}-${Math.random()}`,
         value: "",
         price: "",
+        publicPrice: "",
       },
     ]);
   const changeOption = (id: string, key: keyof OptionRow, value: string) =>
@@ -214,7 +225,7 @@ export function SourcingScreen({
     setLoading(true);
     const { data, error } = await supabase
       .from("source_products")
-      .select("*,source_product_options(id,option_value,source_price),source_product_images(id,image_url,storage_path,image_type)")
+      .select("*,source_product_options(id,option_value,source_price,selling_price_php),source_product_images(id,image_url,storage_path,image_type)")
       .eq("id", item.id)
       .eq("business_id", businessId)
       .single();
@@ -229,11 +240,15 @@ export function SourcingScreen({
     setPlatform(data.platform ?? "Pinduoduo");
     setSupplier(data.supplier_name ?? "");
     setEnglishDescription(data.english_description ?? "");
+    setSellingPhp(data.selling_price_php == null ? "" : String(data.selling_price_php));
+    setLeadTime(data.lead_time_text ?? "Estimated 1–2 months");
+    setPublishOnWebsite(data.status === "active");
+    setFeatured(Boolean(data.featured));
     setTaxPercent(String(data.tax_percent ?? 3));
     setShippingType(data.shipping_type === "paid" ? "paid" : "free");
     setShippingAmount(data.shipping_amount ? String(data.shipping_amount) : "");
     setRate(String(data.source_currency === "SGD" ? (data.currency_to_php_rate ?? 45) : 45));
-    setOptions((data.source_product_options ?? []).map((option: any) => ({ id: option.id, databaseId: option.id, value: option.option_value ?? "", price: option.source_price == null ? "" : String(option.source_price) })));
+    setOptions((data.source_product_options ?? []).map((option: any) => ({ id: option.id, databaseId: option.id, value: option.option_value ?? "", price: option.source_price == null ? "" : String(option.source_price), publicPrice: option.selling_price_php == null ? "" : String(option.selling_price_php) })));
     setSavedImages((data.source_product_images ?? []) as SavedImage[]);
     setImages([]);
     setEditing(true);
@@ -286,6 +301,14 @@ export function SourcingScreen({
         "Complete the options",
         "Enter a name for every variant or choice, or remove the empty row.",
       );
+    if (publishOnWebsite && !englishDescription.trim())
+      return Alert.alert("Product details needed", "Add a short customer-facing description before publishing.");
+    if (publishOnWebsite && !leadTime.trim())
+      return Alert.alert("Waiting time needed", "Tell customers how long this preorder normally takes.");
+    if (publishOnWebsite && savedImages.length + images.length === 0)
+      return Alert.alert("Product photo needed", "Add at least one photo before publishing this product.");
+    if (publishOnWebsite && !sellingPhp && (!options.length || options.some((option) => !option.publicPrice)))
+      return Alert.alert("Customer price needed", "Enter one product price, or enter a customer price for every variant.");
     setSaving(true);
     const legacySgdCost = currency === "SGD" ? lowestVariantSourceCost : lowestVariantPhpCost / 45;
     const productValues = {
@@ -314,8 +337,10 @@ export function SourcingScreen({
         deposit_percent: 50,
         market_reference_price_php: marketPrice ? n(marketPrice) : null,
         market_reference_url: marketLink.trim() || null,
-        selling_price_php: null,
-        status: "draft",
+        selling_price_php: sellingPhp ? n(sellingPhp) : null,
+        lead_time_text: leadTime.trim() || "Estimated 1–2 months",
+        featured,
+        status: publishOnWebsite && (savedImages.length > 0 || images.length === 0) ? "active" : "draft",
       };
     const productRequest = editingId
       ? supabase.from("source_products").update(productValues).eq("id", editingId).eq("business_id", businessId)
@@ -336,7 +361,7 @@ export function SourcingScreen({
       }
       for (let index = 0; index < options.length; index++) {
         const option = options[index];
-        const values = { option_type: "Variant", option_value: option.value.trim(), source_price: option.price ? n(option.price) : null, price_sgd: currency === "SGD" && option.price ? n(option.price) : null, minimum_quantity: 1, sort_order: index };
+        const values = { option_type: "Variant", option_value: option.value.trim(), source_price: option.price ? n(option.price) : null, price_sgd: currency === "SGD" && option.price ? n(option.price) : null, selling_price_php: option.publicPrice ? n(option.publicPrice) : null, minimum_quantity: 1, sort_order: index };
         const request = option.databaseId
           ? supabase.from("source_product_options").update(values).eq("id", option.databaseId).eq("source_product_id", productId)
           : supabase.from("source_product_options").insert({ source_product_id: productId, ...values });
@@ -351,6 +376,7 @@ export function SourcingScreen({
             option_value: x.value.trim(),
             source_price: x.price ? n(x.price) : null,
             price_sgd: currency === "SGD" && x.price ? n(x.price) : null,
+            selling_price_php: x.publicPrice ? n(x.publicPrice) : null,
             minimum_quantity: 1,
             sort_order: index,
           })));
@@ -401,6 +427,17 @@ export function SourcingScreen({
         "Product saved, but some images failed",
         imageError?.message ?? "You can add them again later.",
       );
+    }
+    if (publishOnWebsite && images.length > 0) {
+      const { error: publishError } = await supabase
+        .from("source_products")
+        .update({ status: "active" })
+        .eq("id", productId)
+        .eq("business_id", businessId);
+      if (publishError) {
+        setSaving(false);
+        return Alert.alert("Product saved but not published", publishError.message);
+      }
     }
     setSaving(false);
     reset();
@@ -501,6 +538,9 @@ export function SourcingScreen({
                 <Text style={styles.cardTitle}>{item.name}</Text>
                 <View style={styles.cardMeta}>
                   <Text style={styles.categoryTag}>{item.category_name}</Text>
+                  <Text style={item.status === "active" ? styles.liveTag : styles.draftTag}>
+                    {item.status === "active" ? "Live on VIAE" : "Private draft"}
+                  </Text>
                 </View>
                 <Text style={styles.help}>
                   {item.product_url ? `${item.platform} · ` : ""}
@@ -668,6 +708,13 @@ export function SourcingScreen({
               keyboardType="decimal-pad"
               placeholder="Example: 50"
             />
+            <Field
+              label="Customer price · PHP"
+              value={row.publicPrice}
+              setValue={(v) => changeOption(row.id, "publicPrice", v)}
+              keyboardType="decimal-pad"
+              placeholder="Example: 499"
+            />
             {row.price ? <Text style={styles.variantCost}>Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")} · includes selected tax and shipping</Text> : null}
             <Pressable
               style={styles.remove}
@@ -684,9 +731,35 @@ export function SourcingScreen({
           <Ionicons name="add" size={20} color="#315FBE" />
           <Text style={styles.secondaryText}>Add another variant or choice</Text>
         </Pressable>
-        <Text style={styles.note}>
-          Selling prices are set later when you build a reseller package.
+        <Text style={styles.note}>Supplier prices remain private. Customer prices are the only prices shown on VIAE.</Text>
+      </Section>
+      <Section number="5" title="VIAE website">
+        <Text style={styles.help}>
+          Publish this product when its photo, description and customer price are ready. Private supplier details never appear on the website.
         </Text>
+        <Field
+          label="Product price · PHP"
+          value={sellingPhp}
+          setValue={setSellingPhp}
+          keyboardType="decimal-pad"
+          placeholder="Use this when every variant has the same price"
+        />
+        <Field
+          label="Estimated waiting time"
+          value={leadTime}
+          setValue={setLeadTime}
+          placeholder="Estimated 1–2 months"
+        />
+        <Text style={styles.label}>Show on VIAE website?</Text>
+        <View style={styles.chips}>
+          <Chip label="Keep private" active={!publishOnWebsite} onPress={() => setPublishOnWebsite(false)} />
+          <Chip label="Publish on VIAE" active={publishOnWebsite} onPress={() => setPublishOnWebsite(true)} />
+        </View>
+        <Text style={styles.label}>Homepage feature</Text>
+        <View style={styles.chips}>
+          <Chip label="Normal product" active={!featured} onPress={() => setFeatured(false)} />
+          <Chip label="Feature this product" active={featured} onPress={() => setFeatured(true)} />
+        </View>
       </Section>
       <Pressable
         style={[styles.primary, saving && styles.disabled]}
@@ -944,6 +1017,24 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#315FBE",
     backgroundColor: "#EEF3FF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  liveTag: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#236146",
+    backgroundColor: "#EAF5EF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  draftTag: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#626A78",
+    backgroundColor: "#F1F3F6",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
