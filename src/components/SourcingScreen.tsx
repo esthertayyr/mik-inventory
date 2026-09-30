@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -100,6 +101,7 @@ export function SourcingScreen({
   const [options, setOptions] = useState<OptionRow[]>([]);
   const [images, setImages] = useState<LocalImage[]>([]);
   const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -483,11 +485,13 @@ export function SourcingScreen({
             return (
             <View key={item.id} style={styles.item}>
               {item.source_product_images?.[0]?.image_url ? (
-                <Image
-                  source={{ uri: item.source_product_images[0].image_url }}
-                  style={styles.thumb as any}
-                  resizeMode="cover"
-                />
+                <Pressable accessibilityRole="button" accessibilityLabel={`View full photo of ${item.name}`} onPress={() => setExpandedImage(item.source_product_images![0].image_url)}>
+                  <Image
+                    source={{ uri: item.source_product_images[0].image_url }}
+                    style={styles.thumb as any}
+                    resizeMode="cover"
+                  />
+                </Pressable>
               ) : (
                 <View style={styles.thumbEmpty}>
                   <Ionicons name="image-outline" size={24} color="#737B89" />
@@ -522,6 +526,7 @@ export function SourcingScreen({
             );
           })
         )}
+        <PhotoViewer uri={expandedImage} onClose={() => setExpandedImage(null)} />
       </ScrollView>
     );
   return (
@@ -603,12 +608,16 @@ export function SourcingScreen({
         <View style={styles.imageGrid}>
           {savedImages.map((image) => (
             <View key={image.id} style={styles.imageWrap}>
-              <Image source={{ uri: image.image_url }} style={styles.preview as any} resizeMode="contain" />
+              <Pressable accessibilityRole="button" accessibilityLabel="View full product photo" onPress={() => setExpandedImage(image.image_url)}>
+                <Image source={{ uri: image.image_url }} style={styles.preview as any} resizeMode="contain" />
+              </Pressable>
             </View>
           ))}
           {images.map((image, index) => (
             <View key={`${image.uri}-${index}`} style={styles.imageWrap}>
-              <Image source={{ uri: image.uri }} style={styles.preview as any} resizeMode="contain" />
+              <Pressable accessibilityRole="button" accessibilityLabel="View full product photo" onPress={() => setExpandedImage(image.uri)}>
+                <Image source={{ uri: image.uri }} style={styles.preview as any} resizeMode="contain" />
+              </Pressable>
               <Pressable style={styles.imageRemove} onPress={() => setImages((v) => v.filter((_, i) => i !== index))}>
                 <Ionicons name="close" size={16} color="white" />
               </Pressable>
@@ -691,7 +700,22 @@ export function SourcingScreen({
         )}
         <Text style={styles.primaryText}>{saving ? "Saving…" : editingId ? "Save changes" : "Save product"}</Text>
       </Pressable>
+      <PhotoViewer uri={expandedImage} onClose={() => setExpandedImage(null)} />
     </ScrollView>
+  );
+}
+
+function PhotoViewer({ uri, onClose }: { uri: string | null; onClose: () => void }) {
+  return (
+    <Modal visible={Boolean(uri)} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.viewerShade}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Close full photo" style={styles.viewerClose} onPress={onClose}>
+          <Ionicons name="close" size={25} color="white" />
+        </Pressable>
+        {uri ? <Image source={{ uri }} style={styles.viewerImage as any} resizeMode="contain" /> : null}
+        <Text style={styles.viewerHelp}>Tap × to close</Text>
+      </View>
+    </Modal>
   );
 }
 
@@ -1068,4 +1092,25 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: "center",
   },
+  viewerShade: {
+    flex: 1,
+    padding: 18,
+    backgroundColor: "rgba(8, 10, 16, .94)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewerClose: {
+    position: "absolute",
+    top: 18,
+    right: 18,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "rgba(255,255,255,.16)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2,
+  },
+  viewerImage: { width: "100%", height: "82%" },
+  viewerHelp: { marginTop: 12, color: "white", fontSize: 13, fontWeight: "600" },
 });
