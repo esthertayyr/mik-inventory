@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +10,8 @@ import { userNotice } from "@/src/lib/userNotice";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/src/lib/supabase";
 import { Text, TextInput } from "@/src/components/AppTypography";
+import { ExpenseDatePicker } from "./ExpensesScreen";
+import { ResellerPackageCheckout } from "./ResellerPackageCheckout";
 
 type Payment = {
   id: string;
@@ -36,7 +38,7 @@ type Order = {
   created_at: string;
   reseller_preorder_payments: Payment[];
 };
-type SourceProduct = { id: string; name: string };
+type SourceProduct = { id: string; name: string; selling_price_php:number|null; source_product_options:{id:string;option_value:string;stock_units:number;selling_price_php:number|null}[] };
 type ResellerPackage = {
   id: string;
   name: string;
@@ -96,6 +98,7 @@ export function ResellerPreordersScreen({
   locationId: string;
   onBack: () => void;
 }) {
+  const paymentBusy=useRef(false),paymentRequest=useRef('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<SourceProduct[]>([]);
   const [packages, setPackages] = useState<ResellerPackage[]>([]);
@@ -107,6 +110,7 @@ export function ResellerPreordersScreen({
   const [contact, setContact] = useState("");
   const [address, setAddress] = useState("");
   const [productId, setProductId] = useState<string | null>(null);
+  const [variantId,setVariantId]=useState<string|null>(null);
   const [packageId, setPackageId] = useState<string | null>(null);
   const [productName, setProductName] = useState("");
   const [options, setOptions] = useState("");
@@ -135,12 +139,13 @@ export function ResellerPreordersScreen({
           "id,customer_name,customer_contact,delivery_address,product_name,selected_options,quantity,total_price_php,deposit_required_php,delivery_fee_php,delivery_fee_confirmed,fulfilment_status,courier,tracking_number,created_at,reseller_preorder_payments(id,payment_type,amount_php,payment_method,payment_date)",
         )
         .eq("business_id", businessId)
+        .eq("direct_sale", false)
         .order("created_at", { ascending: false }),
       supabase
         .from("source_products")
-        .select("id,name")
+        .select("id,name,selling_price_php,source_product_options(id,option_value,stock_units,selling_price_php)")
         .eq("business_id", businessId)
-        .neq("idea_stage", "not_proceeding")
+        .eq("status", "active")
         .order("name"),
       supabase
         .from("reseller_packages")
@@ -163,6 +168,7 @@ export function ResellerPreordersScreen({
     setContact("");
     setAddress("");
     setProductId(null);
+    setVariantId(null);
     setPackageId(null);
     setProductName("");
     setOptions("");
@@ -176,10 +182,10 @@ export function ResellerPreordersScreen({
       packages.find((p) => p.id === packageId)?.name ??
       products.find((p) => p.id === productId)?.name ?? productName.trim();
     if (!customer.trim()) return userNotice("Customer name needed");
-    if (!chosen)
+    if (!chosen || (!productId&&!packageId))
       return userNotice(
         "Product needed",
-        "Choose a product idea or type the item ordered.",
+        "Choose an official product or bundle.",
       );
     if (num(total) <= 0)
       return userNotice(
@@ -187,11 +193,14 @@ export function ResellerPreordersScreen({
         "Enter the customer's full order price.",
       );
     const depositRequired = deposit ? num(deposit) : num(total) * 0.5;
+    if(productId&&products.find(p=>p.id===productId)?.source_product_options.length&&!variantId) return userNotice("Choose the exact variant","This tells MIK which pieces to reserve and deduct.");
+    if(depositRequired<=0||depositRequired>num(total))return userNotice("Check deposit","Deposit must be greater than zero and no more than the full price.");
     setSaving(true);
     const { error } = await supabase.from("reseller_preorders").insert({
       business_id: businessId,
       location_id: locationId,
       source_product_id: productId,
+      source_product_option_id: productId?variantId:null,
       reseller_package_id: packageId,
       package_name: packages.find((p) => p.id === packageId)?.name ?? null,
       customer_name: customer.trim(),
@@ -219,55 +228,17 @@ export function ResellerPreordersScreen({
       .filter((p) => !type || p.payment_type === type)
       .reduce((sum, p) => sum + Number(p.amount_php), 0);
   const recordPayment = async (order: Order) => {
-    if (num(paymentAmount) <= 0) return userNotice("Payment amount needed");
-    const savedDate = toIsoDate(paymentDate);
-    if (!savedDate)
-      return userNotice(
-        "Check the payment date",
-        "Use DD-MM-YYYY, for example 27-09-2026.",
-      );
-    setSaving(true);
-    const { error } = await supabase.from("reseller_preorder_payments").insert({
-      preorder_id: order.id,
-      business_id: businessId,
-      location_id: locationId,
-      payment_type: paymentType,
-      amount_php: num(paymentAmount),
-      payment_method: method,
-      payment_date: savedDate,
-    });
-    if (error) {
-      setSaving(false);
-      return userNotice("Payment not saved", error.message);
-    }
-    const newPaid = paid(order) + num(paymentAmount);
-    const depositPaid =
-      paid(order, "deposit") +
-      (paymentType === "deposit" ? num(paymentAmount) : 0);
-    let status = order.fulfilment_status;
-    if (
-      status === "awaiting_deposit" &&
-      depositPaid >= Number(order.deposit_required_php)
-    )
-      status = "confirmed";
-    if (
-      ["arrived", "ready_to_ship"].includes(status) &&
-      order.delivery_fee_confirmed &&
-      newPaid >= Number(order.total_price_php) + Number(order.delivery_fee_php)
-    )
-      status = "ready_to_ship";
-    if (status !== order.fulfilment_status)
-      await supabase
-        .from("reseller_preorders")
-        .update({
-          fulfilment_status: status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", order.id);
-    setSaving(false);
-    setPaymentFor(null);
-    setPaymentAmount("");
-    await load();
+    if (paymentBusy.current) return;
+    const amount=Number(paymentAmount),savedDate=toIsoDate(paymentDate);
+    if (!Number.isFinite(amount)||amount<=0) return userNotice("Payment amount needed");
+    if (!savedDate) return userNotice("Choose payment date");
+    paymentBusy.current=true;setSaving(true);
+    try {
+      const {error}=await supabase.from("reseller_preorder_payments").insert({request_id:paymentRequest.current,preorder_id:order.id,business_id:businessId,location_id:locationId,payment_type:paymentType,amount_php:amount,payment_method:method,payment_date:savedDate});
+      if(error&&error.code!=="23505")throw error;
+      setPaymentFor(null);setPaymentAmount("");await load();
+    }catch(e){userNotice("Payment not saved",(e as Error).message);}
+    finally{paymentBusy.current=false;setSaving(false);}
   };
   const move = async (order: Order, next: string) => {
     if (next === "shipped" && !courier.trim()) return setShippingFor(order.id);
@@ -326,6 +297,7 @@ export function ResellerPreordersScreen({
         <Text style={s.help}>Opening pre-orders…</Text>
       </View>
     );
+  if(creating)return <ResellerPackageCheckout businessId={businessId} locationId={locationId} onCancel={()=>setCreating(false)} onSaved={()=>{setCreating(false);void load();}}/>;
   return (
     <ScrollView
       contentContainerStyle={s.page}
@@ -390,7 +362,7 @@ export function ResellerPreordersScreen({
               <Text style={s.help}>The package price, deposit and included products are filled in automatically. You can still edit the customer’s choices.</Text>
             </>
           ) : null}
-          <Text style={s.label}>Or choose one product idea</Text>
+          <Text style={s.label}>Or choose an official product</Text>
           <View style={s.chips}>
             {products.map((p) => (
               <Chip
@@ -399,24 +371,15 @@ export function ResellerPreordersScreen({
                 active={productId === p.id}
                 onPress={() => {
                   setProductId(p.id);
+                  setVariantId(null);
                   setPackageId(null);
                   setProductName("");
+                  if(p.selling_price_php)setTotal(String(p.selling_price_php));
                 }}
               />
             ))}
           </View>
-          <Field
-            label="Or type another product"
-            value={productName}
-            setValue={(v) => {
-              setProductName(v);
-              if (v) {
-                setProductId(null);
-                setPackageId(null);
-              }
-            }}
-            placeholder="Product name"
-          />
+          {productId?<View style={s.chips}>{products.find(p=>p.id===productId)?.source_product_options.map(v=><Chip key={v.id} label={`${v.option_value} · ${v.stock_units} piece${v.stock_units===1?'':'s'} per selection`} active={variantId===v.id} onPress={()=>{setVariantId(v.id);if(v.selling_price_php)setTotal(String(v.selling_price_php));}}/>)}</View>:null}
           <Field
             label="Choices"
             value={options}
@@ -627,12 +590,7 @@ export function ResellerPreordersScreen({
                       />
                     ))}
                   </View>
-                  <Field
-                    label="Payment date · DD-MM-YYYY"
-                    value={paymentDate}
-                    setValue={setPaymentDate}
-                    placeholder={displayDate(today())}
-                  />
+                  <ExpenseDatePicker label="Payment date · Required" value={paymentDate} onChange={setPaymentDate}/>
                   <View style={s.row}>
                     <Pressable
                       style={s.secondary}
@@ -642,6 +600,7 @@ export function ResellerPreordersScreen({
                     </Pressable>
                     <Pressable
                       style={s.primarySmall}
+                      disabled={saving}
                       onPress={() => void recordPayment(order)}
                     >
                       <Text style={s.primaryText}>Save payment</Text>
@@ -735,6 +694,8 @@ export function ResellerPreordersScreen({
                     <Pressable
                       style={s.payButton}
                       onPress={() => {
+                        paymentRequest.current='xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.floor(Math.random()*16);return(c==='x'?r:(r&3)|8).toString(16);});
+                        setPaymentDate(displayDate(today()));
                         setPaymentFor(order.id);
                         setPaymentType(
                           depositPaid < Number(order.deposit_required_php)

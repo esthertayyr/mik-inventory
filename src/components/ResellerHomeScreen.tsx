@@ -13,10 +13,11 @@ import { Text } from "@/src/components/AppTypography";
 import type { Screen } from "@/src/types";
 
 type Order = {
+  direct_sale: boolean;
   total_price_php: number;
   delivery_fee_php: number;
   fulfilment_status: string;
-  reseller_preorder_payments: { amount_php: number }[] | null;
+  reseller_preorder_payments: { amount_php: number; payment_date:string }[] | null;
 };
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", {
@@ -28,9 +29,13 @@ const peso = (value: number) =>
 export function ResellerHomeScreen({
   businessId,
   onOpen,
+  canManageWebsite = false,
+  permissions,
 }: {
   businessId: string;
   onOpen: (screen: Screen) => void;
+  canManageWebsite?: boolean;
+  permissions?: string[];
 }) {
   const { width } = useWindowDimensions();
   const compact = width < 600;
@@ -38,9 +43,12 @@ export function ResellerHomeScreen({
   const [ideas, setIdeas] = useState(0);
   const [packages, setPackages] = useState(0);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [period,setPeriod]=useState<'today'|'month'>('month');
+  const [tradeRows,setTradeRows]=useState<{kind:string;amount_php:number;payment_date:string|null;status:string}[]>([]);
+  const [expenseRows,setExpenseRows]=useState<{amount:number;expense_date:string}[]>([]);
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ count: ideaCount }, { count: packageCount }, { data }] =
+    const [{ count: ideaCount }, { count: packageCount }, { data },trades,expenses] =
       await Promise.all([
         supabase
           .from("source_products")
@@ -55,13 +63,16 @@ export function ResellerHomeScreen({
         supabase
           .from("reseller_preorders")
           .select(
-            "total_price_php,delivery_fee_php,fulfilment_status,reseller_preorder_payments(amount_php)",
+            "direct_sale,total_price_php,delivery_fee_php,fulfilment_status,reseller_preorder_payments(amount_php,payment_date)",
           )
           .eq("business_id", businessId),
+        supabase.from('reseller_trade_entries').select('kind,amount_php,payment_date,status').eq('business_id',businessId),
+        supabase.from('expenses').select('amount,expense_date').eq('business_id',businessId),
       ]);
     setIdeas(ideaCount ?? 0);
     setPackages(packageCount ?? 0);
     setOrders((data ?? []) as Order[]);
+    setTradeRows(trades.data??[]);setExpenseRows(expenses.data??[]);
     setLoading(false);
   }, [businessId]);
   useEffect(() => void load(), [load]);
@@ -88,6 +99,12 @@ export function ResellerHomeScreen({
     ).length;
     return { active: active.length, toCollect, awaitingDeposit };
   }, [orders]);
+  const current=new Date();const localToday=`${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
+  const inPeriod=(date:string|null)=>!!date&&(period==='today'?date===localToday:date.slice(0,7)===localToday.slice(0,7));
+  const salesMoney=orders.filter(row=>row.direct_sale).flatMap(row=>row.reseller_preorder_payments??[]).filter(row=>inPeriod(row.payment_date)).reduce((sum,row)=>sum+Number(row.amount_php),0)+tradeRows.filter(row=>row.kind==='sale'&&row.status!=='cancelled'&&inPeriod(row.payment_date)).reduce((sum,row)=>sum+Number(row.amount_php),0);
+  const paidPurchases=tradeRows.filter(row=>row.kind==='purchase'&&row.status!=='cancelled'&&inPeriod(row.payment_date)).reduce((sum,row)=>sum+Number(row.amount_php),0);
+  const orderMoney=orders.filter(row=>!row.direct_sale).flatMap(row=>row.reseller_preorder_payments??[]).filter(row=>inPeriod(row.payment_date)).reduce((sum,row)=>sum+Number(row.amount_php),0);
+  const spent=expenseRows.filter(row=>inPeriod(row.expense_date)).reduce((sum,row)=>sum+Number(row.amount),0);
   const actions: {
     screen: Screen;
     title: string;
@@ -96,6 +113,7 @@ export function ResellerHomeScreen({
     color: string;
     soft: string;
   }[] = [
+    ...(canManageWebsite ? [{screen: "website" as Screen, title: "Website", help: "Edit homepage text and photos", icon: "globe-outline" as const, color: "#650f1c", soft: "#f8edf0"}] : []),
     {
       screen: "sourcing",
       title: "Products",
@@ -128,21 +146,28 @@ export function ResellerHomeScreen({
       color: "#1B685C",
       soft: "#EDF6F3",
     },
+    {screen:"reseller_sales",title:"Sales",help:"Record a fully paid direct sale",icon:"cart-outline",color:"#315FBE",soft:"#EDF3FB"},
+    {screen:"reseller_purchases",title:"Supplier purchases",help:"Track buying costs and arrivals",icon:"cube-outline",color:"#594C8D",soft:"#F3F0F8"},
+    {screen:"expenses",title:"Expenses",help:"Record other business spending",icon:"wallet-outline",color:"#8A365B",soft:"#FAEFF4"},
+    {screen:"reseller_stock",title:"Stock and printing",help:"Available pieces, incoming stock and printing jobs",icon:"grid-outline",color:"#1B685C",soft:"#EDF6F3"},
   ];
   const groups = [
     {
       title: "Start here",
       help: "Save products and build packages for customers.",
       color: "#315FBE",
-      actions: actions.slice(0, 2),
+      actions: actions.filter(action => ["sourcing","reseller_packages"].includes(action.screen)),
     },
     {
       title: "Customer orders & money",
       help: "Track pre-orders, payments, balances and delivery.",
       color: "#8A365B",
-      actions: actions.slice(2),
+      actions: actions.filter(action => ["preorders", "reseller_sales", "reseller_reports", "expenses"].includes(action.screen)),
     },
   ];
+  groups.push({title:"Buying and stock",help:"Receive purchases or finish printing to add available stock. Pack offline.",color:"#594C8D",actions:actions.filter(action=>["reseller_purchases","reseller_stock"].includes(action.screen))});
+  const allowed=(screen:Screen)=>!permissions || permissions.includes(screen==="reseller_sales"?"sell":screen==="preorders"?"orders":["expenses","reseller_reports"].includes(screen)?"reports":"products");
+  if (canManageWebsite) groups.push({title:"Public website",help:"Manage what customers see on VIAE.",color:"#650f1c",actions:actions.filter(action=>action.screen==="website")});
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     day: "numeric",
@@ -165,11 +190,16 @@ export function ResellerHomeScreen({
         </View>
       ) : (
         <>
+          {allowed('reseller_reports')?<><View style={s.grid}>{(['today','month'] as const).map(value=><Pressable key={value} style={[s.icon,{width:140,backgroundColor:period===value?'#594C8D':'#F3F0F8'}]} onPress={()=>setPeriod(value)}><Text style={{fontSize:14,fontWeight:'600',color:period===value?'white':'#594C8D'}}>{value==='today'?'Today':current.toLocaleDateString('en-US',{month:'short',year:'numeric'})}</Text></Pressable>)}</View><View style={s.summaryGrid}>
+            <OverviewCard compact={compact} label="Direct sales" value={peso(salesMoney)} help="View reports" color="#315FBE" soft="#EDF3FB" onPress={()=>onOpen('reseller_reports')}/>
+            <OverviewCard compact={compact} label="Order money received" value={peso(orderMoney)} help="Customer payments" color="#594C8D" soft="#F3F0F8" onPress={()=>onOpen('reseller_reports')}/>
+            <OverviewCard compact={compact} label="Purchases and expenses" value={peso(paidPurchases+spent)} help="Money paid out" color="#8A365B" soft="#FAEFF4" onPress={()=>onOpen('reseller_reports')}/>
+            <OverviewCard compact={compact} label="Money after spending" value={peso(salesMoney+orderMoney-paidPurchases-spent)} help="Cash flow, not profit" color="#1B685C" soft="#EDF6F3" onPress={()=>onOpen('reseller_reports')}/>
+          </View></>:null}
           <View style={s.summaryGrid}>
-            <OverviewCard compact={compact} label="Products" value={`${ideas}`} help="Saved products" color="#315FBE" soft="#EDF3FB" onPress={() => onOpen("sourcing")} />
-            <OverviewCard compact={compact} label="Active packages" value={`${packages}`} help="Packages for customers" color="#594C8D" soft="#F3F0F8" onPress={() => onOpen("reseller_packages")} />
-            <OverviewCard compact={compact} label="Open pre-orders" value={`${summary.active}`} help={`${summary.awaitingDeposit} awaiting deposit`} color="#8A365B" soft="#FAEFF4" onPress={() => onOpen("preorders")} />
-            <OverviewCard compact={compact} label="Still to collect" value={peso(summary.toCollect)} help="Customer balances" color="#1B685C" soft="#EDF6F3" onPress={() => onOpen("reseller_reports")} />
+            {allowed('sourcing')?<OverviewCard compact={compact} label="Products" value={`${ideas}`} help="Saved products" color="#315FBE" soft="#EDF3FB" onPress={() => onOpen("sourcing")} />:null}
+            {allowed('preorders')?<OverviewCard compact={compact} label="Open pre-orders" value={`${summary.active}`} help={`${summary.awaitingDeposit} awaiting deposit`} color="#8A365B" soft="#FAEFF4" onPress={() => onOpen("preorders")} />:null}
+            {allowed('reseller_reports')?<OverviewCard compact={compact} label="Still to collect" value={peso(summary.toCollect)} help="Customer balances" color="#1B685C" soft="#EDF6F3" onPress={() => onOpen("reseller_reports")} />:null}
           </View>
           {groups.map((group) => (
           <View key={group.title} style={s.section}>
@@ -181,7 +211,7 @@ export function ResellerHomeScreen({
               </View>
             </View>
             <View style={s.grid}>
-              {group.actions.map((action) => (
+              {group.actions.filter(action=>allowed(action.screen)).map((action) => (
                 <Pressable key={action.screen} style={[s.card, compact && s.cardCompact]} onPress={() => onOpen(action.screen)}>
                   <View style={[s.icon, { backgroundColor: action.soft }]}>
                     <Ionicons name={action.icon} size={25} color={action.color} />
@@ -201,7 +231,7 @@ export function ResellerHomeScreen({
       <View style={s.flow}>
         <Text style={s.flowTitle}>How VIAE works</Text>
         <Text style={s.flowText}>
-          Product idea → Reseller package → Customer pre-order → Deposit →
+          Official products → Reseller package → Customer pre-order → Deposit →
           Arrival → Final payment → Delivery
         </Text>
       </View>

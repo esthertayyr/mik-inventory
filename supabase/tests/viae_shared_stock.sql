@@ -1,0 +1,56 @@
+-- Runs against the connected project; every test row is rolled back.
+begin;
+select set_config('request.jwt.claim.sub',(select user_id::text from public.business_memberships where business_id='3fe4c82d-a659-406b-b290-32d8a49f2bdf' and role='owner' limit 1),true);
+set local role authenticated;
+do $$
+declare b uuid:='3fe4c82d-a659-406b-b290-32d8a49f2bdf';l uuid;p uuid;v uuid;purchase uuid;job uuid;bundle uuid;sale uuid;customer_order uuid;request uuid:=gen_random_uuid();count_stock bigint;blocked boolean:=false;
+begin
+ select id into l from public.locations where business_id=b limit 1;
+ insert into public.source_products(business_id,location_id,name,english_description,selling_price_php,tax_percent) values(b,l,'__QA rollback product','Test description',999,3) returning id into p;
+ insert into public.source_product_options(source_product_id,option_type,option_value,source_price,selling_price_php,stock_units) values(p,'Variant','Black pack of 20',1,999,20) returning id into v;
+ insert into public.source_product_images(source_product_id,image_url,storage_path,image_type) values(p,'https://ecommerce-ai-store.vercel.app/viae/dragon-story.png','test-only-no-upload','product');
+ update public.source_products set status='active' where id=p;
+ if not exists(select 1 from public.viae_public_catalog where id=p) then raise exception 'Official product missing from public catalogue';end if;
+ insert into public.reseller_trade_entries(request_id,business_id,location_id,kind,source_product_id,source_product_option_id,product_name,quantity,entry_date,payment_date,payment_method,amount_php,cost_sgd,exchange_rate,status) values(gen_random_uuid(),b,l,'purchase',p,v,'test',200,current_date,current_date,'cash',450,10,45,'ordered') returning id into purchase;
+ select on_hand into count_stock from public.reseller_stock_summary where source_product_id=p;
+ if count_stock<>0 then raise exception 'Ordering increased available stock';end if;
+ update public.reseller_trade_entries set received_quantity=100 where id=purchase;
+ update public.reseller_trade_entries set received_quantity=200,status='received' where id=purchase;
+ update public.reseller_trade_entries set received_quantity=200,status='received' where id=purchase;
+ select on_hand into count_stock from public.reseller_stock_summary where source_product_id=p;
+ if count_stock<>200 then raise exception 'Receipt did not add exactly 200 pieces';end if;
+ insert into public.reseller_packages(business_id,location_id,name,tier,package_price_php,deposit_required_php) values(b,l,'__QA set package','reseller',999,499.5) returning id into bundle;
+ insert into public.reseller_package_items(business_id,package_id,source_product_id,source_product_option_id,quantity) values(b,bundle,p,v,1);
+ sale:=public.create_reseller_package_order(b,l,request,bundle,'[]','Test buyer','','',2,1998,true,current_date,'gcash','Rollback test');
+ if public.create_reseller_package_order(b,l,request,bundle,'[]','Test buyer','','',2,1998,true,current_date,'gcash','Rollback test')<>sale then raise exception 'Retry created another order';end if;
+ select on_hand into count_stock from public.reseller_stock_summary where source_product_id=p;
+ if count_stock<>160 then raise exception 'Two packages did not deduct 40 pieces';end if;
+ if (select count(*) from public.reseller_preorder_payments where preorder_id=sale)<>1 then raise exception 'Payment counted twice';end if;
+ customer_order:=public.create_reseller_package_order(b,l,gen_random_uuid(),null,jsonb_build_array(jsonb_build_object('product_id',p,'option_id',v,'quantity',2)),'Preorder buyer','','',1,1998,false,null,'cash','');
+ insert into public.reseller_preorder_payments(preorder_id,business_id,location_id,payment_type,amount_php,payment_method,payment_date) values(customer_order,b,l,'deposit',999,'cash',current_date);
+ if (select reserved from public.reseller_stock_summary where source_product_id=p)<>40 then raise exception 'Deposit did not reserve 40 pieces';end if;
+ if (select on_hand from public.reseller_stock_summary where source_product_id=p)<>160 then raise exception 'Deposit deducted physical stock';end if;
+ update public.reseller_package_items set quantity=3 where package_id=bundle;
+ if (select sum(pieces) from public.reseller_order_stock_lines where order_id=sale)<>40 then raise exception 'Package edit changed historic sale';end if;
+ begin
+  insert into public.reseller_trade_entries(request_id,business_id,location_id,kind,source_product_id,source_product_option_id,product_name,quantity,entry_date,payment_date,payment_method,amount_php,status) values(gen_random_uuid(),b,l,'sale',p,v,'test',7,current_date,current_date,'cash',6993,'completed');
+ exception when others then if sqlerrm like 'Not enough available pieces%' then blocked:=true;else raise;end if;end;
+ if not blocked then raise exception 'Sale consumed customer-reserved stock';end if;
+ blocked:=false;
+ begin update public.reseller_preorders set fulfilment_status='shipped',delivery_fee_confirmed=true where id=customer_order;
+ exception when others then if sqlerrm like 'Confirm local delivery cost%' then blocked:=true;else raise;end if;end;
+ if not blocked then raise exception 'Shipping allowed with unpaid balance';end if;
+ insert into public.reseller_preorder_payments(preorder_id,business_id,location_id,payment_type,amount_php,payment_method,payment_date) values(customer_order,b,l,'final',999,'cash',current_date);
+ update public.reseller_preorders set fulfilment_status='shipped',delivery_fee_confirmed=true where id=customer_order;
+ update public.reseller_preorders set fulfilment_status='delivered' where id=customer_order;
+ if (select on_hand from public.reseller_stock_summary where source_product_id=p)<>120 then raise exception 'Shipping and delivery deducted twice';end if;
+ insert into public.reseller_print_jobs(business_id,location_id,source_product_id,source_product_option_id,product_name,quantity) values(b,l,p,v,'test',50) returning id into job;
+ update public.reseller_print_jobs set completed_quantity=40 where id=job;
+ update public.reseller_print_jobs set completed_quantity=50,status='ready' where id=job;
+ update public.reseller_print_jobs set completed_quantity=50,status='ready' where id=job;
+ if (select on_hand from public.reseller_stock_summary where source_product_id=p)<>170 then raise exception 'Printing added the same pieces twice';end if;
+ perform public.correct_reseller_stock(b,l,p,v,165,'Test count',gen_random_uuid());
+ if (select on_hand from public.reseller_stock_summary where source_product_id=p)<>165 then raise exception 'Stock correction did not set actual count';end if;
+end $$;
+select 'PASS: official catalogue, incoming stock, partial receipts, set/custom packages, idempotent checkout, reservations, payment gate, single fulfilment deduction, printing and stock correction' result;
+rollback;

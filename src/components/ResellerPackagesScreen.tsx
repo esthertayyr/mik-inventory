@@ -23,7 +23,7 @@ type Product = {
   tax_percent: number;
   shipping_amount: number;
   currency_to_php_rate: number;
-  source_product_options: { id: string; option_type: string; option_value: string; source_price: number | null }[] | null;
+  source_product_options: { id: string; option_type: string; option_value: string; source_price: number | null; stock_units: number }[] | null;
 };
 type PackageItem = {
   id: string;
@@ -45,7 +45,7 @@ type Package = {
   active: boolean;
   reseller_package_items: PackageItem[] | null;
 };
-type DraftItem = { productId: string; optionId: string; quantity: string; note: string };
+type DraftItem = { id: string; productId: string; optionId: string; quantity: string; note: string };
 
 const money = (value: number) =>
   new Intl.NumberFormat("en-PH", {
@@ -101,9 +101,9 @@ export function ResellerPackagesScreen({
         .order("created_at", { ascending: false }),
       supabase
         .from("source_products")
-        .select("id,name,selling_price_php,final_cost_sgd,exchange_rate_sgd_php,order_quantity,source_currency,source_price,tax_percent,shipping_amount,currency_to_php_rate,source_product_options(id,option_type,option_value,source_price)")
+        .select("id,name,selling_price_php,final_cost_sgd,exchange_rate_sgd_php,order_quantity,source_currency,source_price,tax_percent,shipping_amount,currency_to_php_rate,source_product_options(id,option_type,option_value,source_price,stock_units)")
         .eq("business_id", businessId)
-        .neq("idea_stage", "not_proceeding")
+        .eq("status", "active")
         .order("name"),
     ]);
     if (error) userNotice("Packages not loaded", error.message);
@@ -154,6 +154,7 @@ export function ResellerPackagesScreen({
     setLeadTime(item.lead_time_text);
     setItems(
       (item.reseller_package_items ?? []).map((line) => ({
+        id: line.id,
         productId: line.source_products?.id ?? "",
         optionId: line.source_product_options?.id ?? "",
         quantity: `${line.quantity}`,
@@ -163,14 +164,10 @@ export function ResellerPackagesScreen({
     setEditing(true);
   };
   const toggleProduct = (productId: string) =>
+    setItems((current) => [...current, { id: `${Date.now()}-${Math.random()}`, productId, optionId: "", quantity: "1", note: "" }]);
+  const changeItem = (id: string, field: "quantity" | "note" | "optionId", value: string) =>
     setItems((current) =>
-      current.some((item) => item.productId === productId)
-        ? current.filter((item) => item.productId !== productId)
-        : [...current, { productId, optionId: "", quantity: "1", note: "" }],
-    );
-  const changeItem = (productId: string, field: "quantity" | "note" | "optionId", value: string) =>
-    setItems((current) =>
-      current.map((item) => (item.productId === productId ? { ...item, [field]: value } : item)),
+      current.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
     );
   const useSuggestion = (suggestion: (typeof suggestions)[number]) => {
     if (!items.length)
@@ -191,6 +188,8 @@ export function ResellerPackagesScreen({
   const save = async () => {
     if (!name.trim()) return userNotice("Package name needed");
     if (!items.length) return userNotice("Choose at least one product");
+    if (items.some(item => !Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0))
+      return userNotice("Check quantities", "Enter a positive whole quantity for every variant.");
     const missingVariant = items.find((item) => {
       const product = products.find((entry) => entry.id === item.productId);
       return Boolean(product?.source_product_options?.length) && !item.optionId;
@@ -271,12 +270,12 @@ export function ResellerPackagesScreen({
     <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
       <View style={s.header}>
         <Pressable style={s.back} onPress={onBack}><Ionicons name="chevron-back" size={22} color="#151924" /></Pressable>
-        <View style={s.flex}><Text style={s.title}>Reseller packages</Text><Text style={s.help}>Build editable packs from your product ideas and set tiered prices.</Text></View>
+        <View style={s.flex}><Text style={s.title}>Reseller packages</Text><Text style={s.help}>Choose official products, exact variants and quantities.</Text></View>
       </View>
       {!editing ? (
         <>
           <Pressable style={s.primary} onPress={() => { reset(); setEditing(true); }}><Ionicons name="add" size={21} color="white" /><Text style={s.primaryText}>Create a package</Text></Pressable>
-          {packages.length === 0 ? <View style={s.empty}><Text style={s.cardTitle}>No packages yet</Text><Text style={s.help}>Create Starter, Reseller or Wholesale packs from saved product ideas.</Text></View> : packages.map((item) => {
+          {packages.length === 0 ? <View style={s.empty}><Text style={s.cardTitle}>No packages yet</Text><Text style={s.help}>Create Starter, Reseller or Wholesale packs from official products.</Text></View> : packages.map((item) => {
             const profit = Number(item.suggested_retail_total_php || 0) - Number(item.package_price_php);
             return <View key={item.id} style={[s.card, !item.active && s.inactive]}>
               <View style={s.cardHead}><View style={s.flex}><Text style={s.cardTitle}>{item.name}</Text><Text style={s.tier}>{tierNames[item.tier] ?? "Custom Package"}</Text></View><Text style={s.price}>{money(Number(item.package_price_php))}</Text></View>
@@ -294,9 +293,9 @@ export function ResellerPackagesScreen({
           <Field label="Package name · Required" value={name} setValue={setName} placeholder="Example: Starter Keychain Pack" />
           <Text style={s.label}>Package type</Text><View style={s.chips}>{Object.entries(tierNames).map(([id, label]) => <Chip key={id} label={label} active={tier === id} onPress={() => setTier(id)} />)}</View>
           <Field label="What is included · Optional" value={description} setValue={setDescription} placeholder="A short customer-friendly package description" multiline />
-          <Text style={s.sectionTitle}>1. Choose products</Text>
-          {products.length === 0 ? <Text style={s.help}>Add product ideas first, then return here.</Text> : <View style={s.chips}>{products.map((product) => <Chip key={product.id} label={product.name} active={items.some((item) => item.productId === product.id)} onPress={() => toggleProduct(product.id)} />)}</View>}
-          {items.map((item) => { const product = products.find((p) => p.id === item.productId); const variants=product?.source_product_options??[]; return <View key={item.productId} style={s.productRow}><View style={s.full}><Text style={s.productName}>{product?.name}</Text><Text style={s.help}>{money(itemUnitCost(item))} estimated cost each</Text>{variants.length?<><Text style={s.label}>Choose exact variant</Text><View style={s.chips}>{variants.map((variant)=><Chip key={variant.id} label={`${variant.option_value}${variant.source_price!=null?` · ${product?.source_currency} ${variant.source_price}`:""}`} active={item.optionId===variant.id} onPress={()=>changeItem(item.productId,"optionId",variant.id)}/>)}</View></>:<Text style={s.help}>No variants saved for this product.</Text>}</View><View style={s.qty}><Text style={s.label}>Qty</Text><TextInput style={s.qtyInput} value={item.quantity} onChangeText={(value) => changeItem(item.productId, "quantity", value)} keyboardType="number-pad" /></View><Field label="Note · Optional" value={item.note} setValue={(value) => changeItem(item.productId, "note", value)} placeholder="Any special request" compact /></View>; })}
+          <Text style={s.sectionTitle}>1. Choose products and variants</Text><Text style={s.help}>Tap a product again to add another shape or colour. Each row has its own quantity.</Text>
+          {products.length === 0 ? <Text style={s.help}>Make products official first, then return here.</Text> : <View style={s.chips}>{products.map((product) => <Chip key={product.id} label={`+ ${product.name}`} active={items.some((item) => item.productId === product.id)} onPress={() => toggleProduct(product.id)} />)}</View>}
+          {items.map((item) => { const product = products.find((p) => p.id === item.productId); const variants=product?.source_product_options??[]; return <View key={item.id} style={s.productRow}><View style={s.full}><Text style={s.productName}>{product?.name}</Text><Pressable style={s.secondary} onPress={() => setItems(rows => rows.filter(row => row.id !== item.id))}><Text style={s.secondaryText}>Remove item</Text></Pressable><Text style={s.help}>{money(itemUnitCost(item))} cost per selection · {Number(item.quantity)*(variants.find(v=>v.id===item.optionId)?.stock_units??1)} pieces</Text>{variants.length?<><Text style={s.label}>Choose exact variant</Text><View style={s.chips}>{variants.map((variant)=><Chip key={variant.id} label={`${variant.option_value}${variant.source_price!=null?` · ${product?.source_currency} ${variant.source_price}`:""}`} active={item.optionId===variant.id} onPress={()=>changeItem(item.id,"optionId",variant.id)}/>)}</View></>:<Text style={s.help}>No variants saved for this product.</Text>}</View><View style={s.qty}><Text style={s.label}>Selections</Text><TextInput style={s.qtyInput} value={item.quantity} onChangeText={(value) => changeItem(item.id, "quantity", value)} keyboardType="number-pad" /></View><Field label="Note · Optional" value={item.note} setValue={(value) => changeItem(item.id, "note", value)} placeholder="Any special request" compact /></View>; })}
           <Text style={s.sectionTitle}>2. Let MIK suggest a tier</Text><Text style={s.help}>Suggestions use each selected variant's converted cost. Review every number before saving.</Text>
           <View style={s.suggestions}>{suggestions.map((item) => <Pressable key={item.tier} style={s.suggestion} onPress={() => useSuggestion(item)}><Text style={s.suggestionText}>{item.label}</Text><Text style={s.suggestionHelp}>{Math.round(item.discount * 100)}% package discount</Text></Pressable>)}</View>
           <Text style={s.sectionTitle}>3. Price and availability</Text>
@@ -339,7 +338,7 @@ const s = StyleSheet.create({
   form: { padding: 17, borderRadius: 18, borderWidth: 1, borderColor: "#DED9EB", backgroundColor: "#FAF9FC", gap: 13 }, formTitle: { fontSize: 20, fontWeight: "700", color: "#151924" }, sectionTitle: { fontSize: 17, fontWeight: "700", color: "#151924", marginTop: 7 },
   field: { gap: 6 }, compactField: { minWidth: 115, flex: 0.8 }, label: { fontSize: 13, fontWeight: "600", color: "#343A47" }, input: { minHeight: 46, borderWidth: 1, borderColor: "#D9DDE5", borderRadius: 12, paddingHorizontal: 13, fontSize: 16, color: "#151924", backgroundColor: "white" }, multiline: { minHeight: 82, paddingTop: 11 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 7 }, chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: "#D9DDE5", backgroundColor: "white" }, chipOn: { backgroundColor: "#594C8D", borderColor: "#594C8D" }, chipText: { fontSize: 13, fontWeight: "600", color: "#4F5664" }, chipTextOn: { color: "white" },
-  productRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", gap: 10, padding: 12, borderRadius: 13, backgroundColor: "white", borderWidth: 1, borderColor: "#E0E3EA" }, productName: { fontSize: 15, fontWeight: "700", color: "#151924" }, qty: { width: 64, gap: 6 }, qtyInput: { height: 46, borderWidth: 1, borderColor: "#D9DDE5", borderRadius: 12, paddingHorizontal: 10, fontSize: 16, backgroundColor: "white", color: "#151924" },
+  productRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end", gap: 10, padding: 12, borderRadius: 13, backgroundColor: "white", borderWidth: 1, borderColor: "#E0E3EA" }, productName: { fontSize: 15, fontWeight: "700", color: "#151924" }, qty: { width: 90, gap: 6 }, qtyInput: { height: 46, borderWidth: 1, borderColor: "#D9DDE5", borderRadius: 12, paddingHorizontal: 10, fontSize: 16, backgroundColor: "white", color: "#151924" },
   suggestions: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, suggestion: { flexGrow: 1, minWidth: 145, padding: 12, borderRadius: 13, borderWidth: 1, borderColor: "#D9D3E8", backgroundColor: "white" }, suggestionText: { fontSize: 14, fontWeight: "700", color: "#594C8D" }, suggestionHelp: { fontSize: 12, color: "#737B89", marginTop: 3 },
   two: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, customerCopy: { padding: 14, borderRadius: 14, backgroundColor: "#F2F5FB", borderWidth: 1, borderColor: "#D9E1F0", gap: 5 }, customerTitle: { fontSize: 13, fontWeight: "700", color: "#315FBE", textTransform: "uppercase" }, customerText: { fontSize: 14, lineHeight: 21, color: "#343A47" },
 });

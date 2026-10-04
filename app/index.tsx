@@ -35,9 +35,12 @@ import { WorkspaceAction } from "@/src/components/WorkspaceAction";
 import { PrintQueueScreen } from "@/src/components/PrintQueueScreen";
 import { PrintPriceCalculator } from "@/src/components/PrintPriceCalculator";
 import { SourcingScreen } from "@/src/components/SourcingScreen";
+import { WebsiteScreen } from "@/src/components/WebsiteScreen";
 import { ResellerPreordersScreen } from "@/src/components/ResellerPreordersScreen";
 import { ResellerPackagesScreen } from "@/src/components/ResellerPackagesScreen";
 import { ResellerReportsScreen } from "@/src/components/ResellerReportsScreen";
+import { ResellerTradeScreen } from "@/src/components/ResellerTradeScreen";
+import { ResellerStockScreen } from "@/src/components/ResellerStockScreen";
 import { ResellerHomeScreen } from "@/src/components/ResellerHomeScreen";
 import { Text, TextInput } from "@/src/components/AppTypography";
 import type {
@@ -228,7 +231,7 @@ const ownerNav: {
 const resellerNav: typeof ownerNav = [
   { id: "home", label: "Home", icon: "home-outline", color: "#4F5664", soft: "#F3F4F6" },
   { id: "sourcing", label: "Products", icon: "bag-handle-outline", color: "#315FBE", soft: "#EDF3FB" },
-  { id: "reseller_packages", label: "Packages", icon: "layers-outline", color: "#594C8D", soft: "#F3F0F8" },
+  { id: "reseller_sales", label: "Sales", icon: "cart-outline", color: "#315FBE", soft: "#EDF3FB" },
   { id: "preorders", label: "Pre-orders", icon: "receipt-outline", color: "#8A365B", soft: "#FAEFF4" },
   { id: "reseller_reports", label: "Reports", icon: "bar-chart-outline", color: "#1B685C", soft: "#EDF6F3" },
 ];
@@ -968,14 +971,16 @@ function ShopApp({
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
   const resellerBusiness=business?.business_type==="reseller";
+  const canManageWebsite = resellerBusiness && role === "owner" && business?.id === "3fe4c82d-a659-406b-b290-32d8a49f2bdf";
   const visibleModules=(business?.visible_modules??allShopModules()) as ShopModule[];
-  const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports"] as Screen[]).includes(value)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
+const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports","reseller_sales","reseller_purchases","reseller_stock"] as Screen[]).includes(value)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
   const availableNav = (resellerBusiness?resellerNav:ownerNav).filter(item=>{const module=screenModule(item.id);return !module||visibleModules.includes(module);});
   const nav = role === "owner" ? availableNav : availableNav.filter((x) =>
     x.id === "home" ||
-    (resellerBusiness && (["sourcing","reseller_packages"] as Screen[]).includes(x.id) && staffPermissions?.includes("products")) ||
+    (resellerBusiness && (["sourcing","reseller_packages","reseller_purchases"] as Screen[]).includes(x.id) && staffPermissions?.includes("products")) ||
     (resellerBusiness && x.id === "preorders" && staffPermissions?.includes("orders")) ||
     (resellerBusiness && x.id === "reseller_reports" && staffPermissions?.includes("reports")) ||
+    (resellerBusiness && x.id === "reseller_sales" && staffPermissions?.includes("sell")) ||
     (!resellerBusiness && x.id === "sell_start" && staffPermissions?.includes("sell")) ||
     (!resellerBusiness && x.id === "orders" && staffPermissions?.includes("orders")) ||
     (!resellerBusiness && x.id === "stock_start" && staffPermissions?.includes("stock")) ||
@@ -994,7 +999,7 @@ function ShopApp({
   let body: ReactNode;
   if (screen === "home")
     body = resellerBusiness ? (
-      <ResellerHomeScreen businessId={business!.id} onOpen={setScreen} />
+      <ResellerHomeScreen businessId={business!.id} onOpen={setScreen} canManageWebsite={canManageWebsite} permissions={role === "owner" ? undefined : staffPermissions ?? []} />
     ) : (
       <QuickStart
         businessId={business!.id}
@@ -1100,13 +1105,19 @@ function ShopApp({
   else if (screen === "price_calculator")
     body = <PrintPriceCalculator onBack={() => setScreen("home")} />;
   else if (screen === "sourcing")
-    body = <SourcingScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
+    body = <SourcingScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} onCreateBundle={()=>setScreen("reseller_packages")} />;
+  else if (screen === "website" && canManageWebsite)
+    body = <WebsiteScreen businessId={business!.id} onBack={() => setScreen("home")} />;
   else if (screen === "reseller_packages")
-    body = <ResellerPackagesScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
+    body = <ResellerPackagesScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("sourcing")} />;
   else if (screen === "preorders")
     body = <ResellerPreordersScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
   else if (screen === "reseller_reports")
     body = <ResellerReportsScreen businessId={business!.id} onBack={() => setScreen("home")} />;
+  else if (screen === "reseller_sales" || screen === "reseller_purchases")
+    body = <ResellerTradeScreen key={screen} businessId={business!.id} locationId={locationId} kind={screen === "reseller_sales" ? "sale" : "purchase"} onBack={() => setScreen("home")} />;
+  else if(screen === "reseller_stock")
+    body=<ResellerStockScreen businessId={business!.id} locationId={locationId} onBack={()=>setScreen("home")}/>;
   else if (screen === "correct")
     body = <ReportsScreen locationId={locationId} correctionMode onBack={() => setScreen("sell_start")} />;
   else if (screen === "shop")
@@ -2473,7 +2484,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
     (["reports","expenses"] as Screen[]).includes(screen)?"reports":
     (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
     screen==="calendar"?"calendar":"settings";
-  const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports"] as Screen[]).includes(screen)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
+  const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports","reseller_sales","reseller_purchases","reseller_stock"] as Screen[]).includes(screen)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
   const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>{const module=moduleFor(action.screen);return (!module||visibleModules.includes(module))&&(action.screen==="suggested_images"||!permissions||permissions.includes(permissionFor(action.screen)));})})).filter(group=>group.actions.length);
   const overviewTone=overviewPeriod==="today"?SECTION.sales:{color:"#283D70",soft:"#E8EDF7",border:"#BCCAE4"};
   const overviewCardStyle=[s.overviewMetric,{borderColor:overviewTone.border,backgroundColor:overviewTone.soft}];

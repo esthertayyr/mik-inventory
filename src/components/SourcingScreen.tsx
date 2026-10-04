@@ -47,6 +47,7 @@ type OptionRow = {
   value: string;
   price: string;
   publicPrice: string;
+  stockUnits: string;
 };
 type LocalImage = {
   uri: string;
@@ -76,10 +77,12 @@ export function SourcingScreen({
   businessId,
   locationId,
   onBack,
+  onCreateBundle,
 }: {
   businessId: string;
   locationId: string;
   onBack: () => void;
+  onCreateBundle?: () => void;
 }) {
   const [items, setItems] = useState<SourceItem[]>([]);
   const { width } = useWindowDimensions();
@@ -105,7 +108,7 @@ export function SourcingScreen({
   const [sellingPhp, setSellingPhp] = useState("");
   const [leadTime, setLeadTime] = useState("Estimated 1–2 months");
   const [publishOnWebsite, setPublishOnWebsite] = useState(false);
-  const [featured, setFeatured] = useState(false);
+  const [catalogTab, setCatalogTab] = useState<"official" | "ideas">("official");
   const [options, setOptions] = useState<OptionRow[]>([]);
   const [images, setImages] = useState<LocalImage[]>([]);
   const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
@@ -204,7 +207,6 @@ export function SourcingScreen({
     setSellingPhp("");
     setLeadTime("Estimated 1–2 months");
     setPublishOnWebsite(false);
-    setFeatured(false);
     setOptions([]);
     setImages([]);
     setSavedImages([]);
@@ -218,6 +220,7 @@ export function SourcingScreen({
         value: "",
         price: "",
         publicPrice: "",
+        stockUnits: "1",
       },
     ]);
   const changeOption = (id: string, key: keyof OptionRow, value: string) =>
@@ -244,12 +247,11 @@ export function SourcingScreen({
     setSellingPhp(data.selling_price_php == null ? "" : String(data.selling_price_php));
     setLeadTime(data.lead_time_text ?? "Estimated 1–2 months");
     setPublishOnWebsite(data.status === "active");
-    setFeatured(Boolean(data.featured));
     setTaxPercent(String(data.tax_percent ?? 3));
     setShippingType(data.shipping_type === "paid" ? "paid" : "free");
     setShippingAmount(data.shipping_amount ? String(data.shipping_amount) : "");
     setRate(String(data.source_currency === "SGD" ? (data.currency_to_php_rate ?? 45) : 45));
-    setOptions((data.source_product_options ?? []).map((option: any) => ({ id: option.id, databaseId: option.id, value: option.option_value ?? "", price: option.source_price == null ? "" : String(option.source_price), publicPrice: option.selling_price_php == null ? "" : String(option.selling_price_php) })));
+    setOptions((data.source_product_options ?? []).map((option: any) => ({ id: option.id, databaseId: option.id, value: option.option_value ?? "", price: option.source_price == null ? "" : String(option.source_price), stockUnits: String(option.stock_units ?? 1), publicPrice: option.selling_price_php == null ? "" : String(option.selling_price_php) })));
     setSavedImages((data.source_product_images ?? []) as SavedImage[]);
     setImages([]);
     setEditing(true);
@@ -302,6 +304,13 @@ export function SourcingScreen({
         "Complete the options",
         "Enter a name for every variant or choice, or remove the empty row.",
       );
+    if(options.some(x=>!Number.isInteger(Number(x.stockUnits))||Number(x.stockUnits)<=0)) return userNotice("Pieces per selection needed","Use a whole number. For one item enter 1; for a pack of 50 enter 50.");
+    if (!Number.isFinite(Number(taxPercent)) || Number(taxPercent) <= 0)
+      return userNotice("Tax needed", "Enter a tax percentage greater than zero. The default is 3%.");
+    if (shippingType === "paid" && n(shippingAmount) <= 0)
+      return userNotice("Shipping cost needed", "Enter the estimated supplier shipping cost in SGD.");
+    if (publishOnWebsite && (options.some(option => n(option.publicPrice || sellingPhp) <= 0) || (!options.length && n(sellingPhp) <= 0)))
+      return userNotice("Customer price needed", "Every official variant must have a customer price greater than zero.");
     if (publishOnWebsite && !englishDescription.trim())
       return userNotice("Product details needed", "Add a short customer-facing description before publishing.");
     if (publishOnWebsite && !leadTime.trim())
@@ -324,7 +333,6 @@ export function SourcingScreen({
             : category,
         idea_stage: "idea",
         platform,
-        supplier_name: supplier.trim() || null,
         original_description: null,
         english_description: englishDescription.trim() || null,
         source_currency: currency,
@@ -341,8 +349,7 @@ export function SourcingScreen({
         market_reference_url: marketLink.trim() || null,
         selling_price_php: sellingPhp ? n(sellingPhp) : null,
         lead_time_text: leadTime.trim() || "Estimated 1–2 months",
-        featured,
-        status: publishOnWebsite && (savedImages.length > 0 || images.length === 0) ? "active" : "draft",
+        status: "draft",
       };
     const productRequest = editingId
       ? supabase.from("source_products").update(productValues).eq("id", editingId).eq("business_id", businessId)
@@ -366,7 +373,7 @@ export function SourcingScreen({
       }
       for (let index = 0; index < options.length; index++) {
         const option = options[index];
-        const values = { option_type: "Variant", option_value: option.value.trim(), source_price: option.price ? n(option.price) : null, price_sgd: currency === "SGD" && option.price ? n(option.price) : null, selling_price_php: option.publicPrice ? n(option.publicPrice) : null, minimum_quantity: 1, sort_order: index };
+        const values = { option_type: "Variant", option_value: option.value.trim(), source_price: option.price ? n(option.price) : null, price_sgd: currency === "SGD" && option.price ? n(option.price) : null, selling_price_php: option.publicPrice ? n(option.publicPrice) : null, stock_units: Number(option.stockUnits), minimum_quantity: 1, sort_order: index };
         const request = option.databaseId
           ? supabase.from("source_product_options").update(values).eq("id", option.databaseId).eq("source_product_id", productId)
           : supabase.from("source_product_options").insert({ source_product_id: productId, ...values });
@@ -382,6 +389,7 @@ export function SourcingScreen({
             source_price: x.price ? n(x.price) : null,
             price_sgd: currency === "SGD" && x.price ? n(x.price) : null,
             selling_price_php: x.publicPrice ? n(x.publicPrice) : null,
+            stock_units: Number(x.stockUnits),
             minimum_quantity: 1,
             sort_order: index,
           })));
@@ -433,7 +441,7 @@ export function SourcingScreen({
         imageError?.message ?? "You can add them again later.",
       );
     }
-    if (publishOnWebsite && images.length > 0) {
+    if (publishOnWebsite) {
       const { error: publishError } = await supabase
         .from("source_products")
         .update({ status: "active" })
@@ -449,8 +457,8 @@ export function SourcingScreen({
     setEditing(false);
     await load();
     userNotice(
-      wasEditing ? "Product updated" : "Idea saved",
-      wasEditing ? "Your changes are saved." : "The idea, category, supplier details, costs and images are now kept together.",
+      wasEditing ? "Product updated" : "Product saved",
+      publishOnWebsite ? "Official product saved. It now appears in the VIAE shop." : "Your private idea is saved. It does not appear on the website.",
     );
     } catch (error) {
       userNotice("Product not fully saved", (error as {message?:string})?.message || "Please check your connection and try again.");
@@ -461,9 +469,8 @@ export function SourcingScreen({
   const itemCategories = Array.from(
     new Set(items.map((item) => item.category_name).filter(Boolean)),
   ).sort((a, b) => a.localeCompare(b));
-  const shownItems = categoryFilter === "all"
-    ? items
-    : items.filter((item) => item.category_name === categoryFilter);
+  const tabItems = items.filter(item => catalogTab === "official" ? item.status === "active" : item.status !== "active");
+  const shownItems = categoryFilter === "all" ? tabItems : tabItems.filter(item => item.category_name === categoryFilter);
   if (loading)
     return (
       <View style={styles.loading}>
@@ -475,19 +482,23 @@ export function SourcingScreen({
     return (
       <ScrollView contentContainerStyle={styles.page}>
         <Header title="Products" onBack={onBack} />
+        {onCreateBundle?<Pressable style={styles.secondary} onPress={onCreateBundle}><Text style={styles.secondaryText}>Manage set packages</Text></Pressable>:null}
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
             <Ionicons name="bag-handle-outline" size={25} color="#315FBE" />
           </View>
           <View style={styles.flex}>
-            <Text style={styles.title}>Products to resell</Text>
+            <Text style={styles.title}>Your product catalogue</Text>
             <Text style={styles.help}>
-              Save an idea first. Add links, choices, costs and images when you
-              find them.
+              Official products appear in the shop. Ideas are private until ready.
             </Text>
           </View>
         </View>
-        <Pressable style={styles.primary} onPress={() => setEditing(true)}>
+        <View style={styles.chips}>
+          <Chip label={`Official products ${items.filter(item => item.status === "active").length}`} active={catalogTab === "official"} onPress={() => {setCatalogTab("official"); setCategoryFilter("all");}} />
+          <Chip label={`Ideas ${items.filter(item => item.status !== "active").length}`} active={catalogTab === "ideas"} onPress={() => {setCatalogTab("ideas"); setCategoryFilter("all");}} />
+        </View>
+        <Pressable style={styles.primary} onPress={() => {setPublishOnWebsite(catalogTab === "official"); setEditing(true);}}>
           <Ionicons name="add" size={22} color="white" />
           <Text style={styles.primaryText}>Add product</Text>
         </Pressable>
@@ -497,7 +508,7 @@ export function SourcingScreen({
           contentContainerStyle={styles.filterRow}
         >
           <Chip
-            label={`All ${items.length}`}
+            label={`All ${tabItems.length}`}
             active={categoryFilter === "all"}
             onPress={() => setCategoryFilter("all")}
           />
@@ -549,7 +560,7 @@ export function SourcingScreen({
                 <View style={styles.cardMeta}>
                   <Text style={styles.categoryTag}>{item.category_name}</Text>
                   <Text style={item.status === "active" ? styles.liveTag : styles.draftTag}>
-                    {item.status === "active" ? "Live on VIAE" : "Private draft"}
+                    {item.status === "active" ? "Official · On VIAE" : "Private idea"}
                   </Text>
                 </View>
                 <Text style={styles.help}>
@@ -592,6 +603,12 @@ export function SourcingScreen({
         }}
       />
       <Section number="1" title="Product">
+        <Text style={styles.label}>Product type</Text>
+        <View style={styles.chips}>
+          <Chip label="Official · In website shop" active={publishOnWebsite} onPress={() => setPublishOnWebsite(true)} />
+          <Chip label="Idea · Private" active={!publishOnWebsite} onPress={() => setPublishOnWebsite(false)} />
+        </View>
+        <Text style={styles.note}>{publishOnWebsite ? "Official products appear in the VIAE Shop. Add a photo, description, waiting time and customer price." : "Ideas stay private. Make this official when it is ready to sell."}</Text>
         <Field
           label="Product name · Required"
           value={name}
@@ -675,9 +692,8 @@ export function SourcingScreen({
           ))}
         </View>
       </Section>
-      <Section number="3" title="Shop and product details">
-        <Field label="Supplier or shop name · Optional" value={supplier} setValue={setSupplier} placeholder="Shop or seller name" />
-        <Field label="Product details · Optional" value={englishDescription} setValue={setEnglishDescription} placeholder="Add useful product information" multiline />
+      <Section number="3" title="Product details">
+        <Field label={`Product details · ${publishOnWebsite ? "Required" : "Optional for an idea"}`} value={englishDescription} setValue={setEnglishDescription} placeholder="Describe what the customer will receive" multiline />
       </Section>
       <Section number="4" title="Variants and costs">
         <Text style={styles.help}>
@@ -691,10 +707,9 @@ export function SourcingScreen({
           keyboardType="decimal-pad"
           placeholder="45"
         />
-        <Text style={styles.label}>Tax</Text>
+        <Text style={styles.label}>Tax · Required</Text>
         <View style={styles.chips}>
           <Chip label="3% tax" active={taxPercent === "3"} onPress={() => setTaxPercent("3")} />
-          <Chip label="No tax" active={taxPercent === "0"} onPress={() => setTaxPercent("0")} />
         </View>
         <Text style={styles.label}>Supplier shipping</Text>
         <View style={styles.chips}>
@@ -725,6 +740,8 @@ export function SourcingScreen({
               keyboardType="decimal-pad"
               placeholder="Example: 499"
             />
+            <Field label="Pieces in one selection · Required" value={row.stockUnits} setValue={value=>changeOption(row.id,"stockUnits",value)} keyboardType="number-pad" placeholder="1" />
+            <Text style={styles.note}>Selling one selection deducts this many pieces. Use 50 for a pack of 50, or 1 for a single item.</Text>
             {row.price ? <Text style={styles.variantCost}>Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")} · includes selected tax and shipping</Text> : null}
             <Pressable
               style={styles.remove}
@@ -743,33 +760,23 @@ export function SourcingScreen({
         </Pressable>
         <Text style={styles.note}>Supplier prices remain private. Customer prices are the only prices shown on VIAE.</Text>
       </Section>
-      <Section number="5" title="VIAE website">
+      <Section number="5" title="Customer price and waiting time">
         <Text style={styles.help}>
-          Publish this product when its photo, description and customer price are ready. Private supplier details never appear on the website.
+          Official products appear in the VIAE shop automatically. Ideas stay private. Buying costs and supplier links never appear on the website.
         </Text>
         <Field
-          label="Product price · PHP"
+          label="Same price for all variants · PHP · Optional if each variant is priced"
           value={sellingPhp}
           setValue={setSellingPhp}
           keyboardType="decimal-pad"
           placeholder="Use this when every variant has the same price"
         />
         <Field
-          label="Estimated waiting time"
+          label={`Estimated waiting time · ${publishOnWebsite ? "Required" : "Optional for an idea"}`}
           value={leadTime}
           setValue={setLeadTime}
           placeholder="Estimated 1–2 months"
         />
-        <Text style={styles.label}>Show on VIAE website?</Text>
-        <View style={styles.chips}>
-          <Chip label="Keep private" active={!publishOnWebsite} onPress={() => setPublishOnWebsite(false)} />
-          <Chip label="Publish on VIAE" active={publishOnWebsite} onPress={() => setPublishOnWebsite(true)} />
-        </View>
-        <Text style={styles.label}>Homepage feature</Text>
-        <View style={styles.chips}>
-          <Chip label="Normal product" active={!featured} onPress={() => setFeatured(false)} />
-          <Chip label="Feature this product" active={featured} onPress={() => setFeatured(true)} />
-        </View>
       </Section>
       <Pressable
         style={[styles.primary, saving && styles.disabled]}

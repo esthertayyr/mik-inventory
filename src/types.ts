@@ -24,9 +24,13 @@ export type Screen =
   | "report_issue"
   | "suggested_images"
   | "sourcing"
+  | "website"
   | "reseller_packages"
   | "preorders"
   | "reseller_reports"
+  | "reseller_sales"
+  | "reseller_purchases"
+  | "reseller_stock"
   | "staff"
   | "shop"
   | "more";

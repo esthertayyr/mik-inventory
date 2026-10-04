@@ -13,8 +13,11 @@ import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { supabase } from "@/src/lib/supabase";
 import { Text, TextInput } from "@/src/components/AppTypography";
+import { userNotice } from "@/src/lib/userNotice";
+import { ExpenseDatePicker } from "./ExpensesScreen";
+import type { TradeEntry } from "./ResellerTradeScreen";
 
-type Period = "today" | "month" | "custom";
+type Period = "today" | "week" | "month" | "custom";
 type Payment = {
   id: string;
   payment_type: "deposit" | "final" | "delivery";
@@ -23,6 +26,7 @@ type Payment = {
   payment_date: string;
 };
 type Order = {
+  direct_sale: boolean;
   id: string;
   customer_name: string;
   product_name: string;
@@ -69,6 +73,9 @@ export function ResellerReportsScreen({
   onBack: () => void;
 }) {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [trades,setTrades]=useState<TradeEntry[]>([]);
+  const [expenses,setExpenses]=useState<{id:string;expense_date:string;description:string;amount:number;payment_method:string}[]>([]);
+  const [loadError,setLoadError]=useState("");
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>("month");
   const now = new Date();
@@ -79,14 +86,18 @@ export function ResellerReportsScreen({
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const [{ data, error },tradeResult,expenseResult] = await Promise.all([supabase
       .from("reseller_preorders")
       .select(
-        "id,customer_name,product_name,package_name,quantity,total_price_php,delivery_fee_php,fulfilment_status,created_at,reseller_preorder_payments(id,payment_type,amount_php,payment_method,payment_date)",
+        "id,direct_sale,customer_name,product_name,package_name,quantity,total_price_php,delivery_fee_php,fulfilment_status,created_at,reseller_preorder_payments(id,payment_type,amount_php,payment_method,payment_date)",
       )
       .eq("business_id", businessId)
-      .order("created_at", { ascending: false });
-    if (error) Alert.alert("Report not loaded", error.message);
+      .order("created_at", { ascending: false }),
+      supabase.from('reseller_trade_entries').select('*').eq('business_id',businessId),
+      supabase.from('expenses').select('id,expense_date,description,amount,payment_method').eq('business_id',businessId)]);
+    const failure=error||tradeResult.error||expenseResult.error;
+    setLoadError(failure?.message??"");
+    setTrades((tradeResult.data??[]) as TradeEntry[]);setExpenses(expenseResult.data??[]);
     setOrders((data ?? []) as Order[]);
     setLoading(false);
   }, [businessId]);
@@ -95,6 +106,7 @@ export function ResellerReportsScreen({
   const range = useMemo(() => {
     const today = iso(new Date());
     if (period === "today") return { start: today, end: today };
+    if (period === "week") {const start=new Date();start.setDate(start.getDate()-((start.getDay()+6)%7));const end=new Date(start);end.setDate(end.getDate()+6);return {start:iso(start),end:iso(end)};}
     if (period === "month")
       return {
         start: `${today.slice(0, 7)}-01`,
@@ -106,6 +118,11 @@ export function ResellerReportsScreen({
     };
   }, [period, startText, endText]);
   const validRange = Boolean(range.start && range.end && range.start <= range.end);
+  const selectedTrades=trades.filter(row=>row.status!=='cancelled'&&row.payment_date&&validRange&&row.payment_date>=range.start!&&row.payment_date<=range.end!);
+  const selectedExpenses=expenses.filter(row=>validRange&&row.expense_date>=range.start!&&row.expense_date<=range.end!);
+  const productSaleMoney=selectedTrades.filter(row=>row.kind==='sale').reduce((sum,row)=>sum+Number(row.amount_php),0);
+  const purchaseMoney=selectedTrades.filter(row=>row.kind==='purchase').reduce((sum,row)=>sum+Number(row.amount_php),0);
+  const expenseMoney=selectedExpenses.reduce((sum,row)=>sum+Number(row.amount),0);
   const payments = useMemo(
     () =>
       validRange
@@ -121,12 +138,14 @@ export function ResellerReportsScreen({
         : [],
     [orders, range, validRange],
   );
+  const packageSaleMoney=payments.filter(row=>row.order.direct_sale).reduce((sum,row)=>sum+Number(row.payment.amount_php),0);
+  const saleMoney=productSaleMoney+packageSaleMoney;
   const newOrders = useMemo(
     () =>
       validRange
         ? orders.filter((order) => {
             const date = order.created_at.slice(0, 10);
-            return date >= range.start! && date <= range.end!;
+            return !order.direct_sale && order.fulfilment_status !== 'cancelled' && date >= range.start! && date <= range.end!;
           })
         : [],
     [orders, range, validRange],
@@ -134,9 +153,9 @@ export function ResellerReportsScreen({
   const totals = useMemo(() => {
     const byType = (type: Payment["payment_type"]) =>
       payments
-        .filter(({ payment }) => payment.payment_type === type)
+        .filter(({ order, payment }) => !order.direct_sale && payment.payment_type === type)
         .reduce((sum, { payment }) => sum + Number(payment.amount_php), 0);
-    const received = payments.reduce(
+    const received = payments.filter(row=>!row.order.direct_sale).reduce(
       (sum, { payment }) => sum + Number(payment.amount_php),
       0,
     );
@@ -173,7 +192,8 @@ export function ResellerReportsScreen({
     newOrders.forEach((order) => {
       const name = order.package_name || order.product_name;
       const current = grouped.get(name) ?? { count: 0, value: 0 };
-      current.count += 1;
+      if (!(order.reseller_preorder_payments??[]).length) return;
+      current.count += Number(order.quantity);
       current.value += Number(order.total_price_php);
       grouped.set(name, current);
     });
@@ -181,8 +201,9 @@ export function ResellerReportsScreen({
   }, [newOrders]);
 
   const exportReport = async () => {
+    if (loadError) return userNotice('Report unavailable', 'Reload the page before exporting.');
     if (!validRange)
-      return Alert.alert(
+      return userNotice(
         "Check the date range",
         "Use DD-MM-YYYY and make sure the end date is not before the start date.",
       );
@@ -201,13 +222,15 @@ export function ResellerReportsScreen({
         display(payment.payment_date),
         order.customer_name,
         order.package_name || order.product_name,
-        paymentName[payment.payment_type],
+        order.direct_sale?'Package sale':paymentName[payment.payment_type],
         payment.amount_php,
         payment.payment_method.toUpperCase(),
         order.total_price_php,
         order.fulfilment_status.replaceAll("_", " "),
       ]),
     ];
+    rows.push(...selectedTrades.map(row=>[display(row.payment_date!),row.kind==='sale'?'Direct sale':'Supplier purchase',`${row.product_name} · ${row.variant_name}`,row.kind==='sale'?'Sale received':'Purchase paid',row.kind==='sale'?Number(row.amount_php):-Number(row.amount_php),row.payment_method.toUpperCase(),Number(row.amount_php),row.status]));
+    rows.push(...selectedExpenses.map(row=>[display(row.expense_date),'Business expense',row.description,'Expense paid',-Number(row.amount),row.payment_method.toUpperCase(),Number(row.amount),'recorded']));
     const content = "\uFEFF" + rows.map((row) => row.map(csv).join(",")).join("\n");
     const filename = `mik-reseller-report-${range.start}-to-${range.end}.csv`;
     if (Platform.OS === "web") {
@@ -234,42 +257,49 @@ export function ResellerReportsScreen({
           <Ionicons name="chevron-back" size={22} color="#151924" />
         </Pressable>
         <View style={s.flex}>
-          <Text style={s.title}>Reseller reports</Text>
+          <Text style={s.title}>VIAE reports</Text>
           <Text style={s.help}>
-            Pre-orders, customer payments and money still to collect.
+            Sales, customer payments, purchases and expenses.
           </Text>
         </View>
       </View>
       <View style={s.tabs}>
         <Tab label="Today" active={period === "today"} onPress={() => setPeriod("today")} />
+        <Tab label="This week" active={period === "week"} onPress={() => setPeriod("week")} />
         <Tab label="This month" active={period === "month"} onPress={() => setPeriod("month")} />
         <Tab label="Date range" active={period === "custom"} onPress={() => setPeriod("custom")} />
       </View>
       {period === "custom" ? (
         <View style={s.dateRow}>
-          <DateField label="From · DD-MM-YYYY" value={startText} onChange={setStartText} />
-          <DateField label="To · DD-MM-YYYY" value={endText} onChange={setEndText} />
+          <View style={s.dateField}><ExpenseDatePicker label="From" value={startText} onChange={setStartText}/></View>
+          <View style={s.dateField}><ExpenseDatePicker label="To" value={endText} onChange={setEndText}/></View>
         </View>
       ) : null}
       {!validRange ? (
         <View style={s.warning}><Text style={s.warningText}>Check the dates. Use DD-MM-YYYY.</Text></View>
       ) : null}
+      {loadError?<Text style={s.warningText}>Report incomplete: {loadError}</Text>:null}
       {loading ? (
         <View style={s.loading}><ActivityIndicator color="#594C8D" /><Text style={s.help}>Preparing report…</Text></View>
-      ) : (
+      ) : loadError ? <Text style={s.help}>Reload this page to try again. No totals are shown until all records load.</Text> : (
         <>
           <View style={s.hero}>
-            <Text style={s.eyebrow}>CUSTOMER MONEY RECEIVED</Text>
-            <Text style={s.heroValue}>{peso(totals.received)}</Text>
-            <Text style={s.help}>{display(range.start!)} to {display(range.end!)}</Text>
+            <Text style={s.eyebrow}>MONEY AFTER SPENDING</Text>
+            <Text style={s.heroValue}>{peso(totals.received+saleMoney-purchaseMoney-expenseMoney)}</Text>
+            <Text style={s.help}>{validRange?`${display(range.start!)} to ${display(range.end!)}`:'Choose a valid date range'} · Cash flow, not profit</Text>
           </View>
           <View style={s.grid}>
+            <Metric label="Direct sales" value={peso(saleMoney)} tone="blue" />
+            <Metric label="Order money received" value={peso(totals.received)} tone="purple" />
+            <Metric label="Supplier purchases paid" value={peso(purchaseMoney)} tone="neutral" />
+            <Metric label="Other expenses" value={peso(expenseMoney)} tone="red" />
             <Metric label="Deposits received" value={peso(totals.deposit)} tone="purple" />
             <Metric label="Final payments" value={peso(totals.final)} tone="blue" />
             <Metric label="Delivery fees" value={peso(totals.delivery)} tone="neutral" />
             <Metric label="New pre-orders" value={`${newOrders.length}`} tone="green" />
             <Metric label="Still to collect" value={peso(totals.outstanding)} tone="red" help="Across all active pre-orders" />
           </View>
+          <View style={s.section}><Text style={s.sectionTitle}>Sales and spending</Text><Text style={s.help}>Preorder payments are listed below, not counted again as direct sales. Do not add supplier purchases to Expenses.</Text>{selectedTrades.map(row=><View key={row.id} style={s.row}><View style={s.flex}><Text style={s.rowTitle}>{row.product_name} · {row.variant_name}</Text><Text style={s.help}>{row.kind==='sale'?'Sale':'Purchase'} · × {row.quantity} · {display(row.payment_date!)}</Text></View><Text style={s.rowValue}>{row.kind==='purchase'?'−':''}{peso(Number(row.amount_php))}</Text></View>)}{selectedExpenses.map(row=><View key={row.id} style={s.row}><View style={s.flex}><Text style={s.rowTitle}>{row.description}</Text><Text style={s.help}>Expense · {display(row.expense_date)}</Text></View><Text style={s.rowValue}>−{peso(Number(row.amount))}</Text></View>)}</View>
           <View style={s.section}>
             <Text style={s.sectionTitle}>Package performance</Text>
             <Text style={s.help}>Packages ordered during this period.</Text>
