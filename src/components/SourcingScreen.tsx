@@ -466,10 +466,10 @@ export function SourcingScreen({
       setSaving(false);
     }
   };
-  const itemCategories = Array.from(
-    new Set(items.map((item) => item.category_name).filter(Boolean)),
-  ).sort((a, b) => a.localeCompare(b));
   const tabItems = items.filter(item => catalogTab === "official" ? item.status === "active" : item.status !== "active");
+  const itemCategories = Array.from(
+    new Set(tabItems.map((item) => item.category_name).filter(Boolean)),
+  ).sort((a, b) => a.localeCompare(b));
   const shownItems = categoryFilter === "all" ? tabItems : tabItems.filter(item => item.category_name === categoryFilter);
   if (loading)
     return (
@@ -495,8 +495,8 @@ export function SourcingScreen({
           </View>
         </View>
         <View style={styles.chips}>
-          <Chip label={`Official products ${items.filter(item => item.status === "active").length}`} active={catalogTab === "official"} onPress={() => {setCatalogTab("official"); setCategoryFilter("all");}} />
-          <Chip label={`Ideas ${items.filter(item => item.status !== "active").length}`} active={catalogTab === "ideas"} onPress={() => {setCatalogTab("ideas"); setCategoryFilter("all");}} />
+          <Chip tone="blue" label={`Official products ${items.filter(item => item.status === "active").length}`} active={catalogTab === "official"} onPress={() => {setCatalogTab("official"); setCategoryFilter("all");}} />
+          <Chip tone="purple" label={`Ideas ${items.filter(item => item.status !== "active").length}`} active={catalogTab === "ideas"} onPress={() => {setCatalogTab("ideas"); setCategoryFilter("all");}} />
         </View>
         <Pressable style={styles.primary} onPress={() => {setPublishOnWebsite(catalogTab === "official"); setEditing(true);}}>
           <Ionicons name="add" size={22} color="white" />
@@ -515,7 +515,7 @@ export function SourcingScreen({
           {itemCategories.map((itemCategory) => (
             <Chip
               key={itemCategory}
-              label={`${itemCategory} ${items.filter((item) => item.category_name === itemCategory).length}`}
+              label={`${itemCategory} ${tabItems.filter((item) => item.category_name === itemCategory).length}`}
               active={categoryFilter === itemCategory}
               onPress={() => setCategoryFilter(itemCategory)}
             />
@@ -875,14 +875,17 @@ function Chip({
   label,
   active,
   onPress,
+  tone,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  tone?: "blue" | "purple";
 }) {
+  const colour = tone === "purple" ? "#7043A5" : "#315FBE";
   return (
-    <Pressable style={[styles.chip, active && styles.chipOn]} onPress={onPress}>
-      <Text style={[styles.chipText, active && styles.chipTextOn]}>
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} style={[styles.chip, tone && {backgroundColor: tone === "purple" ? "#F1EBF8" : "#EBF1FC", borderColor: colour}, active && {backgroundColor: colour, borderColor: colour}]} onPress={onPress}>
+      <Text style={[styles.chipText, tone && {color: colour}, active && styles.chipTextOn]}>
         {label}
       </Text>
     </Pressable>
