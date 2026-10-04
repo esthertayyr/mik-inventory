@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
+import { userNotice } from "@/src/lib/userNotice";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/src/lib/supabase";
 import { Text, TextInput } from "@/src/components/AppTypography";
@@ -106,7 +106,7 @@ export function ResellerPackagesScreen({
         .neq("idea_stage", "not_proceeding")
         .order("name"),
     ]);
-    if (error) Alert.alert("Packages not loaded", error.message);
+    if (error) userNotice("Packages not loaded", error.message);
     setPackages((packageRows ?? []) as unknown as Package[]);
     setProducts((productRows ?? []) as Product[]);
     setLoading(false);
@@ -174,7 +174,7 @@ export function ResellerPackagesScreen({
     );
   const useSuggestion = (suggestion: (typeof suggestions)[number]) => {
     if (!items.length)
-      return Alert.alert("Choose products first", "Select what should be inside this package.");
+      return userNotice("Choose products first", "Select what should be inside this package.");
     const next = items.map((item) => ({ ...item, quantity: `${suggestion.quantity}` }));
     const packageCost = next.reduce((sum, item) => sum + itemUnitCost(item) * suggestion.quantity, 0);
     const retailTotal = packageCost * 2;
@@ -189,19 +189,19 @@ export function ResellerPackagesScreen({
     }
   };
   const save = async () => {
-    if (!name.trim()) return Alert.alert("Package name needed");
-    if (!items.length) return Alert.alert("Choose at least one product");
+    if (!name.trim()) return userNotice("Package name needed");
+    if (!items.length) return userNotice("Choose at least one product");
     const missingVariant = items.find((item) => {
       const product = products.find((entry) => entry.id === item.productId);
       return Boolean(product?.source_product_options?.length) && !item.optionId;
     });
-    if (missingVariant) return Alert.alert("Choose a variant", "Select the exact colour, size or type for every package item.");
-    if (n(price) <= 0) return Alert.alert("Package price needed");
+    if (missingVariant) return userNotice("Choose a variant", "Select the exact colour, size or type for every package item.");
+    if (n(price) <= 0) return userNotice("Package price needed");
     const requiredDeposit = deposit ? n(deposit) : n(price) / 2;
     if (requiredDeposit <= 0 || requiredDeposit > n(price))
-      return Alert.alert("Check the deposit", "The deposit must be more than zero and not higher than the package price.");
+      return userNotice("Check the deposit", "The deposit must be more than zero and not higher than the package price.");
     if (selectedCost > 0 && requiredDeposit < selectedCost)
-      return Alert.alert(
+      return userNotice(
         "Deposit does not cover the package cost",
         `Set the deposit to at least ${money(Math.ceil(selectedCost))}, or review the products and price.`,
       );
@@ -227,7 +227,7 @@ export function ResellerPackagesScreen({
       .single();
     if (error) {
       setSaving(false);
-      return Alert.alert("Package not saved", error.message);
+      return userNotice("Package not saved", error.message);
     }
     if (editingId) {
       const { error: clearError } = await supabase
@@ -236,7 +236,7 @@ export function ResellerPackagesScreen({
         .eq("package_id", editingId);
       if (clearError) {
         setSaving(false);
-        return Alert.alert("Package products not updated", clearError.message);
+        return userNotice("Package products not updated", clearError.message);
       }
     }
     const { error: itemError } = await supabase.from("reseller_package_items").insert(
@@ -251,7 +251,7 @@ export function ResellerPackagesScreen({
       })),
     );
     setSaving(false);
-    if (itemError) return Alert.alert("Package products not saved", itemError.message);
+    if (itemError) return userNotice("Package products not saved", itemError.message);
     reset();
     setEditing(false);
     await load();
@@ -261,7 +261,7 @@ export function ResellerPackagesScreen({
       .from("reseller_packages")
       .update({ active, updated_at: new Date().toISOString() })
       .eq("id", item.id);
-    if (error) return Alert.alert("Package not updated", error.message);
+    if (error) return userNotice("Package not updated", error.message);
     await load();
   };
 

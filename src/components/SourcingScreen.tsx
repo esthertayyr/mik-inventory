@@ -16,6 +16,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { supabase } from "@/src/lib/supabase";
 import { Text, TextInput } from "@/src/components/AppTypography";
+import { userNotice } from "@/src/lib/userNotice";
 
 type SourceItem = {
   id: string;
@@ -118,7 +119,7 @@ export function SourcingScreen({
       )
       .eq("business_id", businessId)
       .order("created_at", { ascending: false });
-    if (error) Alert.alert("Products not loaded", error.message);
+    if (error) userNotice("Products not loaded", error.message);
     const products = (data ?? []) as Omit<SourceItem, "source_product_images">[];
     const productIds = products.map((item) => item.id);
     let imageMap = new Map<string, { image_url: string }[]>();
@@ -128,7 +129,7 @@ export function SourcingScreen({
         .select("source_product_id,image_url,sort_order")
         .in("source_product_id", productIds)
         .order("sort_order", { ascending: true });
-      if (imageError) Alert.alert("Product photos not loaded", imageError.message);
+      if (imageError) userNotice("Product photos not loaded", imageError.message);
       imageMap = (imageRows ?? []).reduce((map, row) => {
         const current = map.get(row.source_product_id) ?? [];
         current.push({ image_url: row.image_url });
@@ -154,7 +155,7 @@ export function SourcingScreen({
         .eq("id", item.id)
         .eq("business_id", businessId);
       if (error) {
-        return Alert.alert(
+        return userNotice(
           "Product idea not deleted",
           error.code === "23503"
             ? "This product is already used in a package. Remove it from the package first."
@@ -168,7 +169,7 @@ export function SourcingScreen({
         await supabase.storage.from("product-images").remove(paths);
       }
       await load();
-      Alert.alert("Product idea deleted", `${item.name} has been removed.`);
+      userNotice("Product idea deleted", `${item.name} has been removed.`);
     };
     const title = "Delete this product idea?";
     const message = `${item.name} and its saved variants will be removed. This cannot be undone.`;
@@ -230,7 +231,7 @@ export function SourcingScreen({
       .eq("business_id", businessId)
       .single();
     setLoading(false);
-    if (error || !data) return Alert.alert("Product not opened", error?.message ?? "Please try again.");
+    if (error || !data) return userNotice("Product not opened", error?.message ?? "Please try again.");
     setEditingId(data.id);
     setName(data.name ?? "");
     const savedCategory = data.category_name ?? "Other";
@@ -256,7 +257,7 @@ export function SourcingScreen({
   const pickImages = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted)
-      return Alert.alert(
+      return userNotice(
         "Photo access needed",
         "Allow MIK to choose product images or screenshots.",
       );
@@ -290,26 +291,27 @@ export function SourcingScreen({
   const save = async () => {
     const wasEditing = Boolean(editingId);
     if (!name.trim())
-      return Alert.alert("Product name needed", "Enter the product name.");
-    if (pricedOptions.length > 0 && n(rate) <= 0)
-      return Alert.alert(
+      return userNotice("Product name needed", "Enter the product name.");
+    if (n(rate) <= 0)
+      return userNotice(
         "Conversion rate needed",
         `Enter how many Philippine pesos equal 1 ${currency}.`,
       );
     if (options.some((x) => !x.value.trim()))
-      return Alert.alert(
+      return userNotice(
         "Complete the options",
         "Enter a name for every variant or choice, or remove the empty row.",
       );
     if (publishOnWebsite && !englishDescription.trim())
-      return Alert.alert("Product details needed", "Add a short customer-facing description before publishing.");
+      return userNotice("Product details needed", "Add a short customer-facing description before publishing.");
     if (publishOnWebsite && !leadTime.trim())
-      return Alert.alert("Waiting time needed", "Tell customers how long this preorder normally takes.");
+      return userNotice("Waiting time needed", "Tell customers how long this preorder normally takes.");
     if (publishOnWebsite && savedImages.length + images.length === 0)
-      return Alert.alert("Product photo needed", "Add at least one photo before publishing this product.");
+      return userNotice("Product photo needed", "Add at least one photo before publishing this product.");
     if (publishOnWebsite && !sellingPhp && (!options.length || options.some((option) => !option.publicPrice)))
-      return Alert.alert("Customer price needed", "Enter one product price, or enter a customer price for every variant.");
+      return userNotice("Customer price needed", "Enter one product price, or enter a customer price for every variant.");
     setSaving(true);
+    try {
     const legacySgdCost = currency === "SGD" ? lowestVariantSourceCost : lowestVariantPhpCost / 45;
     const productValues = {
         business_id: businessId,
@@ -348,16 +350,19 @@ export function SourcingScreen({
     const { data, error } = await productRequest.select("id").single();
     if (error) {
       setSaving(false);
-      return Alert.alert("Product not saved", error.message);
+      return userNotice("Product not saved", error.message);
     }
     const productId = data.id as string;
+    // Retry the same product after a variant/photo failure instead of inserting a duplicate.
+    setEditingId(productId);
     if (editingId) {
-      const { data: oldOptions } = await supabase.from("source_product_options").select("id").eq("source_product_id", productId);
+      const { data: oldOptions, error: oldOptionsError } = await supabase.from("source_product_options").select("id").eq("source_product_id", productId);
+      if (oldOptionsError) throw oldOptionsError;
       const keptIds = options.map((option) => option.databaseId).filter(Boolean) as string[];
       const removedIds = (oldOptions ?? []).map((option) => option.id).filter((id) => !keptIds.includes(id));
       if (removedIds.length) {
         const { error: removeError } = await supabase.from("source_product_options").delete().in("id", removedIds);
-        if (removeError) { setSaving(false); return Alert.alert("Variant not removed", removeError.code === "23503" ? "This variant is already used in a package." : removeError.message); }
+        if (removeError) { setSaving(false); return userNotice("Variant not removed", removeError.code === "23503" ? "This variant is already used in a package." : removeError.message); }
       }
       for (let index = 0; index < options.length; index++) {
         const option = options[index];
@@ -366,7 +371,7 @@ export function SourcingScreen({
           ? supabase.from("source_product_options").update(values).eq("id", option.databaseId).eq("source_product_id", productId)
           : supabase.from("source_product_options").insert({ source_product_id: productId, ...values });
         const { error: optionError } = await request;
-        if (optionError) { setSaving(false); return Alert.alert("Variant not saved", optionError.message); }
+        if (optionError) { setSaving(false); return userNotice("Variant not saved", optionError.message); }
       }
     } else if (options.length) {
       const { error: optionError } = await supabase.from("source_product_options").insert(
@@ -382,7 +387,7 @@ export function SourcingScreen({
           })));
       if (optionError) {
         setSaving(false);
-        return Alert.alert("Options not saved", optionError.message);
+        return userNotice("Options not saved", optionError.message);
       }
     }
     const uploaded: string[] = [];
@@ -423,7 +428,7 @@ export function SourcingScreen({
       }
     } catch (imageError: any) {
       setSaving(false);
-      return Alert.alert(
+      return userNotice(
         "Product saved, but some images failed",
         imageError?.message ?? "You can add them again later.",
       );
@@ -436,17 +441,22 @@ export function SourcingScreen({
         .eq("business_id", businessId);
       if (publishError) {
         setSaving(false);
-        return Alert.alert("Product saved but not published", publishError.message);
+        return userNotice("Product saved but not published", publishError.message);
       }
     }
     setSaving(false);
     reset();
     setEditing(false);
     await load();
-    Alert.alert(
+    userNotice(
       wasEditing ? "Product updated" : "Idea saved",
       wasEditing ? "Your changes are saved." : "The idea, category, supplier details, costs and images are now kept together.",
     );
+    } catch (error) {
+      userNotice("Product not fully saved", (error as {message?:string})?.message || "Please check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
   };
   const itemCategories = Array.from(
     new Set(items.map((item) => item.category_name).filter(Boolean)),

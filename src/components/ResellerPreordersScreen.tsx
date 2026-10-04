@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
+import { userNotice } from "@/src/lib/userNotice";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/src/lib/supabase";
 import { Text, TextInput } from "@/src/components/AppTypography";
@@ -149,7 +149,7 @@ export function ResellerPreordersScreen({
         .eq("active", true)
         .order("created_at", { ascending: false }),
     ]);
-    if (error) Alert.alert("Pre-orders not loaded", error.message);
+    if (error) userNotice("Pre-orders not loaded", error.message);
     setOrders((data ?? []) as Order[]);
     setProducts((sourceRows ?? []) as SourceProduct[]);
     setPackages((packageRows ?? []) as unknown as ResellerPackage[]);
@@ -175,14 +175,14 @@ export function ResellerPreordersScreen({
     const chosen =
       packages.find((p) => p.id === packageId)?.name ??
       products.find((p) => p.id === productId)?.name ?? productName.trim();
-    if (!customer.trim()) return Alert.alert("Customer name needed");
+    if (!customer.trim()) return userNotice("Customer name needed");
     if (!chosen)
-      return Alert.alert(
+      return userNotice(
         "Product needed",
         "Choose a product idea or type the item ordered.",
       );
     if (num(total) <= 0)
-      return Alert.alert(
+      return userNotice(
         "Full price needed",
         "Enter the customer's full order price.",
       );
@@ -205,11 +205,11 @@ export function ResellerPreordersScreen({
       notes: notes.trim() || null,
     });
     setSaving(false);
-    if (error) return Alert.alert("Pre-order not saved", error.message);
+    if (error) return userNotice("Pre-order not saved", error.message);
     reset();
     setCreating(false);
     await load();
-    Alert.alert(
+    userNotice(
       "Pre-order saved",
       "It is pending until the customer pays the deposit.",
     );
@@ -219,10 +219,10 @@ export function ResellerPreordersScreen({
       .filter((p) => !type || p.payment_type === type)
       .reduce((sum, p) => sum + Number(p.amount_php), 0);
   const recordPayment = async (order: Order) => {
-    if (num(paymentAmount) <= 0) return Alert.alert("Payment amount needed");
+    if (num(paymentAmount) <= 0) return userNotice("Payment amount needed");
     const savedDate = toIsoDate(paymentDate);
     if (!savedDate)
-      return Alert.alert(
+      return userNotice(
         "Check the payment date",
         "Use DD-MM-YYYY, for example 27-09-2026.",
       );
@@ -238,7 +238,7 @@ export function ResellerPreordersScreen({
     });
     if (error) {
       setSaving(false);
-      return Alert.alert("Payment not saved", error.message);
+      return userNotice("Payment not saved", error.message);
     }
     const newPaid = paid(order) + num(paymentAmount);
     const depositPaid =
@@ -287,7 +287,7 @@ export function ResellerPreordersScreen({
       .from("reseller_preorders")
       .update(patch)
       .eq("id", order.id);
-    if (error) return Alert.alert("Order not updated", error.message);
+    if (error) return userNotice("Order not updated", error.message);
     setShippingFor(null);
     setCourier("");
     setTracking("");
@@ -309,7 +309,7 @@ export function ResellerPreordersScreen({
       .from("reseller_preorders")
       .update(patch)
       .eq("id", order.id);
-    if (error) return Alert.alert("Delivery fee not saved", error.message);
+    if (error) return userNotice("Delivery fee not saved", error.message);
     setDeliveryFor(null);
     setDeliveryFee("");
     await load();
