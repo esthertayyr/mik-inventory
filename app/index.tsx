@@ -1117,7 +1117,7 @@ const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_
   else if (screen === "reseller_sales" || screen === "reseller_purchases")
     body = <ResellerTradeScreen key={screen} businessId={business!.id} locationId={locationId} kind={screen === "reseller_sales" ? "sale" : "purchase"} onBack={() => setScreen("home")} />;
   else if(screen === "reseller_stock")
-    body=<ResellerStockScreen businessId={business!.id} locationId={locationId} onBack={()=>setScreen("home")}/>;
+    body=<ResellerStockScreen businessId={business!.id} locationId={locationId} onBack={()=>setScreen("home")} onCreateProduct={()=>setScreen("sourcing")}/>;
   else if (screen === "correct")
     body = <ReportsScreen locationId={locationId} correctionMode onBack={() => setScreen("sell_start")} />;
   else if (screen === "shop")
