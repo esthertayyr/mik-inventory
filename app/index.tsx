@@ -410,6 +410,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   const [password, setPassword] = useState("");
   const [newBusinessType,setNewBusinessType]=useState<"shop"|"reseller">("shop");
   const [openShop, setOpenShop] = useState<AdminShop | null>(null);
+  const [websiteShop, setWebsiteShop] = useState<AdminShop | null>(null);
   const [showActivity, setShowActivity] = useState(false);
   const [showOwnerOrders,setShowOwnerOrders]=useState(false);
   const [showIssues, setShowIssues] = useState(false);
@@ -514,6 +515,8 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
     }
     const file = new File(Paths.cache, filename); file.create(); file.write(csv); await Sharing.shareAsync(file.uri);
   };
+  if (websiteShop)
+    return <SafeAreaView style={s.app}><StatusBar style="dark" /><WebsiteScreen businessId={websiteShop.id} onBack={() => setWebsiteShop(null)} /></SafeAreaView>;
   if (openShop)
     return (
       <ShopApp
@@ -655,6 +658,12 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
                 <Ionicons name="enter-outline" size={21} color={C.white} /><Text style={[s.adminShopActionText, { color: C.white }]}>Open shop</Text>
               </Pressable>
               </View>
+              {shop.id === "3fe4c82d-a659-406b-b290-32d8a49f2bdf" ? <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open VIAE website controls"
+                style={[s.adminShopAction, {marginTop:10, backgroundColor:"#f8edf0", borderColor:"#dec4cc"}]}
+                onPress={() => setWebsiteShop(shop)}
+              ><Ionicons name="globe-outline" size={21} color="#650f1c" /><Text style={[s.adminShopActionText, {color:"#650f1c"}]}>Website controls</Text></Pressable> : null}
             </View>
           ))
         )}
