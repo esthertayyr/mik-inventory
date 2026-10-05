@@ -577,7 +577,9 @@ export function SourcingScreen({
               .map((option) => Number(option.source_price || 0))
               .filter((price) => price > 0);
             const lowestPrice = variantPrices.length ? Math.min(...variantPrices) : 0;
-            const supplierPriceSgd = lowestPrice * (item.source_currency === "RMB" ? 0.18 : 1);
+            const supplierPriceSgd = (lowestPrice * (1 + Number(item.tax_percent || 0) / 100) +
+              (item.shipping_type === "paid" ? Number(item.shipping_amount || 0) : 0)) *
+              (item.source_currency === "RMB" ? 0.18 : 1);
             return (
             <View key={item.id} style={styles.item}>
               {item.source_product_images?.[0]?.image_url ? (
@@ -607,10 +609,10 @@ export function SourcingScreen({
                 </Text>
                 {lowestPrice > 0 ? (
                   <Text style={styles.price}>
-                    Supplier price from {money(supplierPriceSgd, "SGD")} · {money(supplierPriceSgd * 49, "PHP")}
+                    Supplier cost from {money(supplierPriceSgd, "SGD")} · {money(supplierPriceSgd * 49, "PHP")}
                   </Text>
                 ) : null}
-                {lowestPrice > 0 ? <Text style={styles.help}>Before tax and shipping</Text> : null}
+                {lowestPrice > 0 ? <Text style={styles.help}>Includes selected tax and shipping</Text> : null}
                 <View style={styles.itemActions}>
                   <Pressable accessibilityRole="button" accessibilityLabel={`View or edit ${item.name}`} style={styles.editIdea} onPress={() => void openItem(item)}>
                     <Ionicons name="create-outline" size={16} color="#315FBE" />
@@ -780,7 +782,7 @@ export function SourcingScreen({
             />
             <Field label="Pieces in one selection · Required" value={row.stockUnits} setValue={value=>changeOption(row.id,"stockUnits",value)} keyboardType="number-pad" placeholder="1" />
             <Text style={styles.note}>Selling one selection deducts this many pieces. Use 50 for a pack of 50, or 1 for a single item.</Text>
-            {row.price ? <View><Text style={styles.variantCost}>{currency === "RMB" ? `RMB ${n(row.price).toFixed(2)} → ` : ""}{money(n(row.price) * sourceToSgd, "SGD")} → {money(n(row.price) * sourceToSgd * 49, "PHP")}</Text><Text style={styles.note}>Supplier price before tax and shipping.</Text><Text style={styles.variantCost}>Your total cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")} · includes tax and shipping</Text></View> : null}
+            {row.price ? <View><Text style={styles.variantCost}>Supplier cost: {money((n(row.price) * (1 + n(taxPercent) / 100) + shippingCost) * sourceToSgd, "SGD")} · {money((n(row.price) * (1 + n(taxPercent) / 100) + shippingCost) * n(rate), "PHP")}</Text><Text style={styles.note}>Includes selected tax and shipping.</Text></View> : null}
             <Pressable
               style={styles.remove}
               onPress={() =>
