@@ -980,7 +980,6 @@ function ShopApp({
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
   const resellerBusiness=business?.business_type==="reseller";
-  const canManageWebsite = resellerBusiness && role === "owner" && business?.id === "3fe4c82d-a659-406b-b290-32d8a49f2bdf";
   const visibleModules=(business?.visible_modules??allShopModules()) as ShopModule[];
 const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports","reseller_sales","reseller_purchases","reseller_stock"] as Screen[]).includes(value)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
   const availableNav = (resellerBusiness?resellerNav:ownerNav).filter(item=>{const module=screenModule(item.id);return !module||visibleModules.includes(module);});
@@ -1008,7 +1007,7 @@ const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_
   let body: ReactNode;
   if (screen === "home")
     body = resellerBusiness ? (
-      <ResellerHomeScreen businessId={business!.id} onOpen={setScreen} canManageWebsite={canManageWebsite} permissions={role === "owner" ? undefined : staffPermissions ?? []} />
+      <ResellerHomeScreen businessId={business!.id} onOpen={setScreen} permissions={role === "owner" ? undefined : staffPermissions ?? []} />
     ) : (
       <QuickStart
         businessId={business!.id}
@@ -1115,8 +1114,6 @@ const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_
     body = <PrintPriceCalculator onBack={() => setScreen("home")} />;
   else if (screen === "sourcing")
     body = <SourcingScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} onCreateBundle={()=>setScreen("reseller_packages")} />;
-  else if (screen === "website" && canManageWebsite)
-    body = <WebsiteScreen businessId={business!.id} onBack={() => setScreen("home")} />;
   else if (screen === "reseller_packages")
     body = <ResellerPackagesScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("sourcing")} />;
   else if (screen === "preorders")
