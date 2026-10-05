@@ -98,11 +98,40 @@ export function SourcingScreen({
   const [platform, setPlatform] = useState("Pinduoduo");
   const [supplier, setSupplier] = useState("");
   const [englishDescription, setEnglishDescription] = useState("");
-  const currency = "SGD" as const;
+  const [currency, setCurrency] = useState<"RMB" | "SGD">("SGD");
+  const [rmbToSgd, setRmbToSgd] = useState<number | null>(null);
+  const [conversionError, setConversionError] = useState(false);
   const [taxPercent, setTaxPercent] = useState("3");
   const [shippingType, setShippingType] = useState<"free" | "paid">("free");
   const [shippingAmount, setShippingAmount] = useState("");
-  const [rate, setRate] = useState("45");
+  const rate = String(currency === "SGD" ? 49 : (rmbToSgd ?? 0) * 49);
+  const sourceToSgd = currency === "SGD" ? 1 : (rmbToSgd ?? 0);
+  const loadRmbRate = useCallback(async () => {
+    setConversionError(false);
+    try {
+      const response = await fetch("https://api.frankfurter.dev/v2/rate/CNY/SGD");
+      if (!response.ok) throw new Error("Rate unavailable");
+      const data = await response.json();
+      if (data.base !== "CNY" || data.quote !== "SGD" || !Number.isFinite(data.rate) || data.rate <= 0) throw new Error("Invalid rate");
+      setRmbToSgd(data.rate);
+    } catch { setConversionError(true); }
+  }, []);
+  useEffect(() => { void loadRmbRate(); }, [loadRmbRate]);
+  const changeCurrency = (next: "RMB" | "SGD") => {
+    if (next === currency) return;
+    if (!rmbToSgd) {
+      if (options.some(row => n(row.price) > 0) || n(shippingAmount) > 0) {
+        void loadRmbRate();
+        userNotice("Conversion is loading", "Wait for the RMB conversion before changing the currency of entered prices.");
+        return;
+      }
+      setCurrency(next); return;
+    }
+    const factor = next === "SGD" ? rmbToSgd : 1 / rmbToSgd;
+    setOptions(rows => rows.map(row => ({ ...row, price: row.price ? String(Number((n(row.price) * factor).toFixed(4))) : "" })));
+    setShippingAmount(value => value ? String(Number((n(value) * factor).toFixed(4))) : "");
+    setCurrency(next);
+  };
   const [marketPrice, setMarketPrice] = useState("");
   const [marketLink, setMarketLink] = useState("");
   const [sellingPhp, setSellingPhp] = useState("");
@@ -201,7 +230,7 @@ export function SourcingScreen({
     setTaxPercent("3");
     setShippingType("free");
     setShippingAmount("");
-    setRate("45");
+    setCurrency("SGD");
     setMarketPrice("");
     setMarketLink("");
     setSellingPhp("");
@@ -250,7 +279,7 @@ export function SourcingScreen({
     setTaxPercent(String(data.tax_percent ?? 3));
     setShippingType(data.shipping_type === "paid" ? "paid" : "free");
     setShippingAmount(data.shipping_amount ? String(data.shipping_amount) : "");
-    setRate(String(data.source_currency === "SGD" ? (data.currency_to_php_rate ?? 45) : 45));
+    setCurrency(data.source_currency === "RMB" ? "RMB" : "SGD");
     setOptions((data.source_product_options ?? []).map((option: any) => ({ id: option.id, databaseId: option.id, value: option.option_value ?? "", price: option.source_price == null ? "" : String(option.source_price), stockUnits: String(option.stock_units ?? 1), publicPrice: option.selling_price_php == null ? "" : String(option.selling_price_php) })));
     setSavedImages((data.source_product_images ?? []) as SavedImage[]);
     setImages([]);
@@ -296,8 +325,8 @@ export function SourcingScreen({
       return userNotice("Product name needed", "Enter the product name.");
     if (n(rate) <= 0)
       return userNotice(
-        "Conversion rate needed",
-        `Enter how many Philippine pesos equal 1 ${currency}.`,
+        "RMB conversion unavailable",
+        "Retry the currency conversion, or enter the supplier price in SGD.",
       );
     if (options.some((x) => !x.value.trim()))
       return userNotice(
@@ -308,7 +337,7 @@ export function SourcingScreen({
     if (!Number.isFinite(Number(taxPercent)) || Number(taxPercent) <= 0)
       return userNotice("Tax needed", "Enter a tax percentage greater than zero. The default is 3%.");
     if (shippingType === "paid" && n(shippingAmount) <= 0)
-      return userNotice("Shipping cost needed", "Enter the estimated supplier shipping cost in SGD.");
+      return userNotice("Shipping cost needed", `Enter the estimated supplier shipping cost in ${currency}.`);
     if (publishOnWebsite && (options.some(option => n(option.publicPrice || sellingPhp) <= 0) || (!options.length && n(sellingPhp) <= 0)))
       return userNotice("Customer price needed", "Every official variant must have a customer price greater than zero.");
     if (publishOnWebsite && !englishDescription.trim())
@@ -321,7 +350,7 @@ export function SourcingScreen({
       return userNotice("Customer price needed", "Enter one product price, or enter a customer price for every variant.");
     setSaving(true);
     try {
-    const legacySgdCost = currency === "SGD" ? lowestVariantSourceCost : lowestVariantPhpCost / 45;
+    const legacySgdCost = lowestVariantSourceCost * sourceToSgd;
     const productValues = {
         business_id: businessId,
         location_id: locationId,
@@ -342,7 +371,7 @@ export function SourcingScreen({
         shipping_amount: shippingCost,
         currency_to_php_rate: n(rate),
         final_cost_sgd: legacySgdCost,
-        exchange_rate_sgd_php: 45,
+        exchange_rate_sgd_php: 49,
         order_quantity: 1,
         deposit_percent: 50,
         market_reference_price_php: marketPrice ? n(marketPrice) : null,
@@ -373,7 +402,7 @@ export function SourcingScreen({
       }
       for (let index = 0; index < options.length; index++) {
         const option = options[index];
-        const values = { option_type: "Variant", option_value: option.value.trim(), source_price: option.price ? n(option.price) : null, price_sgd: currency === "SGD" && option.price ? n(option.price) : null, selling_price_php: option.publicPrice ? n(option.publicPrice) : null, stock_units: Number(option.stockUnits), minimum_quantity: 1, sort_order: index };
+        const values = { option_type: "Variant", option_value: option.value.trim(), source_price: option.price ? n(option.price) : null, price_sgd: option.price ? n(option.price) * sourceToSgd : null, selling_price_php: option.publicPrice ? n(option.publicPrice) : null, stock_units: Number(option.stockUnits), minimum_quantity: 1, sort_order: index };
         const request = option.databaseId
           ? supabase.from("source_product_options").update(values).eq("id", option.databaseId).eq("source_product_id", productId)
           : supabase.from("source_product_options").insert({ source_product_id: productId, ...values });
@@ -387,7 +416,7 @@ export function SourcingScreen({
             option_type: "Variant",
             option_value: x.value.trim(),
             source_price: x.price ? n(x.price) : null,
-            price_sgd: currency === "SGD" && x.price ? n(x.price) : null,
+            price_sgd: x.price ? n(x.price) * sourceToSgd : null,
             selling_price_php: x.publicPrice ? n(x.publicPrice) : null,
             stock_units: Number(x.stockUnits),
             minimum_quantity: 1,
@@ -699,14 +728,13 @@ export function SourcingScreen({
         <Text style={styles.help}>
           Add each choice exactly as the supplier shows it, such as Pink, Large Blue or Pack of 50. Each choice can have its own price.
         </Text>
-        <Text style={styles.label}>Variant prices are in SGD</Text>
-        <Field
-          label={`1 ${currency} equals PHP`}
-          value={rate}
-          setValue={setRate}
-          keyboardType="decimal-pad"
-          placeholder="45"
-        />
+        <Text style={styles.label}>Supplier price currency</Text>
+        <View style={styles.chips}>
+          <Chip label="SGD" active={currency === "SGD"} onPress={() => changeCurrency("SGD")} />
+          <Chip label="RMB" active={currency === "RMB"} onPress={() => changeCurrency("RMB")} />
+        </View>
+        <Text style={styles.note}>Prices and supplier shipping below use {currency}. Peso estimates are calculated automatically.</Text>
+        {currency === "RMB" && !rmbToSgd ? <View><Text style={styles.note}>{conversionError ? "Currency conversion could not load." : "Loading RMB conversion…"}</Text>{conversionError ? <Chip label="Retry conversion" active={false} onPress={() => void loadRmbRate()} /> : null}</View> : null}
         <Text style={styles.label}>Tax · Required</Text>
         <View style={styles.chips}>
           <Chip label="3% tax" active={taxPercent === "3"} onPress={() => setTaxPercent("3")} />
@@ -742,7 +770,7 @@ export function SourcingScreen({
             />
             <Field label="Pieces in one selection · Required" value={row.stockUnits} setValue={value=>changeOption(row.id,"stockUnits",value)} keyboardType="number-pad" placeholder="1" />
             <Text style={styles.note}>Selling one selection deducts this many pieces. Use 50 for a pack of 50, or 1 for a single item.</Text>
-            {row.price ? <Text style={styles.variantCost}>Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")} · includes selected tax and shipping</Text> : null}
+            {row.price && sourceToSgd > 0 ? <Text style={styles.variantCost}>{currency === "RMB" ? `Supplier price: ${money(n(row.price) * sourceToSgd, "SGD")} · ` : ""}Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")} · includes selected tax and shipping</Text> : null}
             <Pressable
               style={styles.remove}
               onPress={() =>
