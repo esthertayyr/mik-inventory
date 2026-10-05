@@ -140,6 +140,7 @@ export function SourcingScreen({
   const [catalogTab, setCatalogTab] = useState<"official" | "ideas">("official");
   const [options, setOptions] = useState<OptionRow[]>([]);
   const [images, setImages] = useState<LocalImage[]>([]);
+  const [importingPhotos, setImportingPhotos] = useState(false);
   const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const load = useCallback(async () => {
@@ -311,15 +312,46 @@ export function SourcingScreen({
         ].slice(0, 12),
       );
   };
+  const addBrowserPhotos = useCallback(async (files: File[]) => {
+    const photoFiles = files.filter(file => /^image\/(png|jpeg|webp|gif)$/i.test(file.type));
+    if (!photoFiles.length) return;
+    const available = Math.max(0, 12 - savedImages.length - images.length);
+    if (!available) { userNotice("Photo limit reached", "You can add up to 12 photos per product."); return; }
+    setImportingPhotos(true);
+    try {
+      const photos = await Promise.all(photoFiles.slice(0, available).map(async file => {
+        if (file.size > 20 * 1024 * 1024) throw new Error("Choose photos smaller than 20 MB.");
+        const uri = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("This photo could not be read."));
+          reader.readAsDataURL(file);
+        });
+        const dimensions = await new Promise<{width:number;height:number}>((resolve, reject) => Image.getSize(uri, (width, height) => resolve({width,height}), reject));
+        return { uri, ...dimensions, type: "product" as const };
+      }));
+      setImages(current => [...current, ...photos].slice(0, Math.max(0, 12 - savedImages.length)));
+    } catch (error) { userNotice("Photo not added", (error as Error).message || "Try uploading the image file instead."); }
+    finally { setImportingPhotos(false); }
+  }, [images.length, savedImages.length]);
+  useEffect(() => {
+    if (Platform.OS !== "web" || !editing) return;
+    const paste = (event: ClipboardEvent) => {
+      const files = Array.from(event.clipboardData?.items ?? []).filter(item => item.kind === "file" && item.type.startsWith("image/")).map(item => item.getAsFile()).filter((file): file is File => Boolean(file));
+      if (!files.length) return; // Leave ordinary text and link pasting unchanged.
+      event.preventDefault();
+      void addBrowserPhotos(files);
+    };
+    document.addEventListener("paste", paste);
+    return () => document.removeEventListener("paste", paste);
+  }, [editing, addBrowserPhotos]);
   const addDroppedImages = (event: any) => {
     event?.preventDefault?.();
     const files = Array.from(event?.dataTransfer?.files ?? []) as File[];
-    const next = files.filter((file) => file.type.startsWith("image/")).map((file) => ({
-      uri: URL.createObjectURL(file), width: 1400, height: 1400, type: "product" as const,
-    }));
-    if (next.length) setImages((current) => [...current, ...next].slice(0, 12));
+    void addBrowserPhotos(files);
   };
   const save = async () => {
+    if (importingPhotos) return userNotice("Photo is loading", "Wait for the photo preview, then save the product.");
     const wasEditing = Boolean(editingId);
     if (!name.trim())
       return userNotice("Product name needed", "Enter the product name.");
@@ -691,8 +723,9 @@ export function SourcingScreen({
             {...({ onDragOver: (event: any) => event.preventDefault(), onDrop: addDroppedImages } as any)}
           >
             <Ionicons name="cloud-upload-outline" size={30} color="#315FBE" />
-            <Text style={styles.dropTitle}>Drop images here</Text>
-            <Text style={styles.help}>JPG, PNG or a downloaded supplier photo</Text>
+            <Text style={styles.dropTitle}>Paste or drop photos here</Text>
+            <Text style={styles.help}>Copy an image, then press Ctrl+V (Windows) or ⌘+V (Mac). You can also upload a file.</Text>
+            {importingPhotos ? <Text style={styles.note}>Adding photo…</Text> : null}
           </View>
         ) : null}
         <View style={styles.imageButtons}>
