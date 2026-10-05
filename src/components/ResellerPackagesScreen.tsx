@@ -87,6 +87,7 @@ export function ResellerPackagesScreen({
   const [price, setPrice] = useState("");
   const [deposit, setDeposit] = useState("");
   const [retail, setRetail] = useState("");
+  const [resalePerPiece, setResalePerPiece] = useState("");
   const [availability, setAvailability] = useState<"preorder" | "ready_stock">("preorder");
   const [leadTime, setLeadTime] = useState("Estimated 1–2 months");
   const [items, setItems] = useState<DraftItem[]>([]);
@@ -140,6 +141,7 @@ export function ResellerPackagesScreen({
     const option=product?.source_product_options?.find(entry=>entry.id===item.optionId);
     return sum+Math.max(1,Math.floor(n(item.quantity)||1))*Math.max(1,Number(option?.stock_units||1));
   },0);
+  useEffect(()=>{if(resalePerPiece)setRetail(String(n(resalePerPiece)*totalPieces));},[resalePerPiece,totalPieces]);
   const reset = () => {
     setName("");
     setTier("reseller");
@@ -147,12 +149,14 @@ export function ResellerPackagesScreen({
     setPrice("");
     setDeposit("");
     setRetail("");
+    setResalePerPiece("");
     setAvailability("preorder");
     setLeadTime("Estimated 1–2 months");
     setItems([]);
     setEditingId(null);
   };
   const editPackage = (item: Package) => {
+    setResalePerPiece("");
     setEditingId(item.id);
     setName(item.name);
     setTier(item.tier);
@@ -312,8 +316,8 @@ export function ResellerPackagesScreen({
           <Text style={s.help}>Package price is what your reseller pays you for the whole package. Deposit is paid first; the rest is paid before delivery. Supplier cost is private.</Text>
           <View style={s.two}><View style={s.flex}><Field label="Package price · PHP" value={price} setValue={setPrice} placeholder="0" numeric /></View><View style={s.flex}><Field label="Deposit · PHP" value={deposit} setValue={setDeposit} placeholder={price ? `${n(price) / 2}` : "50%"} numeric /></View></View>
           <Text style={s.help}>Resale means the reseller sells the pieces to their own customers. Enter their suggested price per piece, or the total for all pieces. This is only an estimate, not your package price.</Text>
-          <Field label="Suggested resale price per piece · PHP · Optional" value={retail && totalPieces ? String(Number((n(retail)/totalPieces).toFixed(2))) : ""} setValue={value=>setRetail(value ? String(n(value)*totalPieces) : "")} placeholder="Enter suggested customer price" numeric />
-          <Field label="Total if reseller sells all pieces · PHP · Optional" value={retail} setValue={setRetail} placeholder="Enter total resale value" numeric />
+          <Field label="Suggested resale price per piece · PHP · Optional" value={resalePerPiece} setValue={value=>{setResalePerPiece(value);setRetail(value?String(n(value)*totalPieces):"");}} placeholder={retail && totalPieces ? `Average ${money(n(retail)/totalPieces)} per piece` : "Enter suggested customer price"} numeric />
+          <Field label="Total if reseller sells all pieces · PHP · Optional" value={retail} setValue={value=>{setResalePerPiece("");setRetail(value);}} placeholder="Enter total resale value" numeric />
           <Text style={s.help}>{totalPieces} individual pieces in this package. Average prices divide by pieces, not packs.</Text>
           <View style={s.metrics}><Metric label="Your supplier cost" value={money(selectedCost)} /><Metric label="Your earnings before other expenses" value={price ? money(n(price)-selectedCost) : "Enter package price"} /><Metric label="Reseller earnings before other expenses" value={price && retail ? money(n(retail)-n(price)) : "Enter package and resale prices"} /></View>
           <Text style={s.help}>Reseller's average cost per piece: {price && totalPieces ? money(n(price)/totalPieces) : "Enter package price"}. This is their buying cost, not their selling price.</Text>
