@@ -99,34 +99,14 @@ export function SourcingScreen({
   const [supplier, setSupplier] = useState("");
   const [englishDescription, setEnglishDescription] = useState("");
   const [currency, setCurrency] = useState<"RMB" | "SGD">("SGD");
-  const [rmbToSgd, setRmbToSgd] = useState<number | null>(null);
-  const [conversionError, setConversionError] = useState(false);
+  const rmbToSgd = 0.18;
   const [taxPercent, setTaxPercent] = useState("3");
   const [shippingType, setShippingType] = useState<"free" | "paid">("free");
   const [shippingAmount, setShippingAmount] = useState("");
   const rate = String(currency === "SGD" ? 49 : (rmbToSgd ?? 0) * 49);
   const sourceToSgd = currency === "SGD" ? 1 : (rmbToSgd ?? 0);
-  const loadRmbRate = useCallback(async () => {
-    setConversionError(false);
-    try {
-      const response = await fetch("https://api.frankfurter.dev/v2/rate/CNY/SGD");
-      if (!response.ok) throw new Error("Rate unavailable");
-      const data = await response.json();
-      if (data.base !== "CNY" || data.quote !== "SGD" || !Number.isFinite(data.rate) || data.rate <= 0) throw new Error("Invalid rate");
-      setRmbToSgd(data.rate);
-    } catch { setConversionError(true); }
-  }, []);
-  useEffect(() => { void loadRmbRate(); }, [loadRmbRate]);
   const changeCurrency = (next: "RMB" | "SGD") => {
     if (next === currency) return;
-    if (!rmbToSgd) {
-      if (options.some(row => n(row.price) > 0) || n(shippingAmount) > 0) {
-        void loadRmbRate();
-        userNotice("Conversion is loading", "Wait for the RMB conversion before changing the currency of entered prices.");
-        return;
-      }
-      setCurrency(next); return;
-    }
     const factor = next === "SGD" ? rmbToSgd : 1 / rmbToSgd;
     setOptions(rows => rows.map(row => ({ ...row, price: row.price ? String(Number((n(row.price) * factor).toFixed(4))) : "" })));
     setShippingAmount(value => value ? String(Number((n(value) * factor).toFixed(4))) : "");
@@ -600,7 +580,7 @@ export function SourcingScreen({
             const convertedCost =
               (lowestPrice * (1 + Number(item.tax_percent || 0) / 100) +
                 Number(item.shipping_amount || 0)) *
-              Number(item.currency_to_php_rate || 0);
+              (item.source_currency === "RMB" ? 0.18 * 49 : 49);
             return (
             <View key={item.id} style={styles.item}>
               {item.source_product_images?.[0]?.image_url ? (
@@ -767,7 +747,6 @@ export function SourcingScreen({
           <Chip label="RMB" active={currency === "RMB"} onPress={() => changeCurrency("RMB")} />
         </View>
         <Text style={styles.note}>Prices and supplier shipping below use {currency}. Peso estimates are calculated automatically.</Text>
-        {currency === "RMB" && !rmbToSgd ? <View><Text style={styles.note}>{conversionError ? "Currency conversion could not load." : "Loading RMB conversion…"}</Text>{conversionError ? <Chip label="Retry conversion" active={false} onPress={() => void loadRmbRate()} /> : null}</View> : null}
         <Text style={styles.label}>Tax · Required</Text>
         <View style={styles.chips}>
           <Chip label="3% tax" active={taxPercent === "3"} onPress={() => setTaxPercent("3")} />
@@ -803,7 +782,7 @@ export function SourcingScreen({
             />
             <Field label="Pieces in one selection · Required" value={row.stockUnits} setValue={value=>changeOption(row.id,"stockUnits",value)} keyboardType="number-pad" placeholder="1" />
             <Text style={styles.note}>Selling one selection deducts this many pieces. Use 50 for a pack of 50, or 1 for a single item.</Text>
-            {row.price && sourceToSgd > 0 ? <Text style={styles.variantCost}>{currency === "RMB" ? `Supplier price: ${money(n(row.price) * sourceToSgd, "SGD")} · ` : ""}Estimated Philippine cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")} · includes selected tax and shipping</Text> : null}
+            {row.price ? <View><Text style={styles.variantCost}>{currency === "RMB" ? `RMB ${n(row.price).toFixed(2)} → ` : ""}{money(n(row.price) * sourceToSgd, "SGD")} → {money(n(row.price) * sourceToSgd * 49, "PHP")}</Text><Text style={styles.note}>Supplier price before tax and shipping.</Text><Text style={styles.variantCost}>Your total cost: {money(((n(row.price) * (1 + n(taxPercent) / 100)) + shippingCost) * n(rate), "PHP")} · includes tax and shipping</Text></View> : null}
             <Pressable
               style={styles.remove}
               onPress={() =>

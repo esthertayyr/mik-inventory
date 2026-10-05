@@ -23,7 +23,7 @@ type Product = {
   tax_percent: number;
   shipping_amount: number;
   currency_to_php_rate: number;
-  source_product_options: { id: string; option_type: string; option_value: string; source_price: number | null; stock_units: number }[] | null;
+  source_product_options: { id: string; option_type: string; option_value: string; source_price: number | null; selling_price_php: number | null; stock_units: number }[] | null;
 };
 type PackageItem = {
   id: string;
@@ -101,7 +101,7 @@ export function ResellerPackagesScreen({
         .order("created_at", { ascending: false }),
       supabase
         .from("source_products")
-        .select("id,name,selling_price_php,final_cost_sgd,exchange_rate_sgd_php,order_quantity,source_currency,source_price,tax_percent,shipping_amount,currency_to_php_rate,source_product_options(id,option_type,option_value,source_price,stock_units)")
+        .select("id,name,selling_price_php,final_cost_sgd,exchange_rate_sgd_php,order_quantity,source_currency,source_price,tax_percent,shipping_amount,currency_to_php_rate,source_product_options(id,option_type,option_value,source_price,selling_price_php,stock_units)")
         .eq("business_id", businessId)
         .eq("status", "active")
         .order("name"),
@@ -120,7 +120,7 @@ export function ResellerPackagesScreen({
     const source = Number(option?.source_price ?? product.source_price ?? 0);
     const taxed = source * (1 + Number(product.tax_percent || 0) / 100);
     const shippingPerItem = Number(product.shipping_amount || 0) / Math.max(1, Number(product.order_quantity || 1));
-    return (taxed + shippingPerItem) * Number(product.currency_to_php_rate || 0);
+    return (taxed + shippingPerItem) * (product.source_currency === "RMB" ? 0.18 * 49 : 49);
   };
   const selectedCost = useMemo(
     () =>
@@ -129,7 +129,17 @@ export function ResellerPackagesScreen({
       }, 0),
     [items, products],
   );
-  const selectedRetail = selectedCost * 2;
+  const itemSalePrice = (item: DraftItem) => {
+    const product = products.find(entry => entry.id === item.productId);
+    const option = product?.source_product_options?.find(entry => entry.id === item.optionId);
+    return Number(option?.selling_price_php ?? product?.selling_price_php ?? 0);
+  };
+  const selectedRetail = items.reduce((sum,item)=>sum+itemSalePrice(item)*Math.max(1,Math.floor(n(item.quantity)||1)),0);
+  const totalPieces = items.reduce((sum,item)=>{
+    const product=products.find(entry=>entry.id===item.productId);
+    const option=product?.source_product_options?.find(entry=>entry.id===item.optionId);
+    return sum+Math.max(1,Math.floor(n(item.quantity)||1))*Math.max(1,Number(option?.stock_units||1));
+  },0);
   const reset = () => {
     setName("");
     setTier("reseller");
@@ -174,13 +184,12 @@ export function ResellerPackagesScreen({
       return userNotice("Choose products first", "Select what should be inside this package.");
     const next = items.map((item) => ({ ...item, quantity: `${suggestion.quantity}` }));
     const packageCost = next.reduce((sum, item) => sum + itemUnitCost(item) * suggestion.quantity, 0);
-    const retailTotal = packageCost * 2;
+    const retailTotal = next.reduce((sum,item)=>sum+itemSalePrice(item)*suggestion.quantity,0);
     const packagePrice = Math.round(retailTotal * (1 - suggestion.discount));
     setItems(next);
     setTier(suggestion.tier);
     setName(tierNames[suggestion.tier]);
     if (retailTotal > 0) {
-      setRetail(`${Math.round(retailTotal)}`);
       setPrice(`${packagePrice}`);
       setDeposit(`${Math.ceil(Math.max(packagePrice / 2, packageCost))}`);
     }
@@ -213,7 +222,7 @@ export function ResellerPackagesScreen({
         description: description.trim() || null,
         package_price_php: n(price),
         deposit_required_php: requiredDeposit,
-        suggested_retail_total_php: retail ? n(retail) : selectedRetail || null,
+        suggested_retail_total_php: retail ? n(retail) : null,
         availability,
         lead_time_text: availability === "ready_stock" ? "Ready stock in the Philippines" : leadTime.trim() || "Estimated 1–2 months",
         updated_at: new Date().toISOString(),
@@ -296,12 +305,18 @@ export function ResellerPackagesScreen({
           <Text style={s.sectionTitle}>1. Choose products and variants</Text><Text style={s.help}>Tap a product again to add another shape or colour. Each row has its own quantity.</Text>
           {products.length === 0 ? <Text style={s.help}>Make products official first, then return here.</Text> : <View style={s.chips}>{products.map((product) => <Chip key={product.id} label={`+ ${product.name}`} active={items.some((item) => item.productId === product.id)} onPress={() => toggleProduct(product.id)} />)}</View>}
           {items.map((item) => { const product = products.find((p) => p.id === item.productId); const variants=product?.source_product_options??[]; return <View key={item.id} style={s.productRow}><View style={s.full}><Text style={s.productName}>{product?.name}</Text><Pressable style={s.secondary} onPress={() => setItems(rows => rows.filter(row => row.id !== item.id))}><Text style={s.secondaryText}>Remove item</Text></Pressable><Text style={s.help}>{money(itemUnitCost(item))} cost per selection · {Number(item.quantity)*(variants.find(v=>v.id===item.optionId)?.stock_units??1)} pieces</Text>{variants.length?<><Text style={s.label}>Choose exact variant</Text><View style={s.chips}>{variants.map((variant)=><Chip key={variant.id} label={`${variant.option_value}${variant.source_price!=null?` · ${product?.source_currency} ${variant.source_price}`:""}`} active={item.optionId===variant.id} onPress={()=>changeItem(item.id,"optionId",variant.id)}/>)}</View></>:<Text style={s.help}>No variants saved for this product.</Text>}</View><View style={s.qty}><Text style={s.label}>Selections</Text><TextInput style={s.qtyInput} value={item.quantity} onChangeText={(value) => changeItem(item.id, "quantity", value)} keyboardType="number-pad" /></View><Field label="Note · Optional" value={item.note} setValue={(value) => changeItem(item.id, "note", value)} placeholder="Any special request" compact /></View>; })}
-          <Text style={s.sectionTitle}>2. Let MIK suggest a tier</Text><Text style={s.help}>Suggestions use each selected variant's converted cost. Review every number before saving.</Text>
+          {items.length>0 ? <View style={s.customerCopy}><Text style={s.customerTitle}>Your current selling prices</Text><Text style={s.help}>These are your product prices for customers, separate from the supplier costs above. Each price is for one selected variant or pack.</Text>{items.map(item=>{const product=products.find(entry=>entry.id===item.productId);const option=product?.source_product_options?.find(entry=>entry.id===item.optionId);return <Text key={item.id} style={s.customerText}>{option?.option_value||product?.name}: {itemSalePrice(item)>0?money(itemSalePrice(item)):"Set a customer price in Products"} per selection</Text>;})}<Text style={s.customerText}>At current selling prices: {money(selectedRetail)} for the selected quantities.</Text></View> : null}
+          <Text style={s.sectionTitle}>2. Choose quantities · Optional</Text><Text style={s.help}>These buttons replace the quantity of every selected row. Package price uses your saved product selling prices, not supplier cost. You can change it below.</Text>
           <View style={s.suggestions}>{suggestions.map((item) => <Pressable key={item.tier} style={s.suggestion} onPress={() => useSuggestion(item)}><Text style={s.suggestionText}>{item.label}</Text><Text style={s.suggestionHelp}>{Math.round(item.discount * 100)}% package discount</Text></Pressable>)}</View>
           <Text style={s.sectionTitle}>3. Price and availability</Text>
+          <Text style={s.help}>Package price is what your reseller pays you for the whole package. Deposit is paid first; the rest is paid before delivery. Supplier cost is private.</Text>
           <View style={s.two}><View style={s.flex}><Field label="Package price · PHP" value={price} setValue={setPrice} placeholder="0" numeric /></View><View style={s.flex}><Field label="Deposit · PHP" value={deposit} setValue={setDeposit} placeholder={price ? `${n(price) / 2}` : "50%"} numeric /></View></View>
-          <Field label="Suggested total resale value · PHP" value={retail} setValue={setRetail} placeholder={selectedRetail ? `${selectedRetail}` : "0"} numeric />
-          <View style={s.metrics}><Metric label="Estimated package cost" value={money(selectedCost)} /><Metric label="Price per item" value={money(n(price) / Math.max(1, items.reduce((sum, item) => sum + Math.max(1, Math.floor(n(item.quantity) || 1)), 0)))} /><Metric label="Possible reseller profit" value={money(Math.max(0, (n(retail) || selectedRetail) - n(price)))} /></View>
+          <Text style={s.help}>Resale means the reseller sells the pieces to their own customers. Enter their suggested price per piece, or the total for all pieces. This is only an estimate, not your package price.</Text>
+          <Field label="Suggested resale price per piece · PHP · Optional" value={retail && totalPieces ? String(Number((n(retail)/totalPieces).toFixed(2))) : ""} setValue={value=>setRetail(value ? String(n(value)*totalPieces) : "")} placeholder="Enter suggested customer price" numeric />
+          <Field label="Total if reseller sells all pieces · PHP · Optional" value={retail} setValue={setRetail} placeholder="Enter total resale value" numeric />
+          <Text style={s.help}>{totalPieces} individual pieces in this package. Average prices divide by pieces, not packs.</Text>
+          <View style={s.metrics}><Metric label="Your supplier cost" value={money(selectedCost)} /><Metric label="Your earnings before other expenses" value={price ? money(n(price)-selectedCost) : "Enter package price"} /><Metric label="Reseller earnings before other expenses" value={price && retail ? money(n(retail)-n(price)) : "Enter package and resale prices"} /></View>
+          <Text style={s.help}>Reseller's average cost per piece: {price && totalPieces ? money(n(price)/totalPieces) : "Enter package price"}. This is their buying cost, not their selling price.</Text>
           <Text style={s.label}>Availability</Text><View style={s.chips}><Chip label="Pre-order" active={availability === "preorder"} onPress={() => setAvailability("preorder")} /><Chip label="Ready stock in PH" active={availability === "ready_stock"} onPress={() => setAvailability("ready_stock")} /></View>
           {availability === "preorder" ? <Field label="Estimated waiting time" value={leadTime} setValue={setLeadTime} placeholder="Estimated 1–2 months" /> : null}
           <View style={s.customerCopy}><Text style={s.customerTitle}>Customer wording</Text><Text style={s.customerText}>{availability === "ready_stock" ? "Ready stock in the Philippines. Pay the required amount to confirm your order. Local delivery is charged separately." : `Choose a reseller package and pay the deposit to confirm. ${leadTime || "Estimated waiting time is 1–2 months"}${(leadTime || "").trim().endsWith(".") ? "" : "."} We will notify you when your order is ready. Local delivery is charged separately.`}</Text></View>
