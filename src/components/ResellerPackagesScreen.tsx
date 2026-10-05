@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { userNotice } from "@/src/lib/userNotice";
+import { viaeBuyingCostSgd } from "@/src/lib/viaeBuyingCost";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/src/lib/supabase";
 import { Text, TextInput } from "@/src/components/AppTypography";
@@ -119,9 +120,8 @@ export function ResellerPackagesScreen({
     if (!product) return 0;
     const option = product.source_product_options?.find((entry) => entry.id === item.optionId);
     const source = Number(option?.source_price ?? product.source_price ?? 0);
-    const taxed = source * (1 + Number(product.tax_percent || 0) / 100);
     const shippingPerItem = Number(product.shipping_amount || 0) / Math.max(1, Number(product.order_quantity || 1));
-    return (taxed + shippingPerItem) * (product.source_currency === "RMB" ? 0.18 * 49 : 49);
+    return viaeBuyingCostSgd(source, product.source_currency, Number(product.tax_percent || 0), shippingPerItem) * 49;
   };
   const selectedCost = useMemo(
     () =>

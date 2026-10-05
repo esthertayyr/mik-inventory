@@ -17,6 +17,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import { supabase } from "@/src/lib/supabase";
 import { Text, TextInput } from "@/src/components/AppTypography";
 import { userNotice } from "@/src/lib/userNotice";
+import { viaeBuyingCostSgd } from "@/src/lib/viaeBuyingCost";
 
 type SourceItem = {
   id: string;
@@ -195,7 +196,7 @@ export function SourcingScreen({
       { text: "Delete", style: "destructive", onPress: () => void run() },
     ]);
   };
-  const shippingCost = shippingType === "paid" ? n(shippingAmount) : 0;
+  const shippingCost = platform === "Pinduoduo" ? 0 : shippingType === "paid" ? n(shippingAmount) : 0;
   const pricedOptions = options.map((option) => n(option.price)).filter((price) => price > 0);
   const lowestVariantPrice = pricedOptions.length ? Math.min(...pricedOptions) : 0;
   const lowestVariantSourceCost = lowestVariantPrice * (1 + n(taxPercent) / 100) + shippingCost;
@@ -348,7 +349,7 @@ export function SourcingScreen({
     if(options.some(x=>!Number.isInteger(Number(x.stockUnits))||Number(x.stockUnits)<=0)) return userNotice("Pieces per selection needed","Use a whole number. For one item enter 1; for a pack of 50 enter 50.");
     if (!Number.isFinite(Number(taxPercent)) || Number(taxPercent) <= 0)
       return userNotice("Tax needed", "Enter a tax percentage greater than zero. The default is 3%.");
-    if (shippingType === "paid" && n(shippingAmount) <= 0)
+    if (platform !== "Pinduoduo" && shippingType === "paid" && n(shippingAmount) <= 0)
       return userNotice("Shipping cost needed", `Enter the estimated supplier shipping cost in ${currency}.`);
     if (publishOnWebsite && (options.some(option => n(option.publicPrice || sellingPhp) <= 0) || (!options.length && n(sellingPhp) <= 0)))
       return userNotice("Customer price needed", "Every official variant must have a customer price greater than zero.");
@@ -362,7 +363,7 @@ export function SourcingScreen({
       return userNotice("Customer price needed", "Enter one product price, or enter a customer price for every variant.");
     setSaving(true);
     try {
-    const legacySgdCost = lowestVariantSourceCost * sourceToSgd;
+    const legacySgdCost = viaeBuyingCostSgd(lowestVariantPrice, currency, n(taxPercent), shippingCost);
     const productValues = {
         business_id: businessId,
         location_id: locationId,
@@ -379,7 +380,7 @@ export function SourcingScreen({
         source_currency: currency,
         source_price: 0,
         tax_percent: n(taxPercent),
-        shipping_type: shippingType,
+        shipping_type: platform === "Pinduoduo" ? "free" : shippingType,
         shipping_amount: shippingCost,
         currency_to_php_rate: n(rate),
         final_cost_sgd: legacySgdCost,
@@ -577,9 +578,7 @@ export function SourcingScreen({
               .map((option) => Number(option.source_price || 0))
               .filter((price) => price > 0);
             const lowestPrice = variantPrices.length ? Math.min(...variantPrices) : 0;
-            const supplierPriceSgd = (lowestPrice * (1 + Number(item.tax_percent || 0) / 100) +
-              (item.shipping_type === "paid" ? Number(item.shipping_amount || 0) : 0)) *
-              (item.source_currency === "RMB" ? 0.18 : 1);
+            const supplierPriceSgd = viaeBuyingCostSgd(lowestPrice, item.source_currency, Number(item.tax_percent || 0), item.shipping_type === "paid" ? Number(item.shipping_amount || 0) : 0);
             return (
             <View key={item.id} style={styles.item}>
               {item.source_product_images?.[0]?.image_url ? (
@@ -609,7 +608,7 @@ export function SourcingScreen({
                 </Text>
                 {lowestPrice > 0 ? (
                   <Text style={styles.price}>
-                    Supplier cost from {money(supplierPriceSgd, "SGD")} · {money(supplierPriceSgd * 49, "PHP")}
+                    Our buying cost from {money(supplierPriceSgd, "SGD")} · {money(supplierPriceSgd * 49, "PHP")}
                   </Text>
                 ) : null}
                 {lowestPrice > 0 ? <Text style={styles.help}>Includes selected tax and shipping</Text> : null}
@@ -751,12 +750,12 @@ export function SourcingScreen({
         <View style={styles.chips}>
           <Chip label="3% tax" active={taxPercent === "3"} onPress={() => setTaxPercent("3")} />
         </View>
-        <Text style={styles.label}>Supplier shipping</Text>
+        {platform !== "Pinduoduo" ? <><Text style={styles.label}>Supplier shipping</Text>
         <View style={styles.chips}>
           <Chip label="Free shipping" active={shippingType === "free"} onPress={() => { setShippingType("free"); setShippingAmount(""); }} />
           <Chip label="Paid shipping" active={shippingType === "paid"} onPress={() => setShippingType("paid")} />
         </View>
-        {shippingType === "paid" ? <Field label={`Estimated shipping · ${currency}`} value={shippingAmount} setValue={setShippingAmount} keyboardType="decimal-pad" placeholder="0.00" /> : null}
+        {shippingType === "paid" ? <Field label={`Estimated shipping · ${currency}`} value={shippingAmount} setValue={setShippingAmount} keyboardType="decimal-pad" placeholder="0.00" /> : null}</> : <Text style={styles.note}>Pinduoduo: no supplier shipping charge.</Text>}
         <Text style={styles.note}>These settings apply to every variant below.</Text>
         {options.map((row) => (
           <View key={row.id} style={styles.optionCard}>
@@ -767,14 +766,14 @@ export function SourcingScreen({
               placeholder="Example: Pink, Large Blue or Pack of 50"
             />
             <Field
-              label={`Price shown · ${currency}`}
+              label={`Supplier's listed price · ${currency}`}
               value={row.price}
               setValue={(v) => changeOption(row.id, "price", v)}
               keyboardType="decimal-pad"
               placeholder="Example: 50"
             />
             <Field
-              label="Customer price · PHP"
+              label="Selling price to customer · PHP"
               value={row.publicPrice}
               setValue={(v) => changeOption(row.id, "publicPrice", v)}
               keyboardType="decimal-pad"
@@ -782,7 +781,7 @@ export function SourcingScreen({
             />
             <Field label="Pieces in one selection · Required" value={row.stockUnits} setValue={value=>changeOption(row.id,"stockUnits",value)} keyboardType="number-pad" placeholder="1" />
             <Text style={styles.note}>Selling one selection deducts this many pieces. Use 50 for a pack of 50, or 1 for a single item.</Text>
-            {row.price ? <View><Text style={styles.variantCost}>Supplier cost: {money((n(row.price) * (1 + n(taxPercent) / 100) + shippingCost) * sourceToSgd, "SGD")} · {money((n(row.price) * (1 + n(taxPercent) / 100) + shippingCost) * n(rate), "PHP")}</Text><Text style={styles.note}>Includes selected tax and shipping.</Text></View> : null}
+            {row.price ? <View><Text style={styles.variantCost}>Our buying cost: {money(viaeBuyingCostSgd(n(row.price), currency, n(taxPercent), shippingCost), "SGD")} · {money(viaeBuyingCostSgd(n(row.price), currency, n(taxPercent), shippingCost) * 49, "PHP")}</Text><Text style={styles.note}>Includes tax, shipping if selected, and the RMB buying-cost allowance. This is not the customer selling price.</Text></View> : null}
             <Pressable
               style={styles.remove}
               onPress={() =>
@@ -798,14 +797,14 @@ export function SourcingScreen({
           <Ionicons name="add" size={20} color="#315FBE" />
           <Text style={styles.secondaryText}>Add another variant or choice</Text>
         </Pressable>
-        <Text style={styles.note}>Supplier prices remain private. Customer prices are the only prices shown on VIAE.</Text>
+        <Text style={styles.note}>Buying cost is what we spend. Selling price is what the customer pays. Enter the selling price separately; only that price appears on VIAE.</Text>
       </Section>
-      <Section number="5" title="Customer price and waiting time">
+      <Section number="5" title="Selling price and waiting time">
         <Text style={styles.help}>
           Official products appear in the VIAE shop automatically. Ideas stay private. Buying costs and supplier links never appear on the website.
         </Text>
         <Field
-          label="Same price for all variants · PHP · Optional if each variant is priced"
+          label="Same selling price for all variants · PHP · Optional"
           value={sellingPhp}
           setValue={setSellingPhp}
           keyboardType="decimal-pad"
