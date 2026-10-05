@@ -167,7 +167,6 @@ export function ResellerHomeScreen({
   ];
   groups.push({title:"Buying and stock",help:"Receive purchases or finish printing to add available stock. Pack offline.",color:"#594C8D",actions:actions.filter(action=>["reseller_purchases","reseller_stock"].includes(action.screen))});
   const allowed=(screen:Screen)=>!permissions || permissions.includes(screen==="reseller_sales"?"sell":screen==="preorders"?"orders":["expenses","reseller_reports"].includes(screen)?"reports":"products");
-  if (canManageWebsite) groups.push({title:"Public website",help:"Manage what customers see on VIAE.",color:"#650f1c",actions:actions.filter(action=>action.screen==="website")});
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     day: "numeric",
@@ -183,6 +182,11 @@ export function ResellerHomeScreen({
           Everything for VIAE, organised by task.
         </Text>
       </View>
+      {canManageWebsite ? <Pressable accessibilityRole="button" accessibilityLabel="Open VIAE website controls" style={[s.card, compact && s.cardCompact]} onPress={() => onOpen("website")}>
+        <View style={[s.icon, {backgroundColor:"#f8edf0"}]}><Ionicons name="globe-outline" size={25} color="#650f1c" /></View>
+        <View style={s.flex}><Text style={s.cardTitle}>Website controls</Text><Text style={s.sectionHelp}>Edit homepage text and photos. Preview and publish.</Text></View>
+        <Ionicons name="chevron-forward" size={20} color="#650f1c" />
+      </Pressable> : null}
       {loading ? (
         <View style={s.loading}>
           <ActivityIndicator color="#594C8D" />
