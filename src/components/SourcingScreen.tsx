@@ -577,10 +577,7 @@ export function SourcingScreen({
               .map((option) => Number(option.source_price || 0))
               .filter((price) => price > 0);
             const lowestPrice = variantPrices.length ? Math.min(...variantPrices) : 0;
-            const convertedCost =
-              (lowestPrice * (1 + Number(item.tax_percent || 0) / 100) +
-                Number(item.shipping_amount || 0)) *
-              (item.source_currency === "RMB" ? 0.18 * 49 : 49);
+            const supplierPriceSgd = lowestPrice * (item.source_currency === "RMB" ? 0.18 : 1);
             return (
             <View key={item.id} style={styles.item}>
               {item.source_product_images?.[0]?.image_url ? (
@@ -610,9 +607,10 @@ export function SourcingScreen({
                 </Text>
                 {lowestPrice > 0 ? (
                   <Text style={styles.price}>
-                    From {item.source_currency} {lowestPrice.toLocaleString()} · {money(convertedCost, "PHP")}
+                    Supplier price from {money(supplierPriceSgd, "SGD")} · {money(supplierPriceSgd * 49, "PHP")}
                   </Text>
                 ) : null}
+                {lowestPrice > 0 ? <Text style={styles.help}>Before tax and shipping</Text> : null}
                 <View style={styles.itemActions}>
                   <Pressable accessibilityRole="button" accessibilityLabel={`View or edit ${item.name}`} style={styles.editIdea} onPress={() => void openItem(item)}>
                     <Ionicons name="create-outline" size={16} color="#315FBE" />
