@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +25,7 @@ type Product = {
   tax_percent: number;
   shipping_amount: number;
   currency_to_php_rate: number;
+  source_product_images: { image_url: string; sort_order: number }[] | null;
   source_product_options: { id: string; option_type: string; option_value: string; source_price: number | null; selling_price_php: number | null; stock_units: number }[] | null;
 };
 type PackageItem = {
@@ -103,7 +105,7 @@ export function ResellerPackagesScreen({
         .order("created_at", { ascending: false }),
       supabase
         .from("source_products")
-        .select("id,name,selling_price_php,final_cost_sgd,exchange_rate_sgd_php,order_quantity,source_currency,source_price,tax_percent,shipping_amount,currency_to_php_rate,source_product_options(id,option_type,option_value,source_price,selling_price_php,stock_units)")
+        .select("id,name,selling_price_php,final_cost_sgd,exchange_rate_sgd_php,order_quantity,source_currency,source_price,tax_percent,shipping_amount,currency_to_php_rate,source_product_images(image_url,sort_order),source_product_options(id,option_type,option_value,source_price,selling_price_php,stock_units)")
         .eq("business_id", businessId)
         .eq("status", "active")
         .order("name"),
@@ -306,9 +308,29 @@ export function ResellerPackagesScreen({
           <Field label="Package name · Required" value={name} setValue={setName} placeholder="Example: Starter Keychain Pack" />
           <Text style={s.label}>Package type</Text><View style={s.chips}>{Object.entries(tierNames).map(([id, label]) => <Chip key={id} label={label} active={tier === id} onPress={() => setTier(id)} />)}</View>
           <Field label="What is included · Optional" value={description} setValue={setDescription} placeholder="A short customer-friendly package description" multiline />
-          <Text style={s.sectionTitle}>1. Choose products and variants</Text><Text style={s.help}>Tap a product again to add another shape or colour. Each row has its own quantity.</Text>
-          {products.length === 0 ? <Text style={s.help}>Make products official first, then return here.</Text> : <View style={s.chips}>{products.map((product) => <Chip key={product.id} label={`+ ${product.name}`} active={items.some((item) => item.productId === product.id)} onPress={() => toggleProduct(product.id)} />)}</View>}
-          {items.map((item) => { const product = products.find((p) => p.id === item.productId); const variants=product?.source_product_options??[]; return <View key={item.id} style={s.productRow}><View style={s.full}><Text style={s.productName}>{product?.name}</Text><Pressable style={s.secondary} onPress={() => setItems(rows => rows.filter(row => row.id !== item.id))}><Text style={s.secondaryText}>Remove item</Text></Pressable><Text style={s.help}>{money(itemUnitCost(item))} cost per selection · {Number(item.quantity)*(variants.find(v=>v.id===item.optionId)?.stock_units??1)} pieces</Text>{variants.length?<><Text style={s.label}>Choose exact variant</Text><View style={s.chips}>{variants.map((variant)=><Chip key={variant.id} label={`${variant.option_value}${variant.source_price!=null?` · ${product?.source_currency} ${variant.source_price}`:""}`} active={item.optionId===variant.id} onPress={()=>changeItem(item.id,"optionId",variant.id)}/>)}</View></>:<Text style={s.help}>No variants saved for this product.</Text>}</View><View style={s.qty}><Text style={s.label}>Selections</Text><TextInput style={s.qtyInput} value={item.quantity} onChangeText={(value) => changeItem(item.id, "quantity", value)} keyboardType="number-pad" /></View><Field label="Note · Optional" value={item.note} setValue={(value) => changeItem(item.id, "note", value)} placeholder="Any special request" compact /></View>; })}
+          <Text style={s.sectionTitle}>1. Choose products and variants</Text><Text style={s.help}>Add a variant below its product. Each selected variant has its own quantity.</Text>
+          {products.length === 0 ? <Text style={s.help}>Make products official first, then return here.</Text> : products.map(product => {
+            const photo = [...(product.source_product_images ?? [])].sort((a,b) => a.sort_order-b.sort_order)[0]?.image_url;
+            const variants = product.source_product_options ?? [];
+            const selected = items.filter(item => item.productId === product.id);
+            const add = (optionId: string) => setItems(rows => [...rows, {id: `${Date.now()}-${Math.random()}`, productId: product.id, optionId, quantity: "1", note: ""}]);
+            return <View key={product.id} style={s.card}>
+              <View style={s.cardHead}>
+                {photo ? <Image source={{uri: photo}} style={s.productPhoto} resizeMode="contain" /> : <View style={s.productPhoto}><Ionicons name="image-outline" size={28} color="#737B89" /></View>}
+                <View style={s.flex}><Text style={s.productName}>{product.name}</Text><Text style={s.help}>{variants.length} variants · {selected.length} selected</Text></View>
+              </View>
+              <View style={s.chips}>{variants.length ? variants.map(variant => <Chip key={variant.id} label={`+ ${variant.option_value}`} active={selected.some(item => item.optionId === variant.id)} onPress={() => add(variant.id)} />) : <Chip label="+ Add product" active={selected.length > 0} onPress={() => add("")} />}</View>
+              {selected.map(item => <View key={item.id} style={s.productRow}>
+                <View style={s.full}><Text style={s.productName}>{variants.find(v => v.id === item.optionId)?.option_value || "Choose a variant"}</Text>
+                  {!item.optionId && variants.length > 0 ? <View style={s.chips}>{variants.map(v => <Chip key={v.id} label={v.option_value} active={false} onPress={() => changeItem(item.id,"optionId",v.id)} />)}</View> : null}
+                  <Text style={s.help}>Buying cost: {money(itemUnitCost(item))} · Customer price: {money(itemSalePrice(item))} per selection</Text>
+                </View>
+                <View style={s.qty}><Text style={s.label}>Quantity</Text><TextInput accessibilityLabel={`Quantity for ${variants.find(v => v.id === item.optionId)?.option_value || product.name}`} style={s.qtyInput} value={item.quantity} onChangeText={value => changeItem(item.id,"quantity",value)} keyboardType="number-pad" /></View>
+                <Pressable accessibilityRole="button" style={s.secondary} onPress={() => setItems(rows => rows.filter(row => row.id !== item.id))}><Text style={s.secondaryText}>Remove variant</Text></Pressable>
+                <View style={s.full}><Field label="Note · Optional" value={item.note} setValue={value => changeItem(item.id,"note",value)} placeholder="Any special request" /></View>
+              </View>)}
+            </View>;
+          })}
           {items.length>0 ? <View style={s.customerCopy}><Text style={s.customerTitle}>Your current selling prices</Text><Text style={s.help}>These are your product prices for customers, separate from the supplier costs above. Each price is for one selected variant or pack.</Text>{items.map(item=>{const product=products.find(entry=>entry.id===item.productId);const option=product?.source_product_options?.find(entry=>entry.id===item.optionId);return <Text key={item.id} style={s.customerText}>{option?.option_value||product?.name}: {itemSalePrice(item)>0?money(itemSalePrice(item)):"Set a customer price in Products"} per selection</Text>;})}<Text style={s.customerText}>At current selling prices: {money(selectedRetail)} for the selected quantities.</Text></View> : null}
           <Text style={s.sectionTitle}>2. Choose quantities · Optional</Text><Text style={s.help}>These buttons replace the quantity of every selected row. Package price uses your saved product selling prices, not supplier cost. You can change it below.</Text>
           <View style={s.suggestions}>{suggestions.map((item) => <Pressable key={item.tier} style={s.suggestion} onPress={() => useSuggestion(item)}><Text style={s.suggestionText}>{item.label}</Text><Text style={s.suggestionHelp}>{Math.round(item.discount * 100)}% package discount</Text></Pressable>)}</View>
@@ -318,9 +340,10 @@ export function ResellerPackagesScreen({
           <Text style={s.help}>Resale means the reseller sells the pieces to their own customers. Enter their suggested price per piece, or the total for all pieces. This is only an estimate, not your package price.</Text>
           <Field label="Suggested resale price per piece · PHP · Optional" value={resalePerPiece} setValue={value=>{setResalePerPiece(value);setRetail(value?String(n(value)*totalPieces):"");}} placeholder={retail && totalPieces ? `Average ${money(n(retail)/totalPieces)} per piece` : "Enter suggested customer price"} numeric />
           <Field label="Total if reseller sells all pieces · PHP · Optional" value={retail} setValue={value=>{setResalePerPiece("");setRetail(value);}} placeholder="Enter total resale value" numeric />
-          <Text style={s.help}>{totalPieces} individual pieces in this package. Average prices divide by pieces, not packs.</Text>
+          <Text style={s.help}>{totalPieces} stock items in this package. Average prices divide by pieces, not packs.</Text>
           <View style={s.metrics}><Metric label="Your supplier cost" value={money(selectedCost)} /><Metric label="Your earnings before other expenses" value={price ? money(n(price)-selectedCost) : "Enter package price"} /><Metric label="Reseller earnings before other expenses" value={price && retail ? money(n(retail)-n(price)) : "Enter package and resale prices"} /></View>
-          <Text style={s.help}>Reseller's average cost per piece: {price && totalPieces ? money(n(price)/totalPieces) : "Enter package price"}. This is their buying cost, not their selling price.</Text>
+          <Text style={s.help}>Reseller's average cost per stock unit: {price && totalPieces ? money(n(price)/totalPieces) : "Enter package price"}. Units may be packs or stock items, as set in Products.</Text>
+          {selectedCost>0 && (deposit ? n(deposit) : n(price)*0.5)<selectedCost ? <View style={s.notice}><Text style={s.noticeText}>Deposit does not cover buying cost. You will need {money(selectedCost-(deposit ? n(deposit) : n(price)*0.5))} of your own money to cover this package. This warning is private.</Text></View> : null}
           <Text style={s.label}>Availability</Text><View style={s.chips}><Chip label="Pre-order" active={availability === "preorder"} onPress={() => setAvailability("preorder")} /><Chip label="Ready stock in PH" active={availability === "ready_stock"} onPress={() => setAvailability("ready_stock")} /></View>
           {availability === "preorder" ? <Field label="Estimated waiting time" value={leadTime} setValue={setLeadTime} placeholder="Estimated 1–2 months" /> : null}
           <View style={s.customerCopy}><Text style={s.customerTitle}>Customer wording</Text><Text style={s.customerText}>{availability === "ready_stock" ? "Ready stock in the Philippines. Pay the required amount to confirm your order. Local delivery is charged separately." : `Choose a reseller package and pay the deposit to confirm. ${leadTime || "Estimated waiting time is 1–2 months"}${(leadTime || "").trim().endsWith(".") ? "" : "."} We will notify you when your order is ready. Local delivery is charged separately.`}</Text></View>
@@ -342,6 +365,7 @@ const s = StyleSheet.create({
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
   flex: { flex: 1 }, header: { flexDirection: "row", alignItems: "center", gap: 12 },
   full: { width: "100%", gap: 7 },
+  productPhoto: { width: 72, height: 72, borderRadius: 10, backgroundColor: "#F7F7FA", alignItems: "center", justifyContent: "center" },
   back: { width: 42, height: 42, borderRadius: 13, borderWidth: 1, borderColor: "#E0E3EA", alignItems: "center", justifyContent: "center", backgroundColor: "white" },
   title: { fontSize: 23, fontWeight: "700", color: "#151924" }, help: { fontSize: 14, lineHeight: 20, color: "#626A78" },
   primary: { minHeight: 50, borderRadius: 14, backgroundColor: "#594C8D", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, paddingHorizontal: 16 },

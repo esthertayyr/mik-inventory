@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -17,7 +18,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import { supabase } from "@/src/lib/supabase";
 import { Text, TextInput } from "@/src/components/AppTypography";
 import { userNotice } from "@/src/lib/userNotice";
-import { viaeBuyingCostSgd } from "@/src/lib/viaeBuyingCost";
+import { viaeBuyingCostSgd, viaeSuggestedSellingPhp } from "@/src/lib/viaeBuyingCost";
 
 type SourceItem = {
   id: string;
@@ -58,9 +59,12 @@ type LocalImage = {
 };
 type SavedImage = { id: string; image_url: string; storage_path: string; image_type: LocalImage["type"] };
 const sourcingCategories = [
-  "3D products",
+  "3D Printed Toys / Items",
+  "3D Print Accessories / Related",
   "Filament",
-  "Clicker parts",
+  "Clickers",
+  "Craft / Making Supplies",
+  "Other Type Toys",
   "Squishies",
   "Keychains",
   "Packaging",
@@ -73,6 +77,17 @@ const money = (value: number, currency: "SGD" | "PHP") =>
     currency,
     maximumFractionDigits: currency === "SGD" ? 2 : 0,
   }).format(value);
+
+function normalizedSupplierUrl(value: string | null | undefined) {
+  const raw = value?.trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
 
 export function SourcingScreen({
   businessId,
@@ -92,16 +107,33 @@ export function SourcingScreen({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const categoryScroll = useRef<ScrollView>(null);
+  const categoryOffset = useRef(0);
+  const shiftCategories = (direction: number) => categoryScroll.current?.scrollTo({ x: Math.max(0, categoryOffset.current + direction * 220), animated: true });
+  const [search, setSearch] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Other");
   const [customCategory, setCustomCategory] = useState("");
   const [link, setLink] = useState("");
   const [platform, setPlatform] = useState("Pinduoduo");
+  const isDigital = platform === "Digital / STL File";
+  const openSupplierLink = (value: string | null | undefined) => {
+    const url = normalizedSupplierUrl(value);
+    if (!url) {
+      userNotice("Product link not ready", "Enter a valid web address beginning with https:// or http://.");
+      return;
+    }
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    void Linking.openURL(url).catch(() => userNotice("Could not open link", "Check the address and try again."));
+  };
   const [supplier, setSupplier] = useState("");
   const [englishDescription, setEnglishDescription] = useState("");
   const [currency, setCurrency] = useState<"RMB" | "SGD">("SGD");
   const rmbToSgd = 0.18;
-  const [taxPercent, setTaxPercent] = useState("3");
+  const taxPercent = "3";
   const [shippingType, setShippingType] = useState<"free" | "paid">("free");
   const [shippingAmount, setShippingAmount] = useState("");
   const rate = String(currency === "SGD" ? 49 : (rmbToSgd ?? 0) * 49);
@@ -117,8 +149,9 @@ export function SourcingScreen({
   const [marketLink, setMarketLink] = useState("");
   const [sellingPhp, setSellingPhp] = useState("");
   const [leadTime, setLeadTime] = useState("Estimated 1–2 months");
+  const [websiteAvailability, setWebsiteAvailability] = useState<"preparing" | "incoming" | "in_stock">("preparing");
   const [publishOnWebsite, setPublishOnWebsite] = useState(false);
-  const [catalogTab, setCatalogTab] = useState<"official" | "ideas">("official");
+  const [catalogTab, setCatalogTab] = useState<"all" | "official" | "ideas">("all");
   const [options, setOptions] = useState<OptionRow[]>([]);
   const [images, setImages] = useState<LocalImage[]>([]);
   const [importingPhotos, setImportingPhotos] = useState(false);
@@ -196,7 +229,7 @@ export function SourcingScreen({
       { text: "Delete", style: "destructive", onPress: () => void run() },
     ]);
   };
-  const shippingCost = platform === "Pinduoduo" ? 0 : shippingType === "paid" ? n(shippingAmount) : 0;
+  const shippingCost = isDigital || platform === "Pinduoduo" ? 0 : shippingType === "paid" ? n(shippingAmount) : 0;
   const pricedOptions = options.map((option) => n(option.price)).filter((price) => price > 0);
   const lowestVariantPrice = pricedOptions.length ? Math.min(...pricedOptions) : 0;
   const lowestVariantSourceCost = lowestVariantPrice * (1 + n(taxPercent) / 100) + shippingCost;
@@ -209,7 +242,6 @@ export function SourcingScreen({
     setPlatform("Pinduoduo");
     setSupplier("");
     setEnglishDescription("");
-    setTaxPercent("3");
     setShippingType("free");
     setShippingAmount("");
     setCurrency("SGD");
@@ -217,6 +249,7 @@ export function SourcingScreen({
     setMarketLink("");
     setSellingPhp("");
     setLeadTime("Estimated 1–2 months");
+    setWebsiteAvailability("preparing");
     setPublishOnWebsite(false);
     setOptions([]);
     setImages([]);
@@ -236,6 +269,12 @@ export function SourcingScreen({
     ]);
   const changeOption = (id: string, key: keyof OptionRow, value: string) =>
     setOptions((v) => v.map((x) => (x.id === id ? { ...x, [key]: value } : x)));
+  const deleteSavedImage = async (image: SavedImage) => {
+    if (!editingId) return;
+    const { error } = await supabase.from("source_product_images").delete().eq("id", image.id).eq("source_product_id", editingId);
+    if (error) return userNotice("Photo not deleted", error.message);
+    setSavedImages((current) => current.filter((saved) => saved.id !== image.id));
+  };
   const openItem = async (item: SourceItem) => {
     setLoading(true);
     const { data, error } = await supabase
@@ -257,12 +296,12 @@ export function SourcingScreen({
     setEnglishDescription(data.english_description ?? "");
     setSellingPhp(data.selling_price_php == null ? "" : String(data.selling_price_php));
     setLeadTime(data.lead_time_text ?? "Estimated 1–2 months");
+    setWebsiteAvailability(data.website_availability === "in_stock" ? "in_stock" : data.website_availability === "incoming" ? "incoming" : "preparing");
     setPublishOnWebsite(data.status === "active");
-    setTaxPercent(String(data.tax_percent ?? 3));
     setShippingType(data.shipping_type === "paid" ? "paid" : "free");
     setShippingAmount(data.shipping_amount ? String(data.shipping_amount) : "");
     setCurrency(data.source_currency === "RMB" ? "RMB" : "SGD");
-    setOptions((data.source_product_options ?? []).map((option: any) => ({ id: option.id, databaseId: option.id, value: option.option_value ?? "", price: option.source_price == null ? "" : String(option.source_price), stockUnits: String(option.stock_units ?? 1), publicPrice: option.selling_price_php == null ? "" : String(option.selling_price_php) })));
+    setOptions((data.source_product_options ?? []).map((option: any) => ({ id: option.id, databaseId: option.id, value: option.option_value ?? "", price: option.source_price == null ? "" : String(option.source_price), stockUnits: String(1), publicPrice: option.selling_price_php == null ? "" : String(option.selling_price_php) })));
     setSavedImages((data.source_product_images ?? []) as SavedImage[]);
     setImages([]);
     setEditing(true);
@@ -341,7 +380,8 @@ export function SourcingScreen({
         "RMB conversion unavailable",
         "Retry the currency conversion, or enter the supplier price in SGD.",
       );
-    if (options.some((x) => !x.value.trim()))
+    if (isDigital && (!Number.isFinite(Number(sellingPhp)) || Number(sellingPhp) <= 0)) return userNotice("Price needed", "Enter the fixed selling price in PHP.");
+    if (!isDigital && options.some((x) => !x.value.trim()))
       return userNotice(
         "Complete the options",
         "Enter a name for every variant or choice, or remove the empty row.",
@@ -349,27 +389,23 @@ export function SourcingScreen({
     if(options.some(x=>!Number.isInteger(Number(x.stockUnits))||Number(x.stockUnits)<=0)) return userNotice("Pieces per selection needed","Use a whole number. For one item enter 1; for a pack of 50 enter 50.");
     if (!Number.isFinite(Number(taxPercent)) || Number(taxPercent) <= 0)
       return userNotice("Tax needed", "Enter a tax percentage greater than zero. The default is 3%.");
-    if (platform !== "Pinduoduo" && shippingType === "paid" && n(shippingAmount) <= 0)
+    if (!isDigital && platform !== "Pinduoduo" && shippingType === "paid" && n(shippingAmount) <= 0)
       return userNotice("Shipping cost needed", `Enter the estimated supplier shipping cost in ${currency}.`);
-    if (publishOnWebsite && (options.some(option => n(option.publicPrice || sellingPhp) <= 0) || (!options.length && n(sellingPhp) <= 0)))
-      return userNotice("Customer price needed", "Every official variant must have a customer price greater than zero.");
     if (publishOnWebsite && !englishDescription.trim())
       return userNotice("Product details needed", "Add a short customer-facing description before publishing.");
-    if (publishOnWebsite && !leadTime.trim())
+    if (!isDigital && publishOnWebsite && websiteAvailability === "preparing" && !leadTime.trim())
       return userNotice("Waiting time needed", "Tell customers how long this preorder normally takes.");
     if (publishOnWebsite && savedImages.length + images.length === 0)
       return userNotice("Product photo needed", "Add at least one photo before publishing this product.");
-    if (publishOnWebsite && !sellingPhp && (!options.length || options.some((option) => !option.publicPrice)))
-      return userNotice("Customer price needed", "Enter one product price, or enter a customer price for every variant.");
     setSaving(true);
     try {
-    const legacySgdCost = viaeBuyingCostSgd(lowestVariantPrice, currency, n(taxPercent), shippingCost);
+    const legacySgdCost = isDigital ? 0 : viaeBuyingCostSgd(lowestVariantPrice, currency, n(taxPercent), shippingCost);
     const productValues = {
         business_id: businessId,
         location_id: locationId,
         name: name.trim(),
         product_url: link.trim() || null,
-        category_name:
+        category_name: isDigital ? "Digital / STL Files" :
           category === "Other" && customCategory.trim()
             ? customCategory.trim()
             : category,
@@ -379,18 +415,19 @@ export function SourcingScreen({
         english_description: englishDescription.trim() || null,
         source_currency: currency,
         source_price: 0,
-        tax_percent: n(taxPercent),
-        shipping_type: platform === "Pinduoduo" ? "free" : shippingType,
+        tax_percent: isDigital ? 0 : n(taxPercent),
+        shipping_type: isDigital || platform === "Pinduoduo" ? "free" : shippingType,
         shipping_amount: shippingCost,
         currency_to_php_rate: n(rate),
         final_cost_sgd: legacySgdCost,
         exchange_rate_sgd_php: 49,
         order_quantity: 1,
-        deposit_percent: 50,
+        deposit_percent: isDigital ? 100 : 50,
         market_reference_price_php: marketPrice ? n(marketPrice) : null,
         market_reference_url: marketLink.trim() || null,
-        selling_price_php: sellingPhp ? n(sellingPhp) : null,
-        lead_time_text: leadTime.trim() || "Estimated 1–2 months",
+        selling_price_php: isDigital ? n(sellingPhp) : options.length ? Math.min(...options.map(option => n(option.publicPrice))) || null : null,
+        lead_time_text: isDigital ? "Digital file. Manual delivery after payment verification. No physical shipping." : leadTime.trim() || "Estimated 1–2 months",
+        website_availability: isDigital ? "in_stock" : websiteAvailability,
         status: "draft",
       };
     const productRequest = editingId
@@ -415,7 +452,7 @@ export function SourcingScreen({
       }
       for (let index = 0; index < options.length; index++) {
         const option = options[index];
-        const values = { option_type: "Variant", option_value: option.value.trim(), source_price: option.price ? n(option.price) : null, price_sgd: option.price ? n(option.price) * sourceToSgd : null, selling_price_php: option.publicPrice ? n(option.publicPrice) : null, stock_units: Number(option.stockUnits), minimum_quantity: 1, sort_order: index };
+        const values = { option_type: "Variant", option_value: option.value.trim(), source_price: option.price ? n(option.price) : null, price_sgd: option.price ? n(option.price) * sourceToSgd : null, selling_price_php: option.publicPrice ? n(option.publicPrice) : null, stock_units: 1, minimum_quantity: 1, sort_order: index };
         const request = option.databaseId
           ? supabase.from("source_product_options").update(values).eq("id", option.databaseId).eq("source_product_id", productId)
           : supabase.from("source_product_options").insert({ source_product_id: productId, ...values });
@@ -431,7 +468,7 @@ export function SourcingScreen({
             source_price: x.price ? n(x.price) : null,
             price_sgd: x.price ? n(x.price) * sourceToSgd : null,
             selling_price_php: x.publicPrice ? n(x.publicPrice) : null,
-            stock_units: Number(x.stockUnits),
+            stock_units: 1,
             minimum_quantity: 1,
             sort_order: index,
           })));
@@ -508,11 +545,12 @@ export function SourcingScreen({
       setSaving(false);
     }
   };
-  const tabItems = items.filter(item => catalogTab === "official" ? item.status === "active" : item.status !== "active");
+  const tabItems = items.filter(item => catalogTab === "all" || (catalogTab === "official" ? item.status === "active" : item.status !== "active"));
   const itemCategories = Array.from(
     new Set(tabItems.map((item) => item.category_name).filter(Boolean)),
   ).sort((a, b) => a.localeCompare(b));
-  const shownItems = categoryFilter === "all" ? tabItems : tabItems.filter(item => item.category_name === categoryFilter);
+  const query = search.trim().toLocaleLowerCase();
+  const shownItems = tabItems.filter(item => (categoryFilter === "all" || item.category_name === categoryFilter) && (!query || [item.name, item.category_name, item.product_url, item.platform].some(value => value?.toLocaleLowerCase().includes(query))));
   if (loading)
     return (
       <View style={styles.loading}>
@@ -537,16 +575,25 @@ export function SourcingScreen({
           </View>
         </View>
         <View style={styles.chips}>
+          <Chip label={`All products ${items.length}`} active={catalogTab === "all"} onPress={() => {setCatalogTab("all"); setCategoryFilter("all");}} />
           <Chip tone="blue" label={`Official products ${items.filter(item => item.status === "active").length}`} active={catalogTab === "official"} onPress={() => {setCatalogTab("official"); setCategoryFilter("all");}} />
           <Chip tone="purple" label={`Ideas ${items.filter(item => item.status !== "active").length}`} active={catalogTab === "ideas"} onPress={() => {setCatalogTab("ideas"); setCategoryFilter("all");}} />
         </View>
+        <Field label="Search products" value={search} setValue={setSearch} placeholder="Search name, category or supplier link" />
         <Pressable style={styles.primary} onPress={() => {setPublishOnWebsite(catalogTab === "official"); setEditing(true);}}>
           <Ionicons name="add" size={22} color="white" />
           <Text style={styles.primaryText}>Add product</Text>
         </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, width: '100%', minWidth: 0 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Previous categories" onPress={() => shiftCategories(-1)} style={{ padding: 10 }}><Ionicons name="chevron-back" size={22} color="#650f1c" /></Pressable>
         <ScrollView
+          ref={categoryScroll}
           horizontal
-          showsHorizontalScrollIndicator={false}
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator
+          style={{ flex: 1, minWidth: 0, width: 0 }}
+          onScroll={event => { categoryOffset.current = event.nativeEvent.contentOffset.x; }}
+          scrollEventThrottle={16}
           contentContainerStyle={styles.filterRow}
         >
           <Chip
@@ -563,13 +610,15 @@ export function SourcingScreen({
             />
           ))}
         </ScrollView>
+        <Pressable accessibilityRole="button" accessibilityLabel="Next categories" onPress={() => shiftCategories(1)} style={{ padding: 10 }}><Ionicons name="chevron-forward" size={22} color="#650f1c" /></Pressable>
+        </View>
         {shownItems.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.cardTitle}>
-              {items.length ? "No products in this category" : "No products yet"}
+              {query ? "No matching products" : items.length ? "No products in this category" : "No products yet"}
             </Text>
             <Text style={styles.help}>
-              Add the first item you may buy and resell.
+              {query ? "Try another name, category or product link." : "Add the first item you may buy and resell."}
             </Text>
           </View>
         ) : (
@@ -602,7 +651,7 @@ export function SourcingScreen({
                     {item.status === "active" ? "Official · On VIAE" : "Private idea"}
                   </Text>
                 </View>
-                <Text style={styles.help}>
+                {item.platform === "Digital / STL File" ? <><Text style={styles.help}>Digital file · No physical shipping or inventory</Text><Text style={styles.price}>Selling price: {money(Number(item.selling_price_php || 0), "PHP")}</Text></> : <><Text style={styles.help}>
                   {item.product_url ? `${item.platform} · ` : ""}
                   {variantPrices.length ? `${variantPrices.length} priced ${variantPrices.length === 1 ? "variant" : "variants"}` : "Add a variant price"}
                 </Text>
@@ -611,7 +660,7 @@ export function SourcingScreen({
                     Our buying cost from {money(supplierPriceSgd, "SGD")} · {money(supplierPriceSgd * 49, "PHP")}
                   </Text>
                 ) : null}
-                {lowestPrice > 0 ? <Text style={styles.help}>Includes selected tax and shipping</Text> : null}
+                {lowestPrice > 0 ? <Text style={styles.help}>Includes selected tax and shipping</Text> : null}</>}
                 <View style={styles.itemActions}>
                   <Pressable accessibilityRole="button" accessibilityLabel={`View or edit ${item.name}`} style={styles.editIdea} onPress={() => void openItem(item)}>
                     <Ionicons name="create-outline" size={16} color="#315FBE" />
@@ -643,32 +692,40 @@ export function SourcingScreen({
         }}
       />
       <Section number="1" title="Product">
+        <Text style={styles.label}>What are you creating?</Text>
+        <View style={styles.chips}>
+          <Chip label="Physical product" active={!isDigital} onPress={() => { if (!editingId) setPlatform("Pinduoduo"); }} />
+          <Chip label="Direct Creation · Digital / STL File" active={isDigital} onPress={() => { if (!editingId || options.length === 0) { setPlatform("Digital / STL File"); setOptions([]); } else userNotice("Create a separate digital product", "This product has physical variants. Keep its history and create a new digital file instead."); }} />
+        </View>
+        {editingId ? <Text style={styles.note}>An unused product without variants can become a digital file. Products with stock or order history must keep their original format.</Text> : null}
         <Text style={styles.label}>Product type</Text>
         <View style={styles.chips}>
           <Chip label="Official · In website shop" active={publishOnWebsite} onPress={() => setPublishOnWebsite(true)} />
           <Chip label="Idea · Private" active={!publishOnWebsite} onPress={() => setPublishOnWebsite(false)} />
         </View>
-        <Text style={styles.note}>{publishOnWebsite ? "Official products appear in the VIAE Shop. Add a photo, description, waiting time and customer price." : "Ideas stay private. Make this official when it is ready to sell."}</Text>
+        <Text style={styles.note}>{publishOnWebsite ? "Official products appear in the VIAE Shop. Add a photo, description and waiting time. Missing prices show Price coming soon; customers cannot check out those options." : "Ideas stay private. Make this official when it is ready to show."}</Text>
         <Field
           label="Product name · Required"
           value={name}
           setValue={setName}
           placeholder="Example: Mini animal keychain"
         />
-        <Text style={styles.label}>Category</Text>
+        {!isDigital && <><Text style={styles.label}>Category</Text>
         <View style={styles.chips}>
-          {sourcingCategories.map((value) => (
+          {sourcingCategories.filter(value => items.some(item => item.category_name === value)).map((value) => (
             <Chip
               key={value}
               label={value}
-              active={category === value}
-              onPress={() => setCategory(value)}
+              active={category === value && (value !== "Other" || !customCategory.trim())}
+              onPress={() => { setCategory(value); if (value === "Other") setCustomCategory(""); }}
             />
           ))}
+          {Array.from(new Set(items.map(item => item.category_name).filter(value => value && !sourcingCategories.includes(value)))).sort().map(value => <Chip key={value} label={value} active={category === "Other" && customCategory === value} onPress={() => { setCategory("Other"); setCustomCategory(value); }} />)}
+          <Chip label="+ New category" active={category === "Other" && !items.some(item => item.category_name === customCategory)} onPress={() => { setCategory("Other"); setCustomCategory(""); }} />
         </View>
         {category === "Other" ? (
           <Field
-            label="Category name · Optional"
+            label="Your category name · Optional"
             value={customCategory}
             setValue={setCustomCategory}
             placeholder="Create your own category"
@@ -680,6 +737,15 @@ export function SourcingScreen({
           setValue={setLink}
           placeholder="Paste it now or add it later"
         />
+        {link.trim() ? (
+          <View style={styles.linkPreviewRow}>
+            <Text numberOfLines={1} style={styles.linkPreview}>{normalizedSupplierUrl(link) ?? link.trim()}</Text>
+            <Pressable accessibilityRole="link" accessibilityLabel="Open supplier product link in a new tab" style={styles.supplierLink} {...(Platform.OS === "web" ? { href: normalizedSupplierUrl(link) ?? undefined, hrefAttrs: { target: "_blank", rel: "noopener noreferrer" } } as any : { onPress: () => openSupplierLink(link) })}>
+              <Ionicons name="open-outline" size={16} color="#315FBE" />
+              <Text style={styles.supplierLinkText}>Open supplier page ↗</Text>
+            </Pressable>
+          </View>
+        ) : null}
         <Text style={styles.label}>Where is it from?</Text>
         <View style={styles.chips}>
           {["Pinduoduo", "Taobao", "Other"].map((x) => (
@@ -691,6 +757,7 @@ export function SourcingScreen({
             />
           ))}
         </View>
+        </>}
       </Section>
       <Section number="2" title="Photos">
         <Text style={styles.help}>
@@ -719,6 +786,9 @@ export function SourcingScreen({
               <Pressable accessibilityRole="button" accessibilityLabel="View full product photo" onPress={() => setExpandedImage(image.image_url)}>
                 <Image source={{ uri: image.image_url }} style={styles.preview as any} resizeMode="contain" />
               </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Delete saved product photo" style={styles.imageRemove} onPress={() => void deleteSavedImage(image)}>
+                <Ionicons name="close" size={16} color="white" />
+              </Pressable>
             </View>
           ))}
           {images.map((image, index) => (
@@ -736,7 +806,10 @@ export function SourcingScreen({
       <Section number="3" title="Product details">
         <Field label={`Product details · ${publishOnWebsite ? "Required" : "Optional for an idea"}`} value={englishDescription} setValue={setEnglishDescription} placeholder="Describe what the customer will receive" multiline />
       </Section>
-      <Section number="4" title="Variants and costs">
+      {isDigital ? <Section number="4" title="Fixed price">
+        <Field label="Selling price · PHP · Required" value={sellingPhp} setValue={setSellingPhp} keyboardType="decimal-pad" placeholder="Example: 150" />
+        <Text style={styles.note}>The exact price you enter is saved. No conversion, markup, tax allowance or shipping charge. Digital files have no physical inventory. Deliver the file manually after verifying payment.</Text>
+      </Section> : <><Section number="4" title="Variants and costs">
         <Text style={styles.help}>
           Add each choice exactly as the supplier shows it, such as Pink, Large Blue or Pack of 50. Each choice can have its own price.
         </Text>
@@ -746,10 +819,7 @@ export function SourcingScreen({
           <Chip label="RMB" active={currency === "RMB"} onPress={() => changeCurrency("RMB")} />
         </View>
         <Text style={styles.note}>Prices and supplier shipping below use {currency}. Peso estimates are calculated automatically.</Text>
-        <Text style={styles.label}>Tax · Required</Text>
-        <View style={styles.chips}>
-          <Chip label="3% tax" active={taxPercent === "3"} onPress={() => setTaxPercent("3")} />
-        </View>
+        <Text style={styles.note}>A 3% tax allowance is added automatically to the buying cost. The final buying cost includes this amount.</Text>
         {platform !== "Pinduoduo" ? <><Text style={styles.label}>Supplier shipping</Text>
         <View style={styles.chips}>
           <Chip label="Free shipping" active={shippingType === "free"} onPress={() => { setShippingType("free"); setShippingAmount(""); }} />
@@ -766,7 +836,7 @@ export function SourcingScreen({
               placeholder="Example: Pink, Large Blue or Pack of 50"
             />
             <Field
-              label={`Supplier's listed price · ${currency}`}
+              label={`Buying cost · ${currency}`}
               value={row.price}
               setValue={(v) => changeOption(row.id, "price", v)}
               keyboardType="decimal-pad"
@@ -779,9 +849,21 @@ export function SourcingScreen({
               keyboardType="decimal-pad"
               placeholder="Example: 499"
             />
-            <Field label="Pieces in one selection · Required" value={row.stockUnits} setValue={value=>changeOption(row.id,"stockUnits",value)} keyboardType="number-pad" placeholder="1" />
-            <Text style={styles.note}>Selling one selection deducts this many pieces. Use 50 for a pack of 50, or 1 for a single item.</Text>
-            {row.price ? <View><Text style={styles.variantCost}>Our buying cost: {money(viaeBuyingCostSgd(n(row.price), currency, n(taxPercent), shippingCost), "SGD")} · {money(viaeBuyingCostSgd(n(row.price), currency, n(taxPercent), shippingCost) * 49, "PHP")}</Text><Text style={styles.note}>Includes tax, shipping if selected, and the RMB buying-cost allowance. This is not the customer selling price.</Text></View> : null}
+            <Text style={styles.note}>Suggested prices round to the nearest ₱10: ₱708 → ₱710, ₱702 → ₱700. You can still set a different customer price.</Text>
+            <Text style={styles.note}>One variant = one stock item. Selling one deducts 1 from this variant, regardless of the pack contents in its name.</Text>
+            {n(row.price)>0 ? <Pressable accessibilityRole="button" accessibilityLabel={`Use suggested selling price for ${row.value || "variant"}`} style={styles.secondary} onPress={()=>changeOption(row.id,"publicPrice",String(viaeSuggestedSellingPhp(viaeBuyingCostSgd(n(row.price),currency,3,shippingCost))))}><Text style={styles.secondaryText}>Use suggested selling price · {money(viaeSuggestedSellingPhp(viaeBuyingCostSgd(n(row.price),currency,3,shippingCost)),"PHP")}</Text></Pressable> : null}
+            {row.price ? <View><Text style={styles.variantCost}>Our buying cost: {money(viaeBuyingCostSgd(n(row.price), currency, n(taxPercent), shippingCost), "SGD")} · {money(viaeBuyingCostSgd(n(row.price), currency, n(taxPercent), shippingCost) * 49, "PHP")}</Text><Text style={styles.note}>Includes automatic 3% tax and selected shipping. RMB prices also include the RMB buying-cost allowance. This is not the customer selling price.</Text></View> : null}
+            {n(row.price)>0 ? (() => {
+              const cost = viaeBuyingCostSgd(n(row.price),currency,3,shippingCost)*49;
+              const selling = n(row.publicPrice);
+              const minimum = Math.ceil((cost*2-1e-9)*100)/100;
+              return <View style={styles.optionCard}>
+                <Text style={styles.variantCost}>Minimum price for a 50% deposit: {money(minimum,"PHP")}</Text>
+                {selling>0 ? <><Text style={styles.variantCost}>Estimated gross profit: {money(selling-cost,"PHP")} · {((selling-cost)/selling*100).toFixed(1)}% margin</Text>
+                  <Text style={styles.note}>{selling/2+0.000001>=cost ? "✓ 50% deposit covers buying cost." : `⚠ 50% deposit is short by ${money(cost-selling/2,"PHP")}. Review your selling price.`}</Text></> : <Text style={styles.note}>Enter a selling price to calculate profit and deposit coverage.</Text>}
+                <Text style={styles.note}>Before packaging, payment fees and other business expenses. This is not net profit.</Text>
+              </View>;
+            })() : <Text style={styles.note}>Needs pricing review: enter the buying cost first.</Text>}
             <Pressable
               style={styles.remove}
               onPress={() =>
@@ -799,24 +881,21 @@ export function SourcingScreen({
         </Pressable>
         <Text style={styles.note}>Buying cost is what we spend. Selling price is what the customer pays. Enter the selling price separately; only that price appears on VIAE.</Text>
       </Section>
-      <Section number="5" title="Selling price and waiting time">
+      <Section number="5" title="Website availability">
+        <Text style={styles.label}>Website availability</Text>
+        <Text style={styles.note}>Availability: {websiteAvailability === 'in_stock' ? 'In stock' : websiteAvailability === 'incoming' ? 'Incoming' : 'Preparing'} · Calculated automatically</Text>
+        <Text style={styles.help}>Preparing: no available stock or supplier order. Incoming: ordered from supplier, not received. In stock: received or printed items available after customer reservations. Each variant is checked separately. Publishing never adds stock.</Text>
+        {link.trim() ? <Text style={styles.note}>Imported or linked product: check pack contents, variant prices and photos before making it official. Saving an idea does not publish it or record an expense.</Text> : null}
         <Text style={styles.help}>
           Official products appear in the VIAE shop automatically. Ideas stay private. Buying costs and supplier links never appear on the website.
         </Text>
-        <Field
-          label="Same selling price for all variants · PHP · Optional"
-          value={sellingPhp}
-          setValue={setSellingPhp}
-          keyboardType="decimal-pad"
-          placeholder="Use this when every variant has the same price"
-        />
-        <Field
+        {websiteAvailability === "preparing" && <Field
           label={`Estimated waiting time · ${publishOnWebsite ? "Required" : "Optional for an idea"}`}
           value={leadTime}
           setValue={setLeadTime}
           placeholder="Estimated 1–2 months"
-        />
-      </Section>
+        />}
+      </Section></>}
       <Pressable
         style={[styles.primary, saving && styles.disabled]}
         disabled={saving}
@@ -1151,6 +1230,10 @@ const styles = StyleSheet.create({
   },
   removeText: { fontSize: 14, fontWeight: "600", color: "#8A2943" },
   itemActions: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  linkPreviewRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
+  linkPreview: { flex: 1, minWidth: 160, color: "#626A78", fontSize: 12 },
+  supplierLink: { minHeight: 36, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 1, borderColor: "#CBD8F2", borderRadius: 9, backgroundColor: "#F5F8FE" },
+  supplierLinkText: { color: "#315FBE", fontSize: 12, fontWeight: "700" },
   editIdea: {
     minHeight: 38,
     paddingHorizontal: 11,

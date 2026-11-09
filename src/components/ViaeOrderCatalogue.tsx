@@ -1,0 +1,14 @@
+import {useEffect,useState} from 'react';
+import {ActivityIndicator,Pressable,View} from 'react-native';
+import {Text,TextInput} from './AppTypography';
+import {ViaeProductPicker} from './ViaeProductPicker';
+import {loadViaeSalesCatalogue} from '../lib/viaeSalesCatalogue';
+import type {Product} from '../types';
+export type ViaeOrderItem={catalogue_design_id:string;title:string;format:'printed'|'custom';quantity:number;unit_price:number;image_url:string|null};
+export function ViaeOrderCatalogue({items,onChange}:{items:ViaeOrderItem[];onChange:(items:ViaeOrderItem[])=>void}){
+ const [products,setProducts]=useState<Product[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ useEffect(()=>{loadViaeSalesCatalogue().then(data=>setProducts(data.products.filter(p=>(p as Product&{internal_only?:boolean}).internal_only||p.variants.some(v=>v.id==='printed')))).catch(e=>setError(e.message)).finally(()=>setLoading(false));},[]);
+ return <View style={{gap:12}}><Text style={{fontSize:17,fontWeight:'700'}}>Choose printed catalogue items</Text><Text>Or enter a custom print order below. Digital files already delivered belong in Sales.</Text>{loading?<ActivityIndicator/>:error?<Text accessibilityRole="alert">{error}</Text>:<ViaeProductPicker products={products.map(p=>({...p,category_name:p.category_id,selling_price_php:p.variants.find(v=>v.id==='printed')?.price_override??p.regular_price,source_product_images:p.image_url?[{image_url:p.image_url}]:[],source_product_options:[]}))} selectedIds={items.map(x=>x.catalogue_design_id)} onSelect={p=>{const existing=items.find(x=>x.catalogue_design_id===p.id);onChange(existing?items.map(x=>x===existing?{...x,quantity:x.quantity+1}:x):[...items,{catalogue_design_id:p.id,title:p.name,format:(p as Product&{internal_only?:boolean}).internal_only?'custom':'printed',quantity:1,unit_price:Number(p.selling_price_php||0),image_url:p.image_url}]);}}/>}
+ {items.map(item=><View key={item.catalogue_design_id} style={{padding:12,borderWidth:1,borderColor:'#ddd',borderRadius:10,gap:7}}><Text style={{fontWeight:'600'}}>{item.title}</Text><View style={{flexDirection:'row',alignItems:'center',gap:10,flexWrap:'wrap'}}><Text>Quantity</Text><TextInput accessibilityLabel={`Order quantity for ${item.title}`} style={{borderWidth:1,borderColor:'#aaa',padding:9,width:76}} keyboardType="number-pad" value={String(item.quantity)} onChangeText={v=>onChange(items.map(x=>x===item?{...x,quantity:Number(v)}:x))}/><Text>Unit price</Text><TextInput accessibilityLabel={`Order price for ${item.title}`} style={{borderWidth:1,borderColor:'#aaa',padding:9,width:105}} keyboardType="decimal-pad" value={String(item.unit_price)} onChangeText={v=>onChange(items.map(x=>x===item?{...x,unit_price:Number(v)}:x))}/><Pressable onPress={()=>onChange(items.filter(x=>x!==item))}><Text>Remove</Text></Pressable></View></View>)}
+ </View>;
+}

@@ -1,0 +1,4 @@
+alter table public.sales add column archived_at timestamptz;
+-- User requested a clean VIAE sales list; retain recoverable source records.
+update public.sales set archived_at=now(),status='voided',voided_at=now(),notes=concat_ws(' · ',notes,'Archived at owner request: remove previous VIAE sales') where business_id='3fe4c82d-a659-406b-b290-32d8a49f2bdf' and source_reference like 'viae-legacy-trade:%' and archived_at is null;
+update public.reseller_trade_entries set status='cancelled',notes=concat_ws(' · ',notes,'Archived at owner request: previous VIAE sales; source retained for recovery') where business_id='3fe4c82d-a659-406b-b290-32d8a49f2bdf' and kind='sale' and exists(select 1 from public.sales s where s.source_reference='viae-legacy-trade:'||reseller_trade_entries.id and s.archived_at is not null);

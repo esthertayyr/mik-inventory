@@ -35,13 +35,19 @@ import { WorkspaceAction } from "@/src/components/WorkspaceAction";
 import { PrintQueueScreen } from "@/src/components/PrintQueueScreen";
 import { PrintPriceCalculator } from "@/src/components/PrintPriceCalculator";
 import { SourcingScreen } from "@/src/components/SourcingScreen";
+import {loadViaeSalesCatalogue} from '@/src/lib/viaeSalesCatalogue';
+import { ViaeCatalogueScreen } from "@/src/components/ViaeCatalogueScreen";
+import {ViaeCommerceScreen} from '@/src/components/ViaeCommerceScreen';
 import { WebsiteScreen } from "@/src/components/WebsiteScreen";
-import { ResellerPreordersScreen } from "@/src/components/ResellerPreordersScreen";
+import { WebsiteEnquiriesScreen } from "@/src/components/WebsiteEnquiriesScreen";
+import { ResellerSalesOrdersScreen } from "@/src/components/ResellerSalesOrdersScreen";
 import { ResellerPackagesScreen } from "@/src/components/ResellerPackagesScreen";
 import { ResellerReportsScreen } from "@/src/components/ResellerReportsScreen";
 import { ResellerTradeScreen } from "@/src/components/ResellerTradeScreen";
 import { ResellerStockScreen } from "@/src/components/ResellerStockScreen";
 import { ResellerHomeScreen } from "@/src/components/ResellerHomeScreen";
+import { ViaeTasksScreen, VIAE_BUSINESS_ID } from "@/src/components/ViaeTasksScreen";
+import { ViaeTaxScreen } from "@/src/components/ViaeTaxScreen";
 import { Text, TextInput } from "@/src/components/AppTypography";
 import type {
   Business,
@@ -78,6 +84,16 @@ function localDateKey(date = new Date()) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function shopOverviewBounds(period: "today" | "month", now = new Date()) {
+  const start = period === "today"
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    : new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = period === "today"
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return { start, end };
 }
 
 function friendlyLocalDate(value = localDateKey()) {
@@ -228,11 +244,20 @@ const ownerNav: {
     soft: SECTION.records.soft,
   },
 ];
+const viaeNav: typeof ownerNav = [
+ {id:'home',label:'Home',icon:'home-outline',color:'#4F5664',soft:'#F3F4F6'},
+ {id:'sell_start',label:'Sales',icon:'cart-outline',color:'#315FBE',soft:'#EDF3FB'},
+ {id:'orders',label:'Orders',icon:'clipboard-outline',color:'#594C8D',soft:'#F3F0F8'},
+ {id:'sourcing',label:'Catalogue',icon:'bag-handle-outline',color:'#315FBE',soft:'#EDF3FB'},
+ {id:'expenses',label:'Expenses',icon:'wallet-outline',color:'#8A365B',soft:'#FAEFF4'},
+ {id:'reports',label:'Reports',icon:'bar-chart-outline',color:'#1B685C',soft:'#EDF6F3'},
+ {id:'viae_tasks',label:'Tasks',icon:'checkbox-outline',color:'#650F1C',soft:'#FAEFF4'},
+];
 const resellerNav: typeof ownerNav = [
+  { id: "viae_tasks", label: "Tasks", icon: "checkbox-outline", color: "#650F1C", soft: "#FAEFF4" },
   { id: "home", label: "Home", icon: "home-outline", color: "#4F5664", soft: "#F3F4F6" },
-  { id: "sourcing", label: "Products", icon: "bag-handle-outline", color: "#315FBE", soft: "#EDF3FB" },
-  { id: "reseller_sales", label: "Sales", icon: "cart-outline", color: "#315FBE", soft: "#EDF3FB" },
-  { id: "preorders", label: "Pre-orders", icon: "receipt-outline", color: "#8A365B", soft: "#FAEFF4" },
+  { id: "sourcing", label: "Catalogue", icon: "bag-handle-outline", color: "#315FBE", soft: "#EDF3FB" },
+  { id: "reseller_sales", label: "Sales & Orders", icon: "cart-outline", color: "#315FBE", soft: "#EDF3FB" },
   { id: "reseller_reports", label: "Reports", icon: "bar-chart-outline", color: "#1B685C", soft: "#EDF6F3" },
 ];
 
@@ -435,7 +460,7 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
       supabase.from("businesses").select("id,name,logo_url,slug,login_username,status,created_at,visible_modules,business_type").order("created_at"),
       supabase.from("activity_logs").select("business_id,created_at").eq("action", "login").order("created_at", { ascending: false }).limit(1000),
       supabase.from("sales").select("total,status").eq("status", "completed").gte("created_at", startTime).lt("created_at",endTime),
-      supabase.from("external_orders").select("id,status").not("status", "in", "(completed,cancelled)"),
+      supabase.from("external_orders").select("id,status").is("archived_at",null).not("status", "in", "(completed,cancelled)"),
       supabase.from("inventory_levels").select("quantity_on_hand,product:products!inner(low_stock_threshold,active)").eq("product.active", true),
       supabase.from("order_payments").select("amount").gte("payment_date",start).lt("payment_date",end),
       supabase.from("expenses").select("amount").gte("expense_date",start).lt("expense_date",end),
@@ -502,11 +527,11 @@ function PlatformAdmin({deviceUserName}:{deviceUserName:string}) {
   };
   const exportOwnerSales = async () => {
     setExporting(true);
-    const { data, error } = await supabase.from("sales").select("receipt_number,created_at,payment_method,total,status,business:businesses(name)").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("sales").select("receipt_number,viae_receipt_number,created_at,payment_method,total,status,business:businesses(name)").order("created_at", { ascending: false });
     setExporting(false);
     if (error) return Alert.alert("Export not created", error.message);
     const cell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-    const rows = [["Shop", "Date", "Receipt", "Payment", "Total", "Status"], ...(data ?? []).map((sale: any) => [sale.business?.name ?? "", sale.created_at, `SALE-${sale.receipt_number}`, String(sale.payment_method).toUpperCase(), sale.total, String(sale.status).toUpperCase()])];
+    const rows = [["Shop", "Date", "Receipt", "Payment", "Total", "Status"], ...(data ?? []).map((sale: any) => [sale.business?.name ?? "", sale.created_at, `SALE-${(sale.viae_receipt_number != null ? String(sale.viae_receipt_number).padStart(3, "0") : sale.receipt_number)}`, String(sale.payment_method).toUpperCase(), sale.total, String(sale.status).toUpperCase()])];
     const csv = "\uFEFF" + rows.map((row) => row.map(cell).join(",")).join("\n");
     const filename = `mik-all-shops-sales-${friendlyLocalDate()}.csv`;
     if (Platform.OS === "web") {
@@ -785,6 +810,7 @@ function ShopApp({
 }) {
   const { width } = useWindowDimensions();
   const [screen, setScreen] = useState<Screen>("home");
+  const [viaePrintingOrder,setViaePrintingOrder]=useState<string|null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -854,9 +880,10 @@ function ShopApp({
         supabase
           .from("sales")
           .select(
-            "id,receipt_number,payment_method,total,status,created_at,payment_confirmed_at,payment_reference,sale_items(product_name,variant_name,selected_letters,quantity)",
+            "id,receipt_number,viae_receipt_number,payment_method,total,status,created_at,payment_confirmed_at,payment_reference,sale_items(product_name,variant_name,selected_letters,quantity)",
           )
           .eq("location_id", selectedLocationId)
+          .is("archived_at",null)
           .gte("created_at", start.toISOString())
           .lt("created_at", end.toISOString())
           .order("created_at", { ascending: false }),
@@ -895,6 +922,10 @@ function ShopApp({
         }) as Product[],
       );
       setCategories((cd ?? []) as Category[]);
+      if(businessId===VIAE_BUSINESS_ID){
+        try {const catalogue=await loadViaeSalesCatalogue();setProducts(catalogue.products);setCategories(catalogue.categories);}
+        catch(error){setProducts([]);setCategories([]);Alert.alert('Catalogue not loaded',(error as Error).message);}
+      }
       setSales((sd ?? []) as Sale[]);
     },
     [],
@@ -979,16 +1010,17 @@ function ShopApp({
     );
   if (needsSetup) return <NoShopProfile />;
   const role: Role = business?.role ?? "staff";
-  const resellerBusiness=business?.business_type==="reseller";
-  const visibleModules=(business?.visible_modules??allShopModules()) as ShopModule[];
-const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports","reseller_sales","reseller_purchases","reseller_stock"] as Screen[]).includes(value)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
-  const availableNav = (resellerBusiness?resellerNav:ownerNav).filter(item=>{const module=screenModule(item.id);return !module||visibleModules.includes(module);});
+  const isViae=business?.id===VIAE_BUSINESS_ID;
+  const resellerBusiness=business?.business_type==="reseller"&&!isViae;
+  const visibleModules=(isViae?["sales","orders","reports","production","stock"]:business?.visible_modules??allShopModules()) as ShopModule[];
+const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","monthly_sales","correct"] as Screen[]).includes(value)?"sales":value==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports","reseller_sales","reseller_purchases","reseller_stock"] as Screen[]).includes(value)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(value)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(value)?"production":(["reports","expenses","calendar"] as Screen[]).includes(value)?"reports":null;
+  const availableNav = (isViae?viaeNav:resellerBusiness?resellerNav:ownerNav).filter(item=>{const module=screenModule(item.id);return (isViae&&item.id==="sourcing")||!module||visibleModules.includes(module);});
   const nav = role === "owner" ? availableNav : availableNav.filter((x) =>
-    x.id === "home" ||
+    (isViae&&x.id==="sourcing"&&staffPermissions?.includes("products")) || (isViae&&x.id==="expenses"&&staffPermissions?.includes("reports")) || x.id === "home" || (x.id === "viae_tasks" && business?.id === VIAE_BUSINESS_ID) ||
     (resellerBusiness && (["sourcing","reseller_packages","reseller_purchases"] as Screen[]).includes(x.id) && staffPermissions?.includes("products")) ||
     (resellerBusiness && x.id === "preorders" && staffPermissions?.includes("orders")) ||
     (resellerBusiness && x.id === "reseller_reports" && staffPermissions?.includes("reports")) ||
-    (resellerBusiness && x.id === "reseller_sales" && staffPermissions?.includes("sell")) ||
+    (resellerBusiness && x.id === "reseller_sales" && (staffPermissions?.includes("sell") || staffPermissions?.includes("orders"))) ||
     (!resellerBusiness && x.id === "sell_start" && staffPermissions?.includes("sell")) ||
     (!resellerBusiness && x.id === "orders" && staffPermissions?.includes("orders")) ||
     (!resellerBusiness && x.id === "stock_start" && staffPermissions?.includes("stock")) ||
@@ -1034,6 +1066,7 @@ const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_
         key={`${locationId}-${screen}`}
         products={products}
         categories={categories}
+        viae={isViae}
         locationId={locationId}
         onSaved={reload}
         onPendingChange={setSaleInProgress}
@@ -1042,9 +1075,12 @@ const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_
         onNavigate={setScreen}
       />
     );
-  else if (screen === "dashboard")
+  else if (screen === "dashboard" || screen === "monthly_sales")
     body = (
       <Dashboard
+        key={`${locationId}-${screen}`}
+        monthlyLocation={screen === "monthly_sales" ? locationId : undefined}
+        viae={isViae}
         products={products}
         sales={sales}
         onSell={() => setScreen("sale")}
@@ -1097,35 +1133,47 @@ const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_
     body = (
       <View style={s.flex}>
         <Back title="Sales reports" onPress={() => setScreen("home")} />
-        <ReportsScreen locationId={locationId} hideTitle />
+        <ReportsScreen viae={isViae} locationId={locationId} hideTitle />
       </View>
     );
   else if (screen === "expenses")
     body = <ExpensesScreen businessId={business!.id} locationId={locationId} />;
   else if (screen === "report_issue")
     body = <ReportIssue businessId={business!.id} onBack={() => setScreen(reportBackScreen)} />;
+  else if (screen === "website" && isViae && role === "owner")
+    body = <WebsiteScreen businessId={business!.id} onBack={()=>setScreen("home")} />;
+  else if (screen === "website_inquiries")
+    body = (resellerBusiness||isViae) && role === "owner"
+      ? <WebsiteEnquiriesScreen businessId={business!.id} onBack={() => setScreen("home")} />
+      : <ResellerHomeScreen businessId={business!.id} onOpen={setScreen} permissions={staffPermissions ?? []} />;
   else if (screen === "suggested_images")
     body = <SuggestedImages businessId={business!.id} canManage={role === "owner"} onBack={() => setScreen("home")} />;
   else if (screen === "sell_start")
-    body = <SellStart onOpen={setScreen} />;
+    body = <SellStart viae={isViae} onOpen={setScreen} />;
   else if (screen === "print_queue")
     body = <PrintQueueScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} onOpenOrder={(orderId) => { setOpenOrderId(orderId); setScreen("orders"); }} />;
   else if (screen === "price_calculator")
     body = <PrintPriceCalculator onBack={() => setScreen("home")} />;
   else if (screen === "sourcing")
-    body = <SourcingScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} onCreateBundle={()=>setScreen("reseller_packages")} />;
+    body = business?.id===VIAE_BUSINESS_ID ? <ViaeCatalogueScreen businessId={business.id} canEdit={role==='owner'} onBack={()=>setScreen('home')}/> : <SourcingScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} onCreateBundle={()=>setScreen("reseller_packages")} />;
+  else if (screen === "viae_tasks" && business?.id === VIAE_BUSINESS_ID)
+    body = <ViaeTasksScreen businessId={business.id} onBack={() => setScreen("home")} />;
+  else if(screen==='viae_commerce' && business?.id===VIAE_BUSINESS_ID && role==='owner')
+    body=<ViaeCommerceScreen businessId={business.id} locationId={locationId} onBack={()=>setScreen('home')}/>;
   else if (screen === "reseller_packages")
     body = <ResellerPackagesScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("sourcing")} />;
-  else if (screen === "preorders")
-    body = <ResellerPreordersScreen businessId={business!.id} locationId={locationId} onBack={() => setScreen("home")} />;
+  else if (screen === "preorders" || screen === "reseller_sales")
+    body = <ResellerSalesOrdersScreen businessId={business!.id} locationId={locationId} permissions={role === "owner" ? undefined : staffPermissions ?? []} onBack={() => setScreen("home")} onPrinting={(orderId)=>{setViaePrintingOrder(orderId??null);setScreen("reseller_stock");}} />;
   else if (screen === "reseller_reports")
     body = <ResellerReportsScreen businessId={business!.id} onBack={() => setScreen("home")} />;
-  else if (screen === "reseller_sales" || screen === "reseller_purchases")
-    body = <ResellerTradeScreen key={screen} businessId={business!.id} locationId={locationId} kind={screen === "reseller_sales" ? "sale" : "purchase"} onBack={() => setScreen("home")} />;
+  else if (screen === "viae_tax")
+    body = <ViaeTaxScreen businessId={business!.id} onBack={() => setScreen("home")} />;
+  else if (screen === "reseller_purchases" && business?.id!==VIAE_BUSINESS_ID)
+    body = <ResellerTradeScreen key={screen} businessId={business!.id} locationId={locationId} kind="purchase" onBack={() => setScreen("home")} />;
   else if(screen === "reseller_stock")
-    body=<ResellerStockScreen businessId={business!.id} locationId={locationId} onBack={()=>setScreen("home")} onCreateProduct={()=>setScreen("sourcing")}/>;
+    body=<ResellerStockScreen businessId={business!.id} locationId={locationId} initialOrderId={viaePrintingOrder} onBack={()=>{setScreen(viaePrintingOrder?'preorders':'home');setViaePrintingOrder(null);}} onCreateProduct={()=>{setViaePrintingOrder(null);setScreen("sourcing");}}/>;
   else if (screen === "correct")
-    body = <ReportsScreen locationId={locationId} correctionMode onBack={() => setScreen("sell_start")} />;
+    body = <ReportsScreen viae={isViae} locationId={locationId} correctionMode onBack={() => setScreen("sell_start")} />;
   else if (screen === "shop")
     body = (
       <ShopProfile
@@ -1179,10 +1227,10 @@ const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_
         visibleModules={visibleModules}
       />
     );
-  const selected = resellerBusiness ? screen :
+  const selected = isViae&&["sourcing","expenses","viae_tasks"].includes(screen)?screen:resellerBusiness ? screen :
     (["inventory","alphabet_inventory","products","price_list","sourcing","reseller_packages","preorders","reseller_reports"] as Screen[]).includes(screen)
       ? "stock_start"
-      : (["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)
+      : (["sell_start","sale","event_sale","missed","dashboard","monthly_sales","correct"] as Screen[]).includes(screen)
         ? "sell_start"
         : (["reports","expenses","calendar"] as Screen[]).includes(screen)
           ? "reports"
@@ -1322,7 +1370,7 @@ function NoShopProfile() {
   );
 }
 
-function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
+function SellStart({onOpen,viae=false}:{onOpen:(screen:Screen)=>void;viae?:boolean}) {
   const {width}=useWindowDimensions();
   const today = localDateKey();
   return <ScrollView contentContainerStyle={s.sellStartPage}>
@@ -1333,7 +1381,7 @@ function SellStart({onOpen}:{onOpen:(screen:Screen)=>void}) {
       <Pressable accessibilityRole="button" accessibilityLabel="Open Shop Sale. Normal Checkout." style={[s.sellModeCard,width>=760&&s.sellModeCardDesktop,{backgroundColor:SECTION.sales.soft}]} onPress={()=>onOpen("sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:SECTION.sales.color}]}><Ionicons name="storefront" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Shop Sale</Text><Text style={s.sellModeHelp}>Normal Checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.sales.color}/></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Open Event Sale. Fast checkout. Letter selection is skipped." style={[s.sellModeCard,width>=760&&s.sellModeCardDesktop,{backgroundColor:SECTION.production.soft}]} onPress={()=>onOpen("event_sale")}><View pointerEvents="none" style={[s.sellModeIcon,{backgroundColor:SECTION.production.color}]}><Ionicons name="flash" size={30} color={C.white}/></View><View pointerEvents="none" style={s.flex}><Text style={s.sellModeTitle}>Event Sale</Text><Text style={s.sellModeHelp}>Fast Checkout</Text></View><Ionicons pointerEvents="none" name="arrow-forward" size={23} color={SECTION.production.color}/></Pressable>
     </View>
-    <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={22} color={C.accent}/><View style={s.flex}><Text style={s.eventModeNoteStrong}>How Event Sale works</Text><Text style={s.eventModeStep}>1. Add the product and take payment.</Text><Text style={s.eventModeStep}>2. Clickers skip the letter screen.</Text><Text style={s.eventModeStep}>3. After the event, count the A–Z keycaps left.</Text><Text style={s.eventModeTip}>Tip: Take a photo of sold items to help you count later.</Text></View></View>
+    <View style={s.eventModeNote}><Ionicons name="information-circle-outline" size={22} color={C.accent}/><View style={s.flex}><Text style={s.eventModeNoteStrong}>How Event Sale works</Text><Text style={s.eventModeStep}>1. Add the product and take payment.</Text><Text style={s.eventModeStep}>{viae?"2. Choose digital or printed format.":"2. Clickers skip the letter screen."}</Text><Text style={s.eventModeStep}>{viae?"3. Record the final amount charged.":"3. After the event, count the A–Z keycaps left."}</Text><Text style={s.eventModeTip}>Tip: Take a photo of sold items to help you count later.</Text></View></View>
     <Text style={s.salesRecordHeading}>CORRECT A MISTAKE</Text>
     <Text style={s.salesRecordHelp}>Use this when a sale was entered incorrectly.</Text>
     <View style={[s.saleCorrectionGrid,width>=760&&s.saleCorrectionGridDesktop]}>
@@ -1413,6 +1461,7 @@ function PastSaleDatePicker({ value, onChange, onBack, onContinue,title="When wa
 
 function SaleScreen({
   products,
+  viae = false,
   categories,
   locationId,
   onSaved,
@@ -1422,6 +1471,7 @@ function SaleScreen({
   onNavigate,
 }: {
   products: Product[];
+  viae?: boolean;
   categories: Category[];
   locationId: string;
   onSaved: () => void;
@@ -1444,7 +1494,13 @@ function SaleScreen({
   const [gcashReceived, setGcashReceived] = useState(false);
   const [paymentReference, setPaymentReference] = useState("");
   const [cashReceived, setCashReceived] = useState("");
+  const [finalTotal,setFinalTotal]=useState('');
+  const [priceMode,setPriceMode]=useState<'original'|'promotion'>('original');
+  const [paymentChannel,setPaymentChannel]=useState('Maya');
+  const [saleRequest,setSaleRequest]=useState(()=>globalThis.crypto.randomUUID());
+  const [saleMessage,setSaleMessage]=useState('');
   const [review, setReview] = useState(false);
+  const [receiptPhoto, setReceiptPhoto] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [recordPastSale, setRecordPastSale] = useState(startPastSale);
   const [pastSaleDate, setPastSaleDate] = useState(() => localDateKey());
@@ -1460,11 +1516,15 @@ function SaleScreen({
   const choosingCategory = category === null && search.trim() === "";
   const cardWidth =
     Math.floor((saleContentWidth - (productColumns - 1) * 11 - 1) / productColumns);
-  const total = cart.reduce((n, x) => n + x.quantity * x.unitPrice, 0);
+  const subtotal = cart.reduce((n, x) => n + x.quantity * x.unitPrice, 0);
+  const total = viae&&priceMode==='promotion'?(Number(finalTotal)||0):subtotal;
+  const totalValid=Number.isFinite(total)&&total>0;
+  const hasOverride=viae&&priceMode==='promotion';
+  const overrideValid=!hasOverride||finalTotal.trim()!=='';
   const cashAmount = Number(cashReceived);
   const cashIsEnough =
-    recordPastSale || payment !== "cash" ||
-    (cashReceived.trim() !== "" && Number.isFinite(cashAmount) && cashAmount >= total);
+    totalValid && (recordPastSale || payment !== "cash" ||
+    (cashReceived.trim() !== "" && Number.isFinite(cashAmount) && cashAmount >= total));
   const changeDue = payment === "cash" && cashIsEnough ? cashAmount - total : 0;
   const count = cart.reduce((n, x) => n + x.quantity, 0);
   const cartKey = (
@@ -1488,7 +1548,7 @@ function SaleScreen({
     }
     const price = variant?.price_override ?? p.sale_price ?? p.regular_price;
     const available = variant?.quantity_on_hand ?? p.quantity_on_hand;
-    if (price === null)
+    if (price === null && !viae)
       return Alert.alert("No price yet", "Ask the owner to add a price first.");
     if (available < 1)
       return Alert.alert(
@@ -1510,7 +1570,7 @@ function SaleScreen({
             );
       return [
         ...old,
-        { product: p, variant, selectedLetters, quantity: 1, unitPrice: price, listedPrice: price },
+        { product: p, variant, selectedLetters, quantity: 1, unitPrice: price ?? 0, listedPrice: price ?? 0 },
       ];
     });
     setChoosing(null);
@@ -1562,10 +1622,12 @@ function SaleScreen({
     ));
   };
   const complete = async () => {
-    if (!cart.length) return;
+    if (!cart.length||saving) return;
+    if(!totalValid||!overrideValid)return Alert.alert('Check final total','Enter the final promotion amount above zero.');
+    if(viae&&!hasOverride&&cart.some(x=>x.unitPrice<=0))return Alert.alert('Price needed','Enter the unit prices or final amount charged.');
     if (recordPastSale && !/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate))
       return Alert.alert("Check the sale date", "Choose the original sale date before continuing.");
-    if (recordPastSale && cart.some((item) => !Number.isFinite(item.unitPrice) || item.unitPrice <= 0))
+    if (!viae && recordPastSale && cart.some((item) => !Number.isFinite(item.unitPrice) || item.unitPrice <= 0))
       return Alert.alert("Price needed", "Enter the price charged for every product in this earlier sale.");
     if (!recordPastSale && payment === "cash" && !cashIsEnough)
       return Alert.alert(
@@ -1574,8 +1636,8 @@ function SaleScreen({
       );
     if (!recordPastSale && payment === "gcash" && !gcashReceived)
       return Alert.alert(
-        "Check GCash first",
-        "Confirm that the payment appeared in the shop’s GCash account.",
+        viae?"Check payment first":"Check GCash first",
+        viae?"Confirm that the payment appeared in the shop’s payment account.":"Confirm that the payment appeared in the shop’s GCash account.",
       );
     const savedForDate = recordPastSale ? pastSaleDate : localDateKey();
     setSaving(true);
@@ -1594,7 +1656,13 @@ function SaleScreen({
         p_payment_reference:
           payment === "gcash" ? paymentReference.trim() : null,
       };
-    const { data, error } = eventMode
+    const { data, error } = viae ? await supabase.rpc('create_viae_catalogue_sale',{
+      p_location_id:locationId,p_request_id:saleRequest,p_sale_date:savedForDate,
+      p_items:cart.map(x=>({catalogue_design_id:x.product.id,format:x.variant?.id??'custom_digital',quantity:x.quantity,unit_price:x.unitPrice})),
+      p_payment_method:payment,p_payment_channel:payment==='cash'?'Cash':paymentChannel,
+      p_payment_received:recordPastSale||payment==='cash'||gcashReceived,p_payment_reference:paymentReference.trim()||null,
+      p_final_total:hasOverride?total:null,p_override_reason:hasOverride?'Promotion - Special price for this customer':null
+    }) : eventMode
       ? await supabase.rpc("create_event_sale", saleParams)
       : recordPastSale
       ? await supabase.rpc("create_backdated_sale_with_choices", {
@@ -1603,6 +1671,7 @@ function SaleScreen({
         })
       : await supabase.rpc("create_confirmed_sale_with_choices", saleParams);
     if (error) {
+      setSaleMessage(error.message);
       setSaving(false);
       return Alert.alert(
         "Sale not saved",
@@ -1611,13 +1680,20 @@ function SaleScreen({
           : "Please check the stock and try again.",
       );
     }
+    if (receiptPhoto) {
+      try { await attachSaleReceipt('sale', data, receiptPhoto); }
+      catch { Alert.alert('Sale saved, receipt not uploaded', 'Add the receipt from the saved sale in Reports. Do not enter the sale again.'); }
+      setReceiptPhoto(null);
+    }
     const { data: saved } = await supabase
       .from("sales")
-      .select("receipt_number,total")
+      .select("receipt_number,viae_receipt_number,total")
       .eq("id", data)
       .single();
     setSaving(false);
     setCart([]);
+    setPriceMode('original');setFinalTotal('');setSaleRequest(globalThis.crypto.randomUUID());
+    setSaleMessage(`Sale saved for ${friendlyLocalDate(savedForDate)} · ${peso(Number(saved?.total??total))}`);
     setReview(false);
     setPayment("cash");
     setGcashReceived(false);
@@ -1628,7 +1704,7 @@ function SaleScreen({
     await onSaved();
     Alert.alert(
       "Sale completed",
-      `Saved for ${friendlyLocalDate(savedForDate)}\nReceipt ${saved?.receipt_number ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? recordPastSale ? "Cash" : `Cash\nChange: ${peso(changeDue)}` : recordPastSale ? "GCash" : "GCash received"}.`,
+      `Saved for ${friendlyLocalDate(savedForDate)}\nReceipt ${(saved?.viae_receipt_number != null ? String(saved.viae_receipt_number).padStart(3, "0") : saved?.receipt_number) ?? ""}\n${peso(Number(saved?.total ?? total))} paid by ${payment === "cash" ? recordPastSale ? "Cash" : `Cash\nChange: ${peso(changeDue)}` : recordPastSale ? "GCash" : "GCash received"}.`,
       recordPastSale
         ? [
             { text: "Done", onPress: () => onNavigate("sell_start") },
@@ -1655,6 +1731,8 @@ function SaleScreen({
         <Back title="Review sale" onPress={() => setReview(false)} />
         <ScrollView contentContainerStyle={s.scroll}>
           <Step number="2">Check quantity, then choose payment.</Step>
+          {!!saleMessage&&<Text accessibilityRole="alert" style={s.safe}>{saleMessage}</Text>}
+          <ReceiptPicker uri={receiptPhoto} onChange={setReceiptPhoto} disabled={saving} />
           {cart.map((x) => {
             const key = cartKey(
               x.product.id,
@@ -1667,16 +1745,16 @@ function SaleScreen({
                   {x.product.image_url ? (
                     <Image
                       source={{ uri: x.product.image_url }}
-                      style={s.miniProductImage}
+                      style={[s.miniProductImage,viae&&{width:width<600?104:128,height:width<600?104:128,resizeMode:'contain',backgroundColor:C.white,borderRadius:8}]}
                     />
                   ) : (
-                    <View style={s.miniMissingPhoto}>
+                    <View style={[s.miniMissingPhoto,viae&&{width:width<600?104:128,height:width<600?104:128}]}>
                       <Text style={s.miniMissingText}>NO PHOTO</Text>
                     </View>
                   )}
                   <View style={s.flex}>
                     <Text style={s.rowTitle} numberOfLines={2}>{x.product.name}</Text>
-                    {x.variant ? (
+                    {!viae&&x.variant ? (
                       <Text style={s.variantChosen} numberOfLines={1}>
                         {x.product.variant_label ?? "Choice"}: {x.variant.name}
                       </Text>
@@ -1686,7 +1764,7 @@ function SaleScreen({
                         {x.product.alphabet_style?.name ?? "Letters"}: {x.selectedLetters.join(" · ")}
                       </Text>
                     ) : null}
-                    {recordPastSale ? (
+                    {(recordPastSale&&!viae) ? (
                       <View style={s.pastPriceField}>
                         <Text style={s.pastPriceLabel}>Which price was charged?</Text>
                         <Pressable
@@ -1710,11 +1788,11 @@ function SaleScreen({
                         </View>
                         <Text style={s.pastPriceHint}>Only change this when the earlier selling price was different.</Text>
                       </View>
-                    ) : <Text style={s.rowHelp}>{peso(x.unitPrice)} each</Text>}
+                    ) : <Text style={[s.rowHelp,viae&&{marginTop:7,fontSize:16,fontWeight:'600',color:C.ink}]}>{viae?(x.listedPrice>0?`Original price · ${peso(x.listedPrice)}`:'Original price not set'):`${peso(x.unitPrice)} each`}</Text>}
                   </View>
-                  <Text style={s.lineTotal}>
+                  {!viae?<Text style={s.lineTotal}>
                     {peso(x.quantity * x.unitPrice)}
-                  </Text>
+                  </Text>:null}
                 </View>
                 <View style={s.cartProductBottom}>
                   <Text style={s.quantityLabel}>Quantity</Text>
@@ -1727,9 +1805,19 @@ function SaleScreen({
               </View>
             );
           })}
+          {viae?<View style={[s.cartRow,{gap:12}]}>
+            <Text style={s.rowTitle}>Sale price</Text>
+            <View accessibilityRole="radiogroup" accessibilityLabel="Sale pricing" style={{flexDirection:'row',gap:10}}>
+              {(['original','promotion'] as const).map(mode=><Pressable key={mode} accessibilityRole="radio" accessibilityLabel={mode==='original'?'Original':'Promotion'} accessibilityState={{checked:priceMode===mode}} onPress={()=>setPriceMode(mode)} style={{flex:1,padding:14,borderWidth:1,borderColor:priceMode===mode?C.accent:C.border,borderRadius:10,backgroundColor:priceMode===mode?SECTION.sales.soft:C.white,gap:5}}>
+                <View style={{flexDirection:'row',alignItems:'center',gap:8}}><Ionicons name={priceMode===mode?'radio-button-on':'radio-button-off'} size={21} color={priceMode===mode?C.accent:C.muted}/><Text style={s.rowTitle}>{mode==='original'?'Original':'Promotion'}</Text></View>
+                <Text style={s.rowHelp}>{mode==='original'?`Product total · ${peso(subtotal)}`:'Special price for this customer'}</Text>
+              </Pressable>)}
+            </View>
+            {hasOverride?<><Text style={s.rowTitle}>Promotion total</Text><TextInput accessibilityLabel="Promotion total" style={s.input} keyboardType="decimal-pad" value={finalTotal} onChangeText={setFinalTotal} placeholder="Final amount charged"/><Text style={s.rowHelp}>All products and quantities stay recorded.</Text></>:null}
+          </View>:null}
           <View style={[s.totalBox,width<600&&s.totalBoxMobile]}>
             <Text style={s.totalLabel}>Amount to collect</Text>
-            <Text style={[s.totalValue,width<600&&s.totalValueMobile]}>{peso(total)}</Text>
+            <Text style={[s.totalValue,width<600&&s.totalValueMobile]}>{peso(totalValid?total:0)}</Text>
           </View>
           <Text style={[s.section,width<600&&s.sectionMobile]}>How did the customer pay?</Text>
           <View style={s.choiceRow}>
@@ -1744,7 +1832,7 @@ function SaleScreen({
               }}
             />
             <Choice
-              label="GCash"
+              label={viae?"Electronic payment":"GCash"}
               icon="phone-portrait-outline"
               selected={payment === "gcash"}
               onPress={() => {
@@ -1797,6 +1885,7 @@ function SaleScreen({
               </View>
             </View>
           ) : null}
+          {viae&&payment==='gcash'?<View style={s.choiceRow}>{['Maya','PayPal','Wise','GCash','Bank transfer','Other'].map(name=><Pressable key={name} style={s.currentPriceButton} onPress={()=>setPaymentChannel(name)}><Text>{paymentChannel===name?'✓ ':''}{name}</Text></Pressable>)}</View>:null}
           {payment === "gcash" && !recordPastSale ? (
             <View style={s.gcashCheck}>
               <View style={s.gcashHeading}>
@@ -1808,7 +1897,7 @@ function SaleScreen({
                   />
                 </View>
                 <View style={s.flex}>
-                  <Text style={s.rowTitle}>Check the shop’s GCash</Text>
+                  <Text style={s.rowTitle}>Check the shop’s payment account</Text>
                   <Text style={s.rowHelp}>
                     Only confirm after the payment appears.
                   </Text>
@@ -1831,13 +1920,13 @@ function SaleScreen({
                     : "I confirm payment was received"}
                 </Text>
               </Pressable>
-              <Label>GCash reference (optional)</Label>
+              <Label>Payment reference (optional)</Label>
               <TextInput
                 style={s.input}
                 value={paymentReference}
                 onChangeText={setPaymentReference}
                 placeholder="Example: last 6 digits"
-                keyboardType="number-pad"
+                keyboardType={viae?"default":"number-pad"}
               />
             </View>
           ) : null}
@@ -1856,23 +1945,23 @@ function SaleScreen({
               saving
                 ? "Saving sale…"
                 : !recordPastSale && payment === "gcash" && !gcashReceived
-                  ? "Confirm GCash payment above"
+                  ? (viae?"Confirm payment above":"Confirm GCash payment above")
                   : !recordPastSale && payment === "cash" && !cashIsEnough
                     ? "Enter cash received"
-                  : `${recordPastSale ? "Record past sale" : "Complete sale"} · ${peso(total)}`
+                  : !totalValid ? "Enter promotion total" : `${recordPastSale ? "Record past sale" : "Complete sale"} · ${peso(totalValid?total:0)}`
             }
             icon="checkmark-circle-outline"
             onPress={complete}
             disabled={
               saving ||
-              !cart.length ||
+              !cart.length || !totalValid || !overrideValid || (viae&&!hasOverride&&cart.some(x=>x.unitPrice<=0)) ||
               (!recordPastSale && payment === "gcash" && !gcashReceived) ||
               (!recordPastSale && payment === "cash" && !cashIsEnough) ||
-              (recordPastSale && (!/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate) || cart.some((item) => item.unitPrice <= 0)))
+              (!viae && recordPastSale && (!/^\d{4}-\d{2}-\d{2}$/.test(pastSaleDate) || cart.some((item) => item.unitPrice <= 0)))
             }
           />
           <Text style={s.safe}>
-            Stock changes only after you complete the sale.
+            {viae?"Record completed sales here. Use Orders for work still to be printed or delivered.":"Stock changes only after you complete the sale."}
           </Text>
         </ScrollView>
       </View>
@@ -1891,6 +1980,7 @@ function SaleScreen({
         ]}
         ListHeaderComponent={
           <>
+            {!!saleMessage&&<Text accessibilityRole="alert" style={s.safe}>{saleMessage}</Text>}
             <View style={{height:1,width:"100%"}} onLayout={(event)=>setSaleContentWidth(event.nativeEvent.layout.width)}/>
             {!startPastSale ? (
               <View style={[s.saleDateBar,width<600&&s.saleDateBarMobile]}>
@@ -1931,7 +2021,7 @@ function SaleScreen({
                     "All selected products will be removed.",
                     "Clear sale",
                     () => {
-                      setCart([]);
+                      setCart([]);setPriceMode('original');setFinalTotal('');setSaleMessage('');setSaleRequest(globalThis.crypto.randomUUID());
                       setChoosing(null);
                       setChosenLetters([]);
                       setChosenDesign(null);
@@ -2019,19 +2109,20 @@ function SaleScreen({
         renderItem={({ item }) => {
           const variantPrices = item.variants
             .map((variant) => variant.price_override)
-            .filter((value): value is number => value !== null);
-          const price =
+            .filter((value): value is number => value !== null && (!viae || value > 0));
+          const rawPrice =
             item.sale_price ??
             item.regular_price ??
             (variantPrices.length ? Math.min(...variantPrices) : null);
+          const price=viae&&rawPrice===0?null:rawPrice;
           const qty = cart
             .filter((x) => x.product.id === item.id)
             .reduce((sum, x) => sum + x.quantity, 0);
-          const unavailable = item.quantity_on_hand <= 0 || price === null;
+          const unavailable = !viae&&(item.quantity_on_hand <= 0 || price === null);
           return (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Add ${item.name}, ${price === null ? "no price" : peso(price)}`}
+              accessibilityLabel={`Add ${item.name}, ${price === null ? (viae?"enter price in review":"no price") : peso(price)}`}
               style={[
                 s.productCard,
                 { width: cardWidth },
@@ -2073,7 +2164,7 @@ function SaleScreen({
                   ]}
                 >
                   <Text style={s.stockBadgeText}>
-                    {item.needs_stock_count
+                    {viae ? ((item as Product & {catalogue_code?:string}).catalogue_code||'Catalogue') : item.needs_stock_count
                       ? "? left"
                       : item.quantity_on_hand <= 0
                         ? "Out"
@@ -2086,7 +2177,7 @@ function SaleScreen({
               </Text>
               <Text style={s.productPrice}>
                 {price === null
-                  ? "No price"
+                  ? (viae?"Enter price at checkout":"No price")
                   : item.sale_price === null && item.regular_price === null && variantPrices.length
                     ? `From ${peso(price)}`
                     : peso(price)}
@@ -2203,7 +2294,7 @@ function SaleScreen({
                           <Text style={s.designButtonText}>{design}</Text>
                           <Text style={s.designPrice}>
                             {price === null || price === undefined
-                              ? "No price"
+                              ? (viae?"Enter price at checkout":"No price")
                               : peso(price)}
                           </Text>
                           <Text style={s.designStock}>{available} letters ready</Text>
@@ -2272,7 +2363,7 @@ function SaleScreen({
                   >
                     <Text style={s.variantButtonText}>{variant.name}</Text>
                     <Text style={[s.variantStock, unavailable && s.low]}>
-                      {unavailable ? "Out" : `${variant.quantity_on_hand} left`}
+                      {viae?(variant.price_override?peso(variant.price_override):"Enter price in review"):unavailable ? "Out" : `${variant.quantity_on_hand} left`}
                     </Text>
                   </Pressable>
                 );
@@ -2302,7 +2393,7 @@ function SaleScreen({
             <Text style={s.basketCount}>
               {count} item{count === 1 ? "" : "s"} selected
             </Text>
-            <Text style={s.basketTotal}>{peso(total)}</Text>
+            <Text style={s.basketTotal}>{peso(totalValid?total:0)}</Text>
           </View>
           <Pressable style={s.reviewButton} onPress={() => setReview(true)}>
             <Ionicons name="receipt-outline" size={22} color={C.white} />
@@ -2393,15 +2484,20 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
   useEffect(() => {
     setEventReminder(null);
     Promise.all([
-      supabase.from("external_orders").select("status,target_date,total_price,amount_paid,image_url").eq("location_id", locationId),
-      supabase.from("print_jobs").select("status").eq("location_id",locationId).in("status",["to_print","printing"]),
+      supabase.from("external_orders").select("status,target_date,total_price,amount_paid,image_url").eq("location_id", locationId).is("archived_at",null),
+      supabase.from("print_jobs").select("status,external_order_id,external_orders(status,archived_at)").eq("location_id",locationId).in("status",["to_print","printing"]),
     ]).then(([{data},{data:printJobs}]) => {
         const activeRows=(data ?? []).filter((o) => !["completed", "cancelled"].includes(o.status));
         const active = activeRows.length;
         const todayValue = localDateKey();
         const urgent = activeRows.filter((o) => o.target_date && o.target_date <= todayValue).length;
         const pendingMoney=activeRows.reduce((sum,o)=>sum+Math.max(0,Number(o.total_price)-Number(o.amount_paid)),0);
-        setOrderSummary({ active, urgent, pendingMoney, toPrint:(printJobs??[]).filter(j=>j.status==="to_print").length, printing:(printJobs??[]).filter(j=>j.status==="printing").length });
+        const activeJobs=(printJobs??[]).filter(j=>{
+          if(!j.external_order_id)return true;
+          const parent=Array.isArray(j.external_orders)?j.external_orders[0]:j.external_orders;
+          return !!parent&&!parent.archived_at&&!["completed","cancelled"].includes(parent.status);
+        });
+        setOrderSummary({ active, urgent, pendingMoney, toPrint:activeJobs.filter(j=>j.status==="to_print").length, printing:activeJobs.filter(j=>j.status==="printing").length });
       });
     const today = localDateKey();
     const end = new Date();
@@ -2425,7 +2521,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
         setEventReminder(due ?? null);
       });
   }, [businessId,locationId]);
-  useEffect(()=>{void(async()=>{const now=new Date(),today=localDateKey(now);const start=overviewPeriod==="today"?today:`${today.slice(0,7)}-01`;const endDate=overviewPeriod==="today"?new Date(now.getFullYear(),now.getMonth(),now.getDate()+1):new Date(now.getFullYear(),now.getMonth()+1,1);const end=localDateKey(endDate);const [{data:saleRows},{data:paymentRows},{data:expenseRows}]=await Promise.all([supabase.from("sales").select("total").eq("location_id",locationId).eq("status","completed").gte("created_at",`${start}T00:00:00`).lt("created_at",`${end}T00:00:00`),supabase.from("order_payments").select("amount").eq("location_id",locationId).gte("payment_date",start).lt("payment_date",end),supabase.from("expenses").select("amount").eq("location_id",locationId).gte("expense_date",start).lt("expense_date",end)]);setOverview({sales:(saleRows??[]).reduce((n,x)=>n+Number(x.total),0),payments:(paymentRows??[]).reduce((n,x)=>n+Number(x.amount),0),expenses:(expenseRows??[]).reduce((n,x)=>n+Number(x.amount),0)});})()},[locationId,overviewPeriod]);
+  useEffect(()=>{void(async()=>{const {start,end}=shopOverviewBounds(overviewPeriod);const firstDay=localDateKey(start),nextDay=localDateKey(end);const [{data:saleRows},{data:paymentRows},{data:expenseRows}]=await Promise.all([supabase.from("sales").select("total").eq("location_id",locationId).eq("status","completed").is("archived_at",null).gte("created_at",start.toISOString()).lt("created_at",end.toISOString()),supabase.from("order_payments").select("amount").eq("location_id",locationId).gte("payment_date",firstDay).lt("payment_date",nextDay),supabase.from("expenses").select("amount").eq("location_id",locationId).gte("expense_date",firstDay).lt("expense_date",nextDay)]);setOverview({sales:(saleRows??[]).reduce((n,x)=>n+Number(x.total),0),payments:(paymentRows??[]).reduce((n,x)=>n+Number(x.amount),0),expenses:(expenseRows??[]).reduce((n,x)=>n+Number(x.amount),0)});})()},[locationId,overviewPeriod]);
   type HomeAction = {
     title: string;
     help: string;
@@ -2440,6 +2536,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
     border: string;
     actions: HomeAction[];
   };
+  const isViae=businessId===VIAE_BUSINESS_ID;
   const groups: HomeGroup[] = [
     {
       title: "Start here", help: "Choose what you want to do now.", ...SECTION.sales, actions: [
@@ -2450,7 +2547,11 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
       ],
     },
     {
-      title: "Stock & products", help: "Check stock, products and prices.", ...SECTION.stock, actions: [
+      title: isViae?"Catalogue & website":"Stock & products", help: isViae?"Manage designs and customer enquiries.":"Check stock, products and prices.", ...SECTION.stock, actions: isViae?[
+        {title:'Catalogue',help:'Digital files, printed prices and custom orders',icon:'pricetags',screen:'sourcing'},
+        ...(!permissions?[{title:'Website',help:'Offers and published content',icon:'globe' as Icon,screen:'website' as Screen},{title:'Website enquiries',help:'Customer requests from the storefront',icon:'mail' as Icon,screen:'website_inquiries' as Screen},{title:'Customers & licences',help:'Accounts, promo codes and licences',icon:'people' as Icon,screen:'viae_commerce' as Screen},{title:'Tax tracker',help:'Quarterly sales and filings',icon:'calculator' as Icon,screen:'viae_tax' as Screen}]:[]),
+        {title:'Tasks',help:'Assign and follow up on work',icon:'checkbox',screen:'viae_tasks'},
+      ]:[
         { title: "Update stock", help: "Add stock or change the number", icon: "cube", screen: "stock_start" },
         { title: "Products & prices", help: "Add or edit products", icon: "pricetags", screen: "products" },
       ],
@@ -2459,7 +2560,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
       title: "Reseller business", help: "Plan products, build packages and fulfil customer pre-orders.", color: "#594C8D", soft: "#F3F0F8", border: "#D8D0E7", actions: [
         { title: "Products", help: "Save links, choices, costs and photos", icon: "bag-handle" as Icon, screen: "sourcing" as Screen },
         { title: "Reseller packages", help: "Choose products and set tiered prices", icon: "layers" as Icon, screen: "reseller_packages" as Screen },
-        { title: "Customer pre-orders", help: "Track deposits, arrival, final payment and delivery", icon: "receipt" as Icon, screen: "preorders" as Screen },
+        { title: "Sales & Orders", help: "Ready-stock sales, deposits, final payment and delivery", icon: "receipt" as Icon, screen: "preorders" as Screen },
         { title: "Reseller reports", help: "See customer payments, balances and popular packages", icon: "bar-chart" as Icon, screen: "reseller_reports" as Screen },
       ],
     }] : []),
@@ -2482,16 +2583,16 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
   ];
   const permissionFor=(screen:Screen):StaffPermission=>
     (["sell_start","sale","event_sale","missed"] as Screen[]).includes(screen)?"sell":
-    (["dashboard","correct"] as Screen[]).includes(screen)?"sales":
+    (["dashboard","monthly_sales","correct"] as Screen[]).includes(screen)?"sales":
     screen==="orders"?"orders":
     (["stock_start","inventory","alphabet_inventory"] as Screen[]).includes(screen)?"stock":
     (["products","price_list","sourcing","reseller_packages","preorders"] as Screen[]).includes(screen)?"products":
     screen==="reseller_reports"?"reports":
     (["reports","expenses"] as Screen[]).includes(screen)?"reports":
     (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
-    screen==="calendar"?"calendar":"settings";
-  const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports","reseller_sales","reseller_purchases","reseller_stock"] as Screen[]).includes(screen)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
-  const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>{const module=moduleFor(action.screen);return (!module||visibleModules.includes(module))&&(action.screen==="suggested_images"||!permissions||permissions.includes(permissionFor(action.screen)));})})).filter(group=>group.actions.length);
+    screen==="viae_tasks"?"orders":screen==="calendar"?"calendar":"settings";
+  const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","monthly_sales","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports","reseller_sales","reseller_purchases","reseller_stock"] as Screen[]).includes(screen)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
+  const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>{const module=moduleFor(action.screen);return ((isViae&&["sourcing","viae_tasks","website","website_inquiries","viae_commerce"].includes(action.screen))||!module||visibleModules.includes(module))&&(action.screen==="suggested_images"||!permissions||permissions.includes(permissionFor(action.screen)));})})).filter(group=>group.actions.length);
   const overviewTone=overviewPeriod==="today"?SECTION.sales:{color:"#283D70",soft:"#E8EDF7",border:"#BCCAE4"};
   const overviewCardStyle=[s.overviewMetric,{borderColor:overviewTone.border,backgroundColor:overviewTone.soft}];
   const overviewLabelStyle=[s.overviewMetricLabel,{color:overviewTone.color}];
@@ -2506,7 +2607,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
       </View>
       <View style={s.homePeriodSwitch}><Pressable style={[s.homePeriodButton,s.homePeriodToday,overviewPeriod==="today"&&s.homePeriodTodayOn]} onPress={()=>setOverviewPeriod("today")}><Text style={[s.homePeriodTodayText,overviewPeriod==="today"&&s.homePeriodTextOn]}>Today</Text></Pressable><Pressable style={[s.homePeriodButton,s.homePeriodMonth,overviewPeriod==="month"&&s.homePeriodMonthOn]} onPress={()=>setOverviewPeriod("month")}><Text style={[s.homePeriodMonthText,overviewPeriod==="month"&&s.homePeriodTextOn]}>This month</Text></Pressable></View>
       <View style={{flexDirection:"row",flexWrap:"wrap",gap:12,marginTop:16}}>
-        {visibleModules.includes("sales")&&(!permissions||permissions.includes("sales"))?<Pressable accessibilityRole="button" accessibilityLabel={`View shop sales for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("dashboard")} style={overviewCardStyle}><Text numberOfLines={2} style={overviewLabelStyle}>{overviewPeriod==="today"?"Shop sales":`Shop sales · ${periodName}`}</Text><Text style={s.overviewMetricValue}>{peso(overview.sales)}</Text><Text style={overviewHelpStyle}>View sales →</Text></Pressable>:null}
+        {visibleModules.includes("sales")&&(!permissions||permissions.includes("sales"))?<Pressable accessibilityRole="button" accessibilityLabel={`View shop sales for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen(overviewPeriod==="month"?"monthly_sales":"dashboard")} style={overviewCardStyle}><Text numberOfLines={2} style={overviewLabelStyle}>{overviewPeriod==="today"?"Shop sales":`Shop sales · ${periodName}`}</Text><Text style={s.overviewMetricValue}>{peso(overview.sales)}</Text><Text style={overviewHelpStyle}>View sales →</Text></Pressable>:null}
         {visibleModules.includes("orders")&&(!permissions||permissions.includes("orders"))?<Pressable accessibilityRole="button" accessibilityLabel={`View order payments received for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("orders")} style={overviewCardStyle}><Text numberOfLines={2} style={overviewLabelStyle}>{overviewPeriod==="today"?"Order money received":`Order money received · ${periodName}`}</Text><Text style={s.overviewMetricValue}>{peso(overview.payments)}</Text><Text style={overviewHelpStyle}>Paid by order customers</Text></Pressable>:null}
         {visibleModules.includes("reports")&&(!permissions||permissions.includes("reports"))?<Pressable accessibilityRole="button" accessibilityLabel={`View expenses for ${overviewPeriod==="today"?"today":"this month"}`} onPress={()=>onOpen("expenses")} style={overviewCardStyle}><Text numberOfLines={2} style={overviewLabelStyle}>{overviewPeriod==="today"?"Expenses":`Expenses · ${periodName}`}</Text><Text style={s.overviewMetricValue}>{peso(overview.expenses)}</Text><Text style={overviewHelpStyle}>See breakdown →</Text></Pressable>:null}
         {visibleModules.includes("reports")&&(!permissions||permissions.includes("reports"))?<View style={overviewCardStyle}><Text numberOfLines={2} style={overviewLabelStyle}>{overviewPeriod==="today"?"Money left":`Money left · ${periodName}`}</Text><Text style={s.overviewMetricValue}>{peso(overview.sales+overview.payments-overview.expenses)}</Text><Text style={overviewHelpStyle}>Money received minus expenses</Text></View>:null}
@@ -2642,17 +2743,44 @@ function AdminShopForm({ shop, mode, onBack, onDone }: { shop: AdminShop; mode: 
 }
 
 function Dashboard({
+  viae=false,
+  monthlyLocation,
   products,
   sales,
   onSell,
   onPrintQueue,
 }: {
+  viae?:boolean;
+  monthlyLocation?: string;
   products: Product[];
   sales: Sale[];
   onSell: () => void;
   onPrintQueue: () => void;
 }) {
-  const day = sales.filter((x) => x.status === "completed");
+  const [monthlySales, setMonthlySales] = useState<Sale[] | null>(null);
+  const [monthlyError, setMonthlyError] = useState(false);
+  const { start, end } = shopOverviewBounds("month");
+  const monthStart = start.toISOString(), monthEnd = end.toISOString();
+  useEffect(() => {
+    if (!monthlyLocation) return;
+    let active = true;
+    void supabase.from("sales")
+      .select("id,receipt_number,viae_receipt_number,payment_method,total,status,created_at,payment_confirmed_at,payment_reference,sale_items(product_name,variant_name,selected_letters,quantity)")
+      .eq("location_id", monthlyLocation)
+      .eq("status", "completed")
+      .is("archived_at", null)
+      .gte("created_at", monthStart)
+      .lt("created_at", monthEnd)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!active) return;
+        setMonthlyError(Boolean(error));
+        setMonthlySales((data ?? []) as Sale[]);
+      });
+    return () => { active = false; };
+  }, [monthlyLocation, monthStart, monthEnd]);
+  const day = monthlyLocation ? monthlySales ?? [] : sales.filter((x) => x.status === "completed");
+  const monthName = start.toLocaleDateString("en-PH", { month: "short", year: "numeric" });
   const total = day.reduce((n, x) => n + Number(x.total), 0);
   const cash = day
     .filter((x) => x.payment_method === "cash")
@@ -2680,10 +2808,13 @@ function Dashboard({
   }).filter((item): item is {name:string;quantity:number;left:number} => Boolean(item && item.left <= Math.max(3,item.quantity)));
   return (
     <ScrollView contentContainerStyle={s.scroll}>
-      <Text style={s.pageTitle}>Today</Text>
-      <Text style={s.subtitle}>{shortDate(new Date().toISOString())}</Text>
+      <Text style={s.pageTitle}>{monthlyLocation ? "This month" : "Today"}</Text>
+      <Text style={s.subtitle}>{monthlyLocation ? monthName : shortDate(new Date().toISOString())}</Text>
+      {monthlyLocation && (monthlyError || monthlySales === null) ? (
+        <Empty title={monthlyError ? "Monthly sales could not load. Reopen this view to retry." : "Loading monthly sales…"} />
+      ) : <>
       <View style={s.hero}>
-        <Text style={s.heroLabel}>Sales today</Text>
+        <Text style={s.heroLabel}>{monthlyLocation ? "Sales this month" : "Sales today"}</Text>
         <Text style={s.heroValue}>{peso(total)}</Text>
         <Text style={s.heroSmall}>
           {day.length} completed sale{day.length === 1 ? "" : "s"}
@@ -2697,7 +2828,7 @@ function Dashboard({
           color={C.accent}
         />
         <Stat
-          label="GCash"
+          label={viae?"Electronic payments":"GCash"}
           value={peso(total - cash)}
           icon="phone-portrait-outline"
           color={C.green}
@@ -2708,7 +2839,7 @@ function Dashboard({
         onPress={onSell}
         icon="cart-outline"
       />
-      <Text style={s.section}>Products sold today</Text>
+      <Text style={s.section}>{monthlyLocation ? "Products sold this month" : "Products sold today"}</Text>
       {sold.length ? (
         sold.map((item) => (
           <View key={item.name} style={s.soldRow}>
@@ -2728,16 +2859,17 @@ function Dashboard({
       ) : (
         <Empty title="No products sold yet" />
       )}
-      {printAgain.length ? <View style={[s.note,{marginTop:18}]}><Ionicons name="sparkles" size={22} color={SECTION.production.color}/><View style={s.flex}><Text style={s.rowTitle}>What to print next</Text><Text style={s.noteText}>{printAgain.slice(0,3).map(item=>`${item.name}: ${item.quantity} sold, ${item.left} left`).join("\n")}</Text><Pressable style={s.inlineLink} onPress={onPrintQueue}><Text style={[s.inlineLinkText,{color:SECTION.production.color}]}>Open Print Queue</Text><Ionicons name="arrow-forward" size={17} color={SECTION.production.color}/></Pressable></View></View>:null}
-      <Text style={s.section}>Today’s sales</Text>
+      {!monthlyLocation && printAgain.length ? <View style={[s.note,{marginTop:18}]}><Ionicons name="sparkles" size={22} color={SECTION.production.color}/><View style={s.flex}><Text style={s.rowTitle}>What to print next</Text><Text style={s.noteText}>{printAgain.slice(0,3).map(item=>`${item.name}: ${item.quantity} sold, ${item.left} left`).join("\n")}</Text><Pressable style={s.inlineLink} onPress={onPrintQueue}><Text style={[s.inlineLinkText,{color:SECTION.production.color}]}>Open Print Queue</Text><Ionicons name="arrow-forward" size={17} color={SECTION.production.color}/></Pressable></View></View>:null}
+      <Text style={s.section}>{monthlyLocation ? "This month’s sales" : "Today’s sales"}</Text>
       {day.length ? (
         day.map((sale) => (
           <View key={sale.id} style={s.receipt}>
+            <SaleReceipt kind="sale" recordId={sale.id} />
             <View style={s.receiptTop}>
               <View>
-                <Text style={s.rowTitle}>Sale {sale.receipt_number}</Text>
+                <Text style={s.rowTitle}>Sale {(sale.viae_receipt_number != null ? String(sale.viae_receipt_number).padStart(3, "0") : sale.receipt_number)}</Text>
                 <Text style={s.rowHelp}>
-                  {new Date(sale.created_at).toLocaleTimeString("en-PH", {
+                  {monthlyLocation ? friendlyDateTime(sale.created_at) : new Date(sale.created_at).toLocaleTimeString("en-PH", {
                     hour: "numeric",
                     minute: "2-digit",
                   })}
@@ -2789,6 +2921,7 @@ function Dashboard({
       ) : (
         <Empty title="Stock looks good" />
       )}
+      </>}
     </ScrollView>
   );
 }
@@ -6912,3 +7045,4 @@ const s = StyleSheet.create({
   },
   variantLetterText: { color: C.teal, fontSize: 18, fontWeight: "700" },
 });
+import { SaleReceipt, ReceiptPicker, attachSaleReceipt } from '../src/components/SaleReceipt';

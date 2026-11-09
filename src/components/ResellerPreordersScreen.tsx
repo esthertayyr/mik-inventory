@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +14,7 @@ import { supabase } from "@/src/lib/supabase";
 import { Text, TextInput } from "@/src/components/AppTypography";
 import { ExpenseDatePicker } from "./ExpensesScreen";
 import { ResellerPackageCheckout } from "./ResellerPackageCheckout";
+import { ViaeSaleCard } from "./ViaeSaleCard";
 
 type Payment = {
   id: string;
@@ -36,9 +39,14 @@ type Order = {
   courier: string | null;
   tracking_number: string | null;
   created_at: string;
+  order_channel: string;
+  order_kind: string;
+  notes: string | null;
+  reseller_order_stock_lines: { product_name:string; variant_name:string; pieces:number; source_product_id:string; source_product_option_id:string|null }[];
   reseller_preorder_payments: Payment[];
 };
-type SourceProduct = { id: string; name: string; selling_price_php:number|null; source_product_options:{id:string;option_value:string;stock_units:number;selling_price_php:number|null}[] };
+type SourceProduct = { id: string; name: string; selling_price_php:number|null; source_product_images:{image_url:string;sort_order:number}[]; source_product_options:{id:string;option_value:string;stock_units:number;selling_price_php:number|null}[] };
+type CompletedSale = {id:string;product_name:string;variant_name:string;quantity:number;amount_php:number;entry_date:string;status:string;payment_method:string;payment_date:string|null;notes:string|null;source_products:{source_product_images:{image_url:string;sort_order:number}[]}|null};
 type ResellerPackage = {
   id: string;
   name: string;
@@ -71,19 +79,19 @@ const toIsoDate = (value: string) => {
   return match ? `${match[3]}-${match[2]}-${match[1]}` : null;
 };
 const statusName: Record<string, string> = {
-  awaiting_deposit: "Pending deposit",
-  confirmed: "Deposit paid",
-  ordered: "Ordered from supplier",
-  in_transit: "Coming to us",
-  arrived: "Arrived with us",
-  ready_to_ship: "Paid · Ready to ship",
+  awaiting_deposit: "Awaiting deposit",
+  confirmed: "Confirmed",
+  ordered: "Confirmed · Ordered",
+  in_transit: "Confirmed · On the way",
+  arrived: "Arrived",
+  ready_to_ship: "Ready to send",
   shipped: "Shipped to customer",
   delivered: "Delivered",
   cancelled: "Cancelled",
 };
 const nextStep: Record<string, { label: string; next: string }> = {
-  confirmed: { label: "Mark ordered from supplier", next: "ordered" },
-  ordered: { label: "Mark as coming to us", next: "in_transit" },
+  confirmed: { label: "Mark arrived", next: "arrived" },
+  ordered: { label: "Mark arrived", next: "arrived" },
   in_transit: { label: "Mark arrived with us", next: "arrived" },
   ready_to_ship: { label: "Mark shipped to customer", next: "shipped" },
   shipped: { label: "Mark delivered", next: "delivered" },
@@ -93,19 +101,23 @@ export function ResellerPreordersScreen({
   businessId,
   locationId,
   onBack,
+  onPrinting,
 }: {
   businessId: string;
   locationId: string;
   onBack: () => void;
+  onPrinting?: (orderId:string)=>void;
 }) {
   const paymentBusy=useRef(false),paymentRequest=useRef('');
   const [orders, setOrders] = useState<Order[]>([]);
+  const [pastSales,setPastSales]=useState<CompletedSale[]>([]);
+  const [stocks,setStocks]=useState<{source_product_id:string;source_product_option_id:string|null;on_hand:number;reserved:number;to_make:number}[]>([]);
   const [products, setProducts] = useState<SourceProduct[]>([]);
   const [packages, setPackages] = useState<ResellerPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [filter, setFilter] = useState<"active" | "completed">("active");
+  const [filter, setFilter] = useState<"active" | "completed" | "cancelled">("active");
   const [customer, setCustomer] = useState("");
   const [contact, setContact] = useState("");
   const [address, setAddress] = useState("");
@@ -132,18 +144,20 @@ export function ResellerPreordersScreen({
   const [tracking, setTracking] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data, error }, { data: sourceRows }, { data: packageRows }] = await Promise.all([
+    const [{ data, error },stockRows,history, { data: sourceRows }, { data: packageRows }] = await Promise.all([
       supabase
         .from("reseller_preorders")
         .select(
-          "id,customer_name,customer_contact,delivery_address,product_name,selected_options,quantity,total_price_php,deposit_required_php,delivery_fee_php,delivery_fee_confirmed,fulfilment_status,courier,tracking_number,created_at,reseller_preorder_payments(id,payment_type,amount_php,payment_method,payment_date)",
+          "id,customer_name,customer_contact,delivery_address,product_name,selected_options,quantity,total_price_php,deposit_required_php,delivery_fee_php,delivery_fee_confirmed,fulfilment_status,courier,tracking_number,created_at,order_channel,order_kind,notes,reseller_order_stock_lines(product_name,variant_name,pieces,source_product_id,source_product_option_id),reseller_preorder_payments(id,payment_type,amount_php,payment_method,payment_date)",
         )
         .eq("business_id", businessId)
-        .eq("direct_sale", false)
+        .eq("location_id", locationId)
         .order("created_at", { ascending: false }),
+      supabase.from('reseller_stock_summary').select('source_product_id,source_product_option_id,on_hand,reserved,to_make').eq('business_id',businessId).eq('location_id',locationId),
+      supabase.from('reseller_trade_entries').select('id,product_name,variant_name,quantity,amount_php,entry_date,status,payment_method,payment_date,notes,source_products(source_product_images(image_url,sort_order))').eq('business_id',businessId).eq('location_id',locationId).eq('kind','sale').order('entry_date',{ascending:false}).order('created_at',{ascending:false}),
       supabase
         .from("source_products")
-        .select("id,name,selling_price_php,source_product_options(id,option_value,stock_units,selling_price_php)")
+        .select("id,name,selling_price_php,source_product_images(image_url,sort_order),source_product_options(id,option_value,stock_units,selling_price_php)")
         .eq("business_id", businessId)
         .eq("status", "active")
         .order("name"),
@@ -156,13 +170,27 @@ export function ResellerPreordersScreen({
     ]);
     if (error) userNotice("Pre-orders not loaded", error.message);
     setOrders((data ?? []) as Order[]);
+    if(stockRows.error)userNotice('Stock not loaded',stockRows.error.message);
+    if(history.error)userNotice('Past sales not loaded',history.error.message);
+    setStocks(stockRows.data??[]);setPastSales((history.data??[]).map(row=>({...row,source_products:Array.isArray(row.source_products)?row.source_products[0]??null:row.source_products})));
     setProducts((sourceRows ?? []) as SourceProduct[]);
     setPackages((packageRows ?? []) as unknown as ResellerPackage[]);
     setLoading(false);
-  }, [businessId]);
+  }, [businessId,locationId]);
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(()=>{
+    if(creating)return;
+    const channel=supabase.channel(`viae-orders-${businessId}-${locationId}`)
+      .on('postgres_changes',{event:'*',schema:'public',table:'reseller_preorders',filter:`business_id=eq.${businessId}`},()=>void load()).subscribe();
+    return ()=>{void supabase.removeChannel(channel);};
+  },[businessId,locationId,load,creating]);
+  useEffect(()=>{
+    if(creating||paymentFor||deliveryFor||shippingFor)return;
+    const timer=setInterval(()=>void load(),60000);
+    return ()=>clearInterval(timer);
+  },[load,creating,paymentFor,deliveryFor,shippingFor]);
   const reset = () => {
     setCustomer("");
     setContact("");
@@ -264,6 +292,11 @@ export function ResellerPreordersScreen({
     setTracking("");
     await load();
   };
+  const cancelOrder=(order:Order)=>{
+    const message='This releases reserved stock. Payments stay in history. Handle any refund separately.';
+    if(Platform.OS==='web'){if(globalThis.confirm(`Cancel order? ${message}`))void move(order,'cancelled');}
+    else Alert.alert('Cancel order?',message,[{text:'Keep order',style:'cancel'},{text:'Cancel order',style:'destructive',onPress:()=>void move(order,'cancelled')}]);
+  };
   const confirmDeliveryFee = async (order: Order) => {
     const fee = num(deliveryFee);
     const patch: Record<string, unknown> = {
@@ -287,17 +320,18 @@ export function ResellerPreordersScreen({
   };
   const shown = orders.filter((o) =>
     filter === "completed"
-      ? ["delivered", "cancelled"].includes(o.fulfilment_status)
+      ? o.fulfilment_status === "delivered"
+      : filter === "cancelled" ? o.fulfilment_status === "cancelled"
       : !["delivered", "cancelled"].includes(o.fulfilment_status),
   );
   if (loading)
     return (
       <View style={s.loading}>
         <ActivityIndicator color="#594C8D" />
-        <Text style={s.help}>Opening pre-orders…</Text>
+        <Text style={s.help}>Loading orders…</Text>
       </View>
     );
-  if(creating)return <ResellerPackageCheckout businessId={businessId} locationId={locationId} onCancel={()=>setCreating(false)} onSaved={()=>{setCreating(false);void load();}}/>;
+  if(creating)return <ResellerPackageCheckout unified businessId={businessId} locationId={locationId} onCancel={()=>setCreating(false)} onSaved={()=>{setCreating(false);void load();}}/>;
   return (
     <ScrollView
       contentContainerStyle={s.page}
@@ -308,16 +342,16 @@ export function ResellerPreordersScreen({
           <Ionicons name="chevron-back" size={22} color="#151924" />
         </Pressable>
         <View style={s.flex}>
-          <Text style={s.title}>Customer pre-orders</Text>
+          <Text style={s.title}>Sales & Orders</Text>
           <Text style={s.help}>
-            Deposit, arrival, final payment and customer delivery.
+            Website orders appear here automatically. Add Messenger or walk-in orders using the same products. Confirm payment, then prepare and send.
           </Text>
         </View>
       </View>
       {!creating ? (
         <Pressable style={s.primary} onPress={() => setCreating(true)}>
           <Ionicons name="add" size={21} color="white" />
-          <Text style={s.primaryText}>Add customer pre-order</Text>
+          <Text style={s.primaryText}>Add order</Text>
         </Pressable>
       ) : (
         <View style={s.form}>
@@ -473,19 +507,26 @@ export function ResellerPreordersScreen({
           <Text style={[s.tabText, filter === "completed" && s.tabTextOn]}>
             Completed{" "}
             {
-              orders.filter((o) =>
-                ["delivered", "cancelled"].includes(o.fulfilment_status),
-              ).length
+              orders.filter((o) => o.fulfilment_status === "delivered").length + pastSales.filter(o=>o.status!=='cancelled').length
             }
           </Text>
         </Pressable>
+        <Pressable style={[s.tab, filter === "cancelled" && s.tabOn]} onPress={() => setFilter("cancelled")}>
+          <Text style={[s.tabText, filter === "cancelled" && s.tabTextOn]}>Cancelled {orders.filter(o => o.fulfilment_status === "cancelled").length + pastSales.filter(o=>o.status==='cancelled').length}</Text>
+        </Pressable>
       </View>
-      {shown.length === 0 ? (
+      {pastSales.filter(o=>filter==='completed'?o.status!=='cancelled':filter==='cancelled'?o.status==='cancelled':false).map(o=><ViaeSaleCard key={o.id} kind="trade_sale" sale={{id:o.id,title:o.product_name,variant:o.variant_name,quantity:o.quantity,total:Number(o.amount_php),date:o.payment_date||o.entry_date,paymentMethod:({cash:'Cash',gcash:'GCash',bank:'Bank transfer',other:'Other'} as Record<string,string>)[o.payment_method]||o.payment_method,image:[...(o.source_products?.source_product_images??[])].sort((a,b)=>a.sort_order-b.sort_order)[0]?.image_url,notes:o.notes,cancelled:o.status==='cancelled'}}/>)}
+      {shown.length === 0 && !pastSales.some(o=>filter==='completed'?o.status!=='cancelled':filter==='cancelled'?o.status==='cancelled':false) ? (
         <View style={s.empty}>
-          <Text style={s.cardTitle}>No {filter} pre-orders</Text>
+          <Text style={s.cardTitle}>No {filter} orders</Text>
         </View>
       ) : (
         shown.map((order) => {
+          if(['delivered','cancelled'].includes(order.fulfilment_status)){
+            const product=products.find(p=>p.id===order.reseller_order_stock_lines?.[0]?.source_product_id);
+            const methods=[...new Set(order.reseller_preorder_payments.map(p=>({cash:'Cash',gcash:'GCash',bank:'Bank transfer',other:'Other'} as Record<string,string>)[p.payment_method]||p.payment_method))].join(' / ');
+            return <ViaeSaleCard key={order.id} kind="preorder" sale={{id:order.id,title:order.product_name,variant:order.selected_options,quantity:order.quantity,total:paid(order),date:order.reseller_preorder_payments.map(p=>p.payment_date).sort().at(-1)||order.created_at,paymentMethod:methods,image:[...(product?.source_product_images??[])].sort((a,b)=>a.sort_order-b.sort_order)[0]?.image_url,customer:order.customer_name,notes:order.notes,cancelled:order.fulfilment_status==='cancelled',items:order.reseller_order_stock_lines?.map(line=>`${line.product_name}${line.variant_name?' · '+line.variant_name:''} × ${line.pieces}`)}}/>;
+          }
           const totalPaid = paid(order),
             depositPaid = paid(order, "deposit"),
             amountDue = Math.max(
@@ -494,23 +535,36 @@ export function ResellerPreordersScreen({
                 Number(order.delivery_fee_php) -
                 totalPaid,
             );
+          const needsStock = (order.reseller_order_stock_lines??[]).some(line=>{
+            const stock=stocks.find(s=>s.source_product_id===line.source_product_id&&s.source_product_option_id===line.source_product_option_id);
+            const same=(order.reseller_order_stock_lines??[]).filter(s=>s.source_product_id===line.source_product_id&&s.source_product_option_id===line.source_product_option_id).reduce((n,s)=>n+s.pieces,0);
+            return Number(stock?.on_hand??0)-Number(stock?.reserved??0)+(totalPaid>=Number(order.deposit_required_php)?same:0)<same;
+          });
           const paymentLabel =
-            depositPaid < Number(order.deposit_required_php)
-              ? "Pending deposit"
+            totalPaid < Number(order.deposit_required_php)
+              ? order.order_kind==='ready_stock' ? "Awaiting full payment" : "Awaiting deposit"
               : amountDue > 0
                 ? "Pending final payment"
                 : "Paid in full";
           return (
             <View key={order.id} style={s.card}>
+              <Text style={s.help}>{({website:'Website',messenger:'Facebook / Messenger',walk_in:'Walk-in',other:'Other'} as Record<string,string>)[order.order_channel] || (order.notes?.startsWith('Website checkout')?'Website':'Other')} · {order.order_kind==='ready_stock'?'Ready stock':'Preorder'}</Text>
+              <SaleReceipt kind="preorder" recordId={order.id} />
+              {!['delivered','cancelled','shipped'].includes(order.fulfilment_status)?<Text style={s.help}>Next: {totalPaid<Number(order.deposit_required_php)?'Confirm the required payment.':needsStock?'Order from your supplier or print the missing items in Stock & printing.':!order.delivery_fee_confirmed?'Confirm local delivery cost. Use 0 for customer pickup.':amountDue>0?'Collect the remaining balance.':'Prepare the items, then send or hand over.'}</Text>:null}
               <View style={s.cardHead}>
                 <View style={s.flex}>
                   <Text style={s.cardTitle}>{order.customer_name}</Text>
+                  <Text style={s.help}>Order {order.id.slice(0,8)}</Text>
+                  {order.customer_contact?<Text style={s.help}>{order.customer_contact}</Text>:null}
+                  {order.delivery_address?<Text style={s.help}>{order.delivery_address}</Text>:null}
+                  {order.notes?<Text style={s.help}>{order.notes}</Text>:null}
                   <Text style={s.product}>
                     {order.product_name} × {order.quantity}
                   </Text>
                   {order.selected_options ? (
                     <Text style={s.help}>{order.selected_options}</Text>
                   ) : null}
+                  {order.reseller_order_stock_lines?.map((line,index)=><Text key={index} style={s.help}>{line.product_name}{line.variant_name?' · '+line.variant_name:''} · {line.pieces} stock items</Text>)}
                 </View>
                 <View style={s.status}>
                   <Text style={s.statusText}>
@@ -547,7 +601,8 @@ export function ResellerPreordersScreen({
               </View>
               {paymentFor === order.id ? (
                 <View style={s.inline}>
-                  <Text style={s.formTitle}>Record customer payment</Text>
+                  <Text style={s.formTitle}>Confirm money received</Text>
+                  <Text style={s.help}>Check your bank or payment account first. A screenshot alone does not confirm payment. Record only the money actually received.</Text>
                   <View style={s.chips}>
                     {(["deposit", "final", "delivery"] as const).map((type) => (
                       <Chip
@@ -640,12 +695,12 @@ export function ResellerPreordersScreen({
               ) : null}
               {shippingFor === order.id ? (
                 <View style={s.inline}>
-                  <Text style={s.formTitle}>Customer shipment</Text>
+                  <Text style={s.formTitle}>Send or hand over</Text>
                   <Field
-                    label="Courier · Required"
+                    label="Courier or customer pickup · Required"
                     value={courier}
                     setValue={setCourier}
-                    placeholder="J&T, LBC or other courier"
+                    placeholder="J&T, LBC or Customer pickup"
                   />
                   <Field
                     label="Tracking number · Optional"
@@ -698,20 +753,21 @@ export function ResellerPreordersScreen({
                         setPaymentDate(displayDate(today()));
                         setPaymentFor(order.id);
                         setPaymentType(
-                          depositPaid < Number(order.deposit_required_php)
+                          order.order_kind!=='ready_stock' && totalPaid < Number(order.deposit_required_php)
                             ? "deposit"
                             : "final",
                         );
                         setPaymentAmount(
-                          `${depositPaid < Number(order.deposit_required_php) ? Math.max(0, Number(order.deposit_required_php) - depositPaid) : amountDue}`,
+                          `${totalPaid < Number(order.deposit_required_php) ? Math.min(amountDue,Math.max(0, Number(order.deposit_required_php) - totalPaid)) : amountDue}`,
                         );
                       }}
                     >
                       <Ionicons name="wallet-outline" size={18} color="white" />
-                      <Text style={s.actionWhite}>Record payment</Text>
+                      <Text style={s.actionWhite}>Confirm money received</Text>
                     </Pressable>
                   ) : null}
-                  {nextStep[order.fulfilment_status] ? (
+                  {order.fulfilment_status==='arrived' && order.delivery_fee_confirmed && amountDue===0 && !needsStock?<Pressable style={s.nextButton} onPress={()=>void move(order,'ready_to_ship')}><Text style={s.nextText}>Ready to send</Text></Pressable>:null}
+                  {nextStep[order.fulfilment_status] && totalPaid>=Number(order.deposit_required_php) && (!['confirmed','ordered','in_transit'].includes(order.fulfilment_status)||!needsStock) ? (
                     <Pressable
                       style={s.nextButton}
                       onPress={() =>
@@ -728,6 +784,7 @@ export function ResellerPreordersScreen({
                       />
                     </Pressable>
                   ) : null}
+                  {!['shipped','delivered','cancelled'].includes(order.fulfilment_status)?<Pressable style={s.nextButton} onPress={()=>cancelOrder(order)}><Text style={s.nextText}>Cancel order</Text></Pressable>:null}
                 </View>
               ) : null}
             </View>
@@ -989,3 +1046,4 @@ const s = StyleSheet.create({
   },
   nextText: { fontSize: 14, fontWeight: "700", color: "#315FBE" },
 });
+import { SaleReceipt } from './SaleReceipt';

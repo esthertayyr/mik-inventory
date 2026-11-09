@@ -1,0 +1,17 @@
+import {useEffect,useState} from "react";
+import {ActivityIndicator,Platform,Pressable,StyleSheet,View} from "react-native";
+import {File,Paths} from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import {Text} from "./AppTypography";
+import {supabase} from "@/src/lib/supabase";
+import {peso} from "@/src/lib/format";
+type Entry={id:string;date:string;title:string;source:string;amount:number};
+type Expense={expense_date:string;description:string;category:string;amount:number};
+export function IncentiveReport({locationId,start,end,expenses}:{locationId:string;start:string;end:string;expenses:Expense[]}){
+ const [outside,setOutside]=useState<Entry[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState("");
+ useEffect(()=>{let active=true;setLoading(true);setError("");void supabase.from("outside_orders").select("id,title,srp,cost,created_at").eq("location_id",locationId).gte("created_at",start).lt("created_at",end).then(({data,error})=>{if(!active)return;if(error){setError(error.message);setOutside([])}else setOutside((data??[]).map(r=>({id:r.id,date:r.created_at.slice(0,10),title:r.title,source:"Outside Order",amount:Number(r.srp)-Number(r.cost)})));setLoading(false)});return()=>{active=false}},[locationId,start,end]);
+ const entries=[...outside,...expenses.filter(e=>/incentiv/i.test(e.category+" "+e.description)).map((e,i)=>({id:"expense-"+i,date:e.expense_date,title:e.description,source:"Expenses",amount:Number(e.amount)}))].sort((a,b)=>b.date.localeCompare(a.date));
+ async function download(){const cell=(v:unknown)=>'"'+String(v??"").replace(/"/g,'""')+'"';const csv="\uFEFF"+[["Date","Entry","Source","Incentive Given"],...entries.map(e=>[e.date,e.title,e.source,e.amount])].map(r=>r.map(cell).join(",")).join("\n");if(Platform.OS==="web"){const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download="incentive-given.csv";a.click();URL.revokeObjectURL(url)}else{const file=new File(Paths.cache,"incentive-given.csv");file.create({overwrite:true});file.write(csv);await Sharing.shareAsync(file.uri)}}
+ return <View style={s.box}><Text style={s.heading}>Incentive Given</Text><Text>For the selected report dates. Expense entries use only the recorded amount, such as ₱50. Outside Orders use SRP minus the sales reference. Reference amounts never add to sales.</Text>{loading?<ActivityIndicator/>:error?<Text>Could not load Outside Orders: {error}</Text>:<Text style={s.total}>{peso(entries.reduce((sum,e)=>sum+e.amount,0))}</Text>}<Text>Record each incentive once, in Outside Order or Expenses. This is a tracking breakdown, not an additional expense deduction.</Text>{entries.map(e=><View style={s.row} key={e.id}><Text>{e.date} · {e.title}</Text><Text>{e.source} · {peso(e.amount)}</Text></View>)}{!loading&&!entries.length?<Text>No incentives for these dates.</Text>:null}<Pressable accessibilityRole="button" disabled={loading||!!error} style={s.button} onPress={()=>void download()}><Text>Export Incentive Given</Text></Pressable></View>;
+}
+const s=StyleSheet.create({box:{marginVertical:20,padding:18,gap:12,borderWidth:1,borderColor:"#E3E5EA",borderRadius:12},heading:{fontSize:21,fontWeight:"700"},total:{fontSize:28,fontWeight:"700",color:"#594C8D"},row:{paddingVertical:10,gap:4,borderTopWidth:1,borderColor:"#E3E5EA"},button:{minHeight:44,padding:12,backgroundColor:"#F5F4F9",borderRadius:8,alignItems:"center"}});

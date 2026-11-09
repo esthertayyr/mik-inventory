@@ -113,10 +113,12 @@ export function PrintQueueScreen({
       const { data: linkedOrders } = await supabase
         .from("external_orders")
         .select("id,image_url")
+        .is("archived_at",null)
+        .not("status","in","(completed,cancelled)")
         .in("id", orderIds);
       orderImages = new Map((linkedOrders ?? []).map((order) => [order.id, order.image_url]));
     }
-    setJobs(jobRows.map((job) => ({
+    setJobs(jobRows.filter(job=>!job.external_order_id||orderImages.has(job.external_order_id)).map((job) => ({
       ...job,
       image_url: job.external_order_id ? orderImages.get(job.external_order_id) ?? null : null,
     })));

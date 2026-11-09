@@ -6,55 +6,59 @@ import { Text } from './AppTypography';
 import { supabase } from '../lib/supabase';
 
 type Slide = { image: string; caption: string };
-type Content = { [key:string]: string | Slide[] };
-const fields = [
- ['heroTitle','Opening title','Start.\nBuild. Scale.'],
- ['heroDescription','Opening description','Preorder products and practical reseller packages selected for new and growing sellers.'],
- ['introTitle','Introduction title','More than a catalogue.\nA clearer way into reselling.'],
- ['introDescription','Introduction text','Choose individual products or ask VIAE to prepare a product mix for your budget and customers. Every preorder has clear payment stages and an expected waiting period.'],
- ['storyTitle','Featured story title','Small beginnings.\nNew possibilities.'],
- ['storyDescription','Featured story text','Explore the product world, from flexible 3D prints to supplies and accessories for your next business idea.'],
- ['closingText','Closing message','Let us help you find your way forward.'],
- ['shippingNote','Delivery note','Local Philippine delivery is separate from the product price.'],
-];
+type Banner = { desktop?: string; mobile?: string; caption?: string; link?: string };
+type Content = { [key:string]: string | Slide[] | Record<string, Banner> };
+const bannerPages = [['studio','Main studio banner']];
+const fields = [["studioCollectionTitle", "Shop heading", "The Collection"], ["licenceNoticePrefix", "Shop licence notice · Before link", "Selling prints? A separate"], ["licenceNoticeSuffix", "Shop licence notice · After link", "is required."]];
+const paymentFields = [["paymentPhilippines", "Philippines payment instructions", "Maya only. Payments in PHP. Confirm payment instructions before paying."], ["paymentInternational", "International payment instructions", "PayPal or Wise. Payments in USD. Confirm the USD quote before paying."]];
+const offerFields = [["quantityOfferActive","Quantity promotion active (true / false)","true"],["quantityOfferMinimum","Minimum eligible quantity","3"],["quantityOfferPercent","Discount percentage","5"],["packageOfferMinimum","Reseller package minimum quantity","5"],["offerIncludesGenerators","Include generators in quantity discount (true / false)","false"],["generatorGiftActive","Generator free gift active (true / false)","false"],["generatorGiftMaximum","Free digital charm set maximum price PHP (0 until decided)","0"]];
+const licenceFields = [["licenceLead", "Introduction", "Buying an STL file does not include commercial use. A commercial licence is sold separately and is required before you sell physical prints made from VIAE files."], ["licencePersonal", "Personal use", "A standard digital-file purchase is for your own personal printing. It does not permit selling physical prints, supplying prints for resale, or using the design for paid customer orders."], ["licencePhysical", "Physical print sales", "Purchase a separate VIAE commercial licence before offering prints for sale. The licence must cover the design or collection you intend to use. Your licence confirmation will identify its coverage, holder and any applicable limits or duration. A licence for one product does not automatically cover the entire catalogue."], ["licenceFiles", "Private digital files", "A commercial licence permits only the physical-print use specified in your licence. It does not permit selling, sharing, uploading, distributing or giving away VIAE STL, 3MF or other source files, including modified versions. Do not share download links or account access."], ["licenceOwnership", "Ownership and permissions", "Purchasing a file or licence does not transfer ownership of the design. A VIAE licence covers only rights VIAE is authorised to grant. It does not grant rights to third-party characters, brands or other protected material."], ["licenceGenerators", "Hosted generators", "Personal use of hosted VIAE generators is free. Commercial use and unmarked commercial exports require a separate commercial licence. The proposed hosted-generator licence covers all VIAE hosted generators. Pricing and final terms will be stated before it is offered for purchase. The older Generator V1 product is a separate purchase and does not itself grant this licence."], ["licenceBeforeSell", "Before selling", "Keep your purchase and licence confirmation. If your intended use is not expressly covered, ask VIAE before selling. Until you have the appropriate commercial licence, use the files for personal printing only."], ["licenceAvailability", "Licence availability", "Commercial licence pricing and purchase options are being finalised. Contact VIAE to discuss the designs and use you need."]];
+
 export function WebsiteScreen({businessId,onBack}:{businessId:string;onBack:()=>void}) {
  const [content,setContent]=useState<Content>({});
  const [loading,setLoading]=useState(true); const [busy,setBusy]=useState(false);
  const [message,setMessage]=useState(''); const [ready,setReady]=useState(false);
  useEffect(()=>{ let alive=true; supabase.from('storefront_drafts').select('content').eq('business_id',businessId).maybeSingle().then(({data,error})=>{if(!alive)return;setLoading(false);setReady(!!data&&!error);if(error||!data)setMessage(error?.message||'Website controls are not enabled for this shop.');else setContent(data.content as Content);});return()=>{alive=false};},[businessId]);
  const slides=(content.slides || []) as Slide[];
- const update=(key:string,value:string|Slide[])=>setContent(current=>({...current,[key]:value}));
+ const banners=(content.banners || {}) as Record<string,Banner>;
+ const update=(key:string,value:string|Slide[]|Record<string,Banner>)=>setContent(current=>({...current,[key]:value}));
+ const editBanner=(page:string,values:Partial<Banner>)=>setContent(current=>({...current,banners:{...((current.banners||{}) as Record<string,Banner>),[page]:{...((current.banners||{}) as Record<string,Banner>)[page],...values}}}));
  async function save(publish:boolean) {
   setBusy(true);setMessage('');
   try {
-   const clean={...content}; fields.forEach(([key,,fallback])=>{clean[key]=String(clean[key]??fallback).trim()||fallback;});
+   const clean={...content}; [...fields,...licenceFields,...paymentFields,...offerFields].forEach(([key,,fallback])=>{clean[key]=String(clean[key]??fallback).trim()||fallback;});
+   if(!['true','false'].includes(String(clean.quantityOfferActive))||!['true','false'].includes(String(clean.offerIncludesGenerators))||!['true','false'].includes(String(clean.generatorGiftActive)))throw new Error('Promotion switches must be true or false.');
+   const promoMin=Number(clean.quantityOfferMinimum),promoPercent=Number(clean.quantityOfferPercent),packageMin=Number(clean.packageOfferMinimum),giftMax=Number(clean.generatorGiftMaximum);
+   if(!Number.isInteger(promoMin)||promoMin<2||promoMin>1000||!Number.isFinite(promoPercent)||promoPercent<=0||promoPercent>100||!Number.isInteger(packageMin)||packageMin<=promoMin||packageMin>1000||!Number.isFinite(giftMax)||giftMax<0||(clean.generatorGiftActive==='true'&&giftMax<=0))throw new Error('Check promotion quantities, percentage and gift limit. Package minimum must exceed the discount minimum.');
    const payload={content:clean,updated_at:new Date().toISOString()};
    const draft=await supabase.from('storefront_drafts').update(payload).eq('business_id',businessId).select('business_id').single();if(draft.error)throw draft.error;
    if(publish){const result=await supabase.from('storefront_pages').update(payload).eq('business_id',businessId).select('business_id').single();if(result.error)throw result.error;}
-   setMessage(publish?'Published. Refresh the VIAE website to see your changes.':'Draft saved. The public website has not changed.');
+   setMessage(publish?'Published. Refresh the VIAE Studio website to see your changes.':'Draft saved. The public website has not changed.');
   }catch(error){setMessage(error instanceof Error?error.message:(error as {message?:string}).message||'Could not save. Please try again.');}finally{setBusy(false);}
  }
- async function addPhoto() {
+ async function addPhoto(page?:string,device?:'desktop'|'mobile') {
   const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:1});if(result.canceled)return;
   setBusy(true);setMessage('');
   try {const asset=result.assets[0];const resized=await ImageManipulator.manipulateAsync(asset.uri,[asset.width>=asset.height?{resize:{width:1400}}:{resize:{height:1400}}],{compress:.78,format:ImageManipulator.SaveFormat.JPEG});
    const bytes=await (await fetch(resized.uri)).arrayBuffer(); const path=`${businessId}/website/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
    const {error}=await supabase.storage.from('product-images').upload(path,bytes,{contentType:'image/jpeg'});if(error)throw error;
-   update('slides',[...slides,{image:supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl,caption:''}]);
-   setMessage('Photo added to this draft. Save or publish to keep it in the carousel.');
+   const url=supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+   if(page&&device)editBanner(page,{[device]:url});else update('slides',[...slides,{image:url,caption:''}]);
+   setMessage('Photo added to your draft. Save or publish to keep it.');
   }catch(error){setMessage((error as Error).message);}finally{setBusy(false);}
  }
  const button=(label:string,action:()=>void,secondary=false)=><Pressable disabled={busy||!ready} onPress={action} style={[s.button,secondary&&s.secondary,(busy||!ready)&&{opacity:.5}]}><Text style={[s.buttonText,secondary&&{color:'#650f1c'}]}>{label}</Text></Pressable>;
  return <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
   <Pressable onPress={onBack}><Text style={s.back}>← Back to VIAE</Text></Pressable>
-  <Text style={s.title}>VIAE website</Text><Text style={s.help}>Edit your homepage and featured images. Save a draft, then publish when ready.</Text>
+  <Text style={s.title}>VIAE website</Text><Text style={s.help}>Manage the current shop heading, licence notice, commercial-use terms and banner. Save a draft, then publish when ready.</Text>
   {loading?<ActivityIndicator/>:<><View style={s.row}>{button('Open website',()=>void Linking.openURL('https://ecommerce-ai-store.vercel.app/'),true)}</View>
   {message?<Text accessibilityLiveRegion="polite" style={s.message}>{message}</Text>:null}
-  {ready&&<><View style={s.card}><Text style={s.heading}>Homepage text</Text>{fields.map(([key,label,fallback])=><View key={key} style={s.field}><Text style={s.label}>{label}</Text><TextInput editable={!busy} multiline style={s.input} value={String(content[key]??fallback)} onChangeText={value=>update(key,value)} accessibilityLabel={label}/></View>)}</View>
-  <View style={s.card}><Text style={s.heading}>Featured images</Text><Text style={s.help}>One photo shows as a story image. Add more for a carousel. Customers can swipe or use the arrows. Your existing dragon image stays until you add a replacement.</Text>
-   {slides.map((slide,index)=><View key={`${slide.image}-${index}`} style={s.slide}><Image source={{uri:slide.image}} style={s.image} resizeMode="contain"/><TextInput editable={!busy} style={s.input} placeholder="Image description" value={slide.caption} onChangeText={caption=>update('slides',slides.map((item,i)=>i===index?{...item,caption}:item))}/><View style={s.row}>{index>0&&button('Move up',()=>{const next=[...slides];[next[index-1],next[index]]=[next[index],next[index-1]];update('slides',next);},true)}{button('Remove from carousel',()=>update('slides',slides.filter((_,i)=>i!==index)),true)}</View></View>)}
-   {button('Upload photo',()=>void addPhoto(),true)}</View>
-  <View style={s.row}>{button('Save draft',()=>void save(false),true)}{button('Publish website',()=>void save(true))}</View><Text style={s.help}>Products and prices are managed in Products. This editor does not change orders, payments or Pixelbug.</Text></>}
+  {ready&&<><View style={s.card}><Text style={s.heading}>Shop text and licence notice</Text>{fields.map(([key,label,fallback])=><View key={key} style={s.field}><Text style={s.label}>{label}</Text><TextInput editable={!busy} multiline style={s.input} value={String(content[key]??fallback)} onChangeText={value=>update(key,value)} accessibilityLabel={label}/></View>)}</View>
+  <View style={s.card}><Text style={s.heading}>Offers & Packages</Text><Text style={s.help}>Buy 3 for 5% off. At 5 or more, VIAE confirms a reseller quote instead of automatically charging a package price. Digital files and printed items can be mixed. Generators have their own free digital charm gift offer. Gift remains inactive until a positive price limit is entered. Website estimates are reviewed before payment.</Text>{offerFields.map(([key,label,fallback])=><View key={key} style={s.field}><Text style={s.label}>{label}</Text>{['quantityOfferActive','offerIncludesGenerators','generatorGiftActive'].includes(key)?<Pressable disabled={busy} onPress={()=>update(key,String(content[key]??fallback)==='true'?'false':'true')} style={s.secondary}><Text>{String(content[key]??fallback)==='true'?'Enabled':'Disabled'} / Tap to change</Text></Pressable>:<TextInput editable={!busy} style={s.input} keyboardType="decimal-pad" value={String(content[key]??fallback)} onChangeText={value=>update(key,value)} accessibilityLabel={label}/>}</View>)}</View><View style={s.card}><Text style={s.heading}>Regional payment instructions</Text><Text style={s.help}>Philippines: PHP with Maya only. International: USD with PayPal or Wise. These instructions do not activate checkout or convert prices.</Text>{paymentFields.map(([key,label,fallback])=><View key={key} style={s.field}><Text style={s.label}>{label}</Text><TextInput editable={!busy} multiline style={s.input} value={String(content[key]??fallback)} onChangeText={value=>update(key,value)} accessibilityLabel={label}/></View>)}</View><View style={s.card}><Text style={s.heading}>Commercial licence page</Text><Text style={s.help}>These terms explain the separately sold commercial licence. They do not grant a customer permission or change licence prices. Save a draft first, then publish when reviewed.</Text>{licenceFields.map(([key,label,fallback])=><View key={key} style={s.field}><Text style={s.label}>{label}</Text><TextInput editable={!busy} multiline style={[s.input,{minHeight:110,textAlignVertical:'top'}]} value={String(content[key]??fallback)} onChangeText={value=>update(key,value)} accessibilityLabel={label}/></View>)}</View>
+  <View style={s.card}><Text style={s.heading}>Page banners</Text><Text style={s.help}>Optional replacement for the studio video. Use a wide desktop image and a separate mobile image. Leave both empty to keep the printing video. Images fill the banner, so keep important details away from the edges.</Text>
+   {bannerPages.map(([page,label])=><View key={page} style={s.slide}><Text style={s.label}>{label}</Text>{(['desktop','mobile'] as const).map(device=><View key={device} style={s.field}>{banners[page]?.[device]?<Image source={{uri:banners[page][device]}} style={s.image} resizeMode="contain"/>:null}<View style={s.row}>{button(`${banners[page]?.[device]?'Replace':'Upload'} ${device} banner`,()=>void addPhoto(page,device),true)}{banners[page]?.[device]?button(`Remove ${device} banner`,()=>editBanner(page,{[device]:''}),true):null}</View></View>)}<TextInput editable={!busy} accessibilityLabel={`${label} banner description`} style={s.input} placeholder="Image description / caption" value={banners[page]?.caption||''} onChangeText={caption=>editBanner(page,{caption})}/><TextInput editable={!busy} accessibilityLabel={`${label} banner link`} style={s.input} placeholder="Optional link, e.g. /shop or https://…" value={banners[page]?.link||''} onChangeText={link=>editBanner(page,{link})}/></View>)}
+  </View>
+  <View style={s.row}>{button('Save draft',()=>void save(false),true)}{button('Publish website',()=>void save(true))}</View><Text style={s.help}>Catalogue prices are managed in the VIAE catalogue. These controls change the shop heading, commercial licence wording and main banner. They do not change orders, payments or Pixelbug.</Text></>}
   </>}
  </ScrollView>;
 }

@@ -36,6 +36,7 @@ type Order = {
   delivery_fee_php: number;
   fulfilment_status: string;
   created_at: string;
+  sale_date: string;
   reseller_preorder_payments: Payment[];
 };
 
@@ -89,7 +90,7 @@ export function ResellerReportsScreen({
     const [{ data, error },tradeResult,expenseResult] = await Promise.all([supabase
       .from("reseller_preorders")
       .select(
-        "id,direct_sale,customer_name,product_name,package_name,quantity,total_price_php,delivery_fee_php,fulfilment_status,created_at,reseller_preorder_payments(id,payment_type,amount_php,payment_method,payment_date)",
+        "id,direct_sale,customer_name,product_name,package_name,quantity,total_price_php,delivery_fee_php,fulfilment_status,sale_date,created_at,reseller_preorder_payments(id,payment_type,amount_php,payment_method,payment_date)",
       )
       .eq("business_id", businessId)
       .order("created_at", { ascending: false }),
@@ -144,7 +145,7 @@ export function ResellerReportsScreen({
     () =>
       validRange
         ? orders.filter((order) => {
-            const date = order.created_at.slice(0, 10);
+            const date = order.sale_date || order.created_at.slice(0, 10);
             return !order.direct_sale && order.fulfilment_status !== 'cancelled' && date >= range.start! && date <= range.end!;
           })
         : [],

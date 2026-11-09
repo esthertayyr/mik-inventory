@@ -9,7 +9,7 @@ import { Text, TextInput } from "./AppTypography";
 
 type Expense={id:string;expense_date:string;description:string;category:string;amount:number;payment_method:string;notes:string|null;created_at:string};
 const C={ink:"#111522",muted:"#626A78",navy:"#8A365B",ruby:"#8A365B",border:"#E7DCE2",soft:"#FAF4F7",white:"#FFF"};
-const categories=["Filament","Materials & parts","Packaging","Equipment & repairs","Event fees","Food","Transport","Bills","Shop supplies","Personal","Other"];
+const categories=["Filament","Materials & parts","Packaging","Equipment & repairs","Event fees","Food","Transport","Bills","Shop supplies","Incentive Given","Personal","Other"];
 const payments=[["cash","Cash"],["gcash","GCash"],["bank","Bank"],["other","Other"]] as const;
 const today=()=>new Date().toLocaleDateString("en-CA");
 const display=(value:string)=>{const [y,m,d]=value.slice(0,10).split("-");return d&&m&&y?`${d}-${m}-${y}`:value};

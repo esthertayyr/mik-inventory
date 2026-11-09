@@ -3,6 +3,7 @@ export type PaymentMethod = "cash" | "gcash";
 export type Screen =
   | "home"
   | "dashboard"
+  | "monthly_sales"
   | "sale"
   | "sell_start"
   | "event_sale"
@@ -25,9 +26,13 @@ export type Screen =
   | "suggested_images"
   | "sourcing"
   | "website"
+  | "website_inquiries"
   | "reseller_packages"
   | "preorders"
   | "reseller_reports"
+  | "viae_tax"
+  | "viae_tasks"
+  | "viae_commerce"
   | "reseller_sales"
   | "reseller_purchases"
   | "reseller_stock"
@@ -108,6 +113,7 @@ export interface SaleItemSummary {
 export interface Sale {
   id: string;
   receipt_number: number;
+  viae_receipt_number?: number | null;
   payment_method: PaymentMethod;
   total: number;
   status: "completed" | "voided";

@@ -11,6 +11,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/src/lib/supabase";
 import { Text } from "@/src/components/AppTypography";
 import type { Screen } from "@/src/types";
+import { ViaeTaxScreen } from './ViaeTaxScreen';
+import { VIAE_BUSINESS_ID } from './ViaeTasksScreen';
 
 type Order = {
   direct_sale: boolean;
@@ -43,18 +45,19 @@ export function ResellerHomeScreen({
   const [ideas, setIdeas] = useState(0);
   const [packages, setPackages] = useState(0);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [customerOrders,setCustomerOrders]=useState<{total_price:number;amount_paid:number}[]>([]);
   const [period,setPeriod]=useState<'today'|'month'>('month');
   const [tradeRows,setTradeRows]=useState<{kind:string;amount_php:number;payment_date:string|null;status:string}[]>([]);
   const [expenseRows,setExpenseRows]=useState<{amount:number;expense_date:string}[]>([]);
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ count: ideaCount }, { count: packageCount }, { data },trades,expenses] =
+    const [{ count: ideaCount }, { count: packageCount }, { data },trades,expenses,customer] =
       await Promise.all([
         supabase
-          .from("source_products")
+          .from(businessId===VIAE_BUSINESS_ID?"viae_design_catalogue":"source_products")
           .select("id", { count: "exact", head: true })
           .eq("business_id", businessId)
-          .neq("idea_stage", "not_proceeding"),
+          .neq(businessId===VIAE_BUSINESS_ID?"website_status":"idea_stage",businessId===VIAE_BUSINESS_ID?"archived":"not_proceeding"),
         supabase
           .from("reseller_packages")
           .select("id", { count: "exact", head: true })
@@ -68,10 +71,12 @@ export function ResellerHomeScreen({
           .eq("business_id", businessId),
         supabase.from('reseller_trade_entries').select('kind,amount_php,payment_date,status').eq('business_id',businessId),
         supabase.from('expenses').select('amount,expense_date').eq('business_id',businessId),
+        supabase.from('external_orders').select('total_price,amount_paid').eq('business_id',businessId).is('archived_at',null).not('status','in','(completed,cancelled)'),
       ]);
     setIdeas(ideaCount ?? 0);
     setPackages(packageCount ?? 0);
     setOrders((data ?? []) as Order[]);
+    setCustomerOrders(customer.data??[]);
     setTradeRows(trades.data??[]);setExpenseRows(expenses.data??[]);
     setLoading(false);
   }, [businessId]);
@@ -97,8 +102,8 @@ export function ResellerHomeScreen({
     const awaitingDeposit = active.filter(
       (order) => order.fulfilment_status === "awaiting_deposit",
     ).length;
-    return { active: active.length, toCollect, awaitingDeposit };
-  }, [orders]);
+    return { active: active.length+customerOrders.length, toCollect:toCollect+customerOrders.reduce((sum,o)=>sum+Math.max(0,Number(o.total_price)-Number(o.amount_paid)),0), awaitingDeposit };
+  }, [orders,customerOrders]);
   const current=new Date();const localToday=`${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
   const inPeriod=(date:string|null)=>!!date&&(period==='today'?date===localToday:date.slice(0,7)===localToday.slice(0,7));
   const salesMoney=orders.filter(row=>row.direct_sale).flatMap(row=>row.reseller_preorder_payments??[]).filter(row=>inPeriod(row.payment_date)).reduce((sum,row)=>sum+Number(row.amount_php),0)+tradeRows.filter(row=>row.kind==='sale'&&row.status!=='cancelled'&&inPeriod(row.payment_date)).reduce((sum,row)=>sum+Number(row.amount_php),0);
@@ -114,10 +119,11 @@ export function ResellerHomeScreen({
     soft: string;
   }[] = [
     ...(canManageWebsite ? [{screen: "website" as Screen, title: "Website", help: "Edit homepage text and photos", icon: "globe-outline" as const, color: "#650f1c", soft: "#f8edf0"}] : []),
+    ...(permissions === undefined ? [{screen: "website_inquiries" as Screen, title: "Website enquiries", help: "Contact messages and print-service requests", icon: "mail-outline" as const, color: "#650f1c", soft: "#f8edf0"}] : []),
     {
       screen: "sourcing",
-      title: "Products",
-      help: "Save products, links, photos and costs",
+      title: businessId===VIAE_BUSINESS_ID?"Catalogue":"Products",
+      help: businessId===VIAE_BUSINESS_ID?"Sync designs and set digital or printed prices":"Save products, links, photos and costs",
       icon: "bag-handle-outline",
       color: "#315FBE",
       soft: "#EDF3FB",
@@ -132,8 +138,8 @@ export function ResellerHomeScreen({
     },
     {
       screen: "preorders",
-      title: "Pre-orders",
-      help: `${summary.awaitingDeposit} waiting for deposit`,
+      title: "Sales & Orders",
+      help: `Customer payments, preparation and delivery · ${summary.awaitingDeposit} awaiting payment`,
       icon: "receipt-outline",
       color: "#8A365B",
       soft: "#FAEFF4",
@@ -146,27 +152,27 @@ export function ResellerHomeScreen({
       color: "#1B685C",
       soft: "#EDF6F3",
     },
-    {screen:"reseller_sales",title:"Sales",help:"Record a fully paid direct sale",icon:"cart-outline",color:"#315FBE",soft:"#EDF3FB"},
-    {screen:"reseller_purchases",title:"Supplier purchases",help:"Track buying costs and arrivals",icon:"cube-outline",color:"#594C8D",soft:"#F3F0F8"},
-    {screen:"expenses",title:"Expenses",help:"Record other business spending",icon:"wallet-outline",color:"#8A365B",soft:"#FAEFF4"},
-    {screen:"reseller_stock",title:"Stock and printing",help:"Available pieces, incoming stock and printing jobs",icon:"grid-outline",color:"#1B685C",soft:"#EDF6F3"},
+    ...(businessId===VIAE_BUSINESS_ID?[]:[{screen:"reseller_purchases" as Screen,title:"Supplier purchases",help:"Track buying costs and arrivals",icon:"cube-outline" as const,color:"#594C8D",soft:"#F3F0F8"}]),
+    {screen:"expenses",title:"Expenses",help:"Materials, printing and business costs",icon:"wallet-outline",color:"#8A365B",soft:"#FAEFF4"},
+    {screen:"reseller_stock",title:"Stock and printing",help:"Link printing to customer orders. Finished items add stock, not another sale.",icon:"grid-outline",color:"#1B685C",soft:"#EDF6F3"},
   ];
+  if(businessId===VIAE_BUSINESS_ID&&permissions===undefined)actions.push({screen:'viae_commerce',title:'Customers & licences',help:'Customer accounts, commercial licences and promo codes',icon:'people-outline',color:'#650f1c',soft:'#f8edf0'});
   const groups = [
     {
       title: "Start here",
-      help: "Save products and build packages for customers.",
+      help: businessId===VIAE_BUSINESS_ID?"Manage catalogue designs, digital files and printed items.":"Save products and build packages for customers.",
       color: "#315FBE",
-      actions: actions.filter(action => ["sourcing","reseller_packages"].includes(action.screen)),
+      actions: actions.filter(action => (businessId===VIAE_BUSINESS_ID?["sourcing","viae_commerce"]:["sourcing","reseller_packages"]).includes(action.screen)),
     },
     {
       title: "Customer orders & money",
-      help: "Track pre-orders, payments, balances and delivery.",
+      help: "Track orders, payments and delivery.",
       color: "#8A365B",
-      actions: actions.filter(action => ["preorders", "reseller_sales", "reseller_reports", "expenses"].includes(action.screen)),
+      actions: actions.filter(action => ["preorders", "reseller_sales", "reseller_reports", "expenses", "website_inquiries"].includes(action.screen)),
     },
   ];
-  groups.push({title:"Buying and stock",help:"Receive purchases or finish printing to add available stock. Pack offline.",color:"#594C8D",actions:actions.filter(action=>["reseller_purchases","reseller_stock"].includes(action.screen))});
-  const allowed=(screen:Screen)=>!permissions || permissions.includes(screen==="reseller_sales"?"sell":screen==="preorders"?"orders":["expenses","reseller_reports"].includes(screen)?"reports":"products");
+  if(businessId!==VIAE_BUSINESS_ID)groups.push({title:"Buying and stock",help:"Receive purchases or finish printing to add available stock. Pack offline.",color:"#594C8D",actions:actions.filter(action=>["reseller_purchases","reseller_stock"].includes(action.screen))});
+  const allowed=(screen:Screen)=>!permissions || (["preorders","reseller_sales"].includes(screen) ? permissions.includes("sell") || permissions.includes("orders") : permissions.includes(["expenses","reseller_reports"].includes(screen)?"reports":"products"));
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "short",
     day: "numeric",
@@ -187,6 +193,7 @@ export function ResellerHomeScreen({
         <View style={s.flex}><Text style={s.cardTitle}>Website controls</Text><Text style={s.sectionHelp}>Edit homepage text and photos. Preview and publish.</Text></View>
         <Ionicons name="chevron-forward" size={20} color="#650f1c" />
       </Pressable> : null}
+      {permissions === undefined ? <ViaeTaxScreen businessId={businessId} compact onOpen={() => onOpen('viae_tax')}/> : null}
       {loading ? (
         <View style={s.loading}>
           <ActivityIndicator color="#594C8D" />
@@ -201,8 +208,8 @@ export function ResellerHomeScreen({
             <OverviewCard compact={compact} label="Money after spending" value={peso(salesMoney+orderMoney-paidPurchases-spent)} help="Cash flow, not profit" color="#1B685C" soft="#EDF6F3" onPress={()=>onOpen('reseller_reports')}/>
           </View></>:null}
           <View style={s.summaryGrid}>
-            {allowed('sourcing')?<OverviewCard compact={compact} label="Products" value={`${ideas}`} help="Saved products" color="#315FBE" soft="#EDF3FB" onPress={() => onOpen("sourcing")} />:null}
-            {allowed('preorders')?<OverviewCard compact={compact} label="Open pre-orders" value={`${summary.active}`} help={`${summary.awaitingDeposit} awaiting deposit`} color="#8A365B" soft="#FAEFF4" onPress={() => onOpen("preorders")} />:null}
+            {allowed('sourcing')?<OverviewCard compact={compact} label={businessId===VIAE_BUSINESS_ID?'Catalogue':'Products'} value={`${ideas}`} help="Designs and purchase options" color="#315FBE" soft="#EDF3FB" onPress={() => onOpen("sourcing")} />:null}
+            {allowed('preorders')?<OverviewCard compact={compact} label="Open orders" value={`${summary.active}`} help={`${summary.awaitingDeposit} awaiting payment`} color="#8A365B" soft="#FAEFF4" onPress={() => onOpen("preorders")} />:null}
             {allowed('reseller_reports')?<OverviewCard compact={compact} label="Still to collect" value={peso(summary.toCollect)} help="Customer balances" color="#1B685C" soft="#EDF6F3" onPress={() => onOpen("reseller_reports")} />:null}
           </View>
           {groups.map((group) => (
@@ -232,11 +239,16 @@ export function ResellerHomeScreen({
           ))}
         </>
       )}
+      {businessId === VIAE_BUSINESS_ID && <Pressable accessibilityRole="button" accessibilityLabel="Open VIAE tasks" style={s.taskShortcut} onPress={() => onOpen('viae_tasks')}>
+        <Ionicons name="checkbox-outline" size={20} color="#650F1C"/>
+        <View style={s.flex}><Text style={s.taskTitle}>Tasks</Text><Text style={s.sectionHelp}>Team tasks and follow-ups</Text></View>
+        <Ionicons name="chevron-forward" size={18} color="#650F1C"/>
+      </Pressable>}
       <View style={s.flow}>
         <Text style={s.flowTitle}>How VIAE works</Text>
         <Text style={s.flowText}>
-          Official products → Reseller package → Customer pre-order → Deposit →
-          Arrival → Final payment → Delivery
+          Catalogue design → Digital file or printed item → Full payment →
+          Private file delivery or printing and shipping
         </Text>
       </View>
     </ScrollView>
@@ -254,6 +266,8 @@ function OverviewCard({ compact, label, value, help, color, soft, onPress }: { c
 }
 
 const s = StyleSheet.create({
+  taskShortcut: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E8DEE2', backgroundColor: '#FCF8F9', minHeight: 54 },
+  taskTitle: { fontSize: 15, fontWeight: '600', color: '#650F1C' },
   page: {
     width: "100%",
     boxSizing: "border-box",

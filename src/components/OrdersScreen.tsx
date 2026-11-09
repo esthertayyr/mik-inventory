@@ -25,12 +25,16 @@ import * as Sharing from "expo-sharing";
 import { supabase } from "@/src/lib/supabase";
 import { peso } from "@/src/lib/format";
 import { EnquiriesPanel, type Enquiry } from "./EnquiriesPanel";
+import {ViaeOrderCatalogue,type ViaeOrderItem} from './ViaeOrderCatalogue';
+import {VIAE_SHOP_ID} from '../lib/viaeSalesCatalogue';
+import { OutsideOrdersPanel } from "./OutsideOrdersPanel";
 
 const FONT = Platform.select({ web: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif", ios: "System", android: "sans-serif" });
 
 type OrderStatus = "new" | "making" | "ready" | "completed" | "cancelled";
 type PaymentStatus = "unpaid" | "partial" | "paid";
 type Order = {
+  business_id:string; catalogue_items?:ViaeOrderItem[];
   id: string; order_number: number; title: string; image_url: string | null;
   customer_name: string | null; customer_contact: string | null; source: string;
   quantity: number; order_date: string; target_date: string | null;
@@ -38,12 +42,13 @@ type Order = {
   payment_channel: string | null; payment_reference: string | null; notes: string | null;
   fulfilment_method: "collection"|"delivery"; fulfilled_at:string|null;
   is_past_order: boolean;
-  status: OrderStatus; created_at: string; updated_at: string;
+  status: OrderStatus; created_at: string; updated_at: string; archived_at:string|null;
   payment_followed_up_at:string|null; payment_followed_up_by_name:string|null;
   order_payments?:Array<{payment_date:string;amount:number;payment_method:string;payment_kind:string}>;
 };
 type Source = { id: string; name: string };
 type Form = {
+  catalogue_items:ViaeOrderItem[];
   title: string; customer_name: string; customer_contact: string; source: string;
   social_platform: string; custom_source: string; quantity: string; order_date: string; target_date: string;
   total_price: string; amount_paid: string; payment_channel: string;
@@ -72,15 +77,15 @@ const ORDER_SOURCES = ["Social media", "Walk-in", "Referral", "Marketplace", "We
 const sourceGroup = (source: string) => SOCIAL_PLATFORMS.includes(source)
   ? "Social media"
   : ORDER_SOURCES.includes(source) ? source : source === "Online" ? "Website" : source === "Word of mouth" ? "Referral" : "Other";
-const emptyForm = (): Form => ({ title: "", customer_name: "", customer_contact: "", source: "Social media", social_platform: "Facebook", custom_source: "", quantity: "1", order_date: displayDate(isoDate()), target_date: "", total_price: "", amount_paid: "", payment_channel: "", payment_date:displayDate(isoDate()), payment_reference: "", notes: "", image_uri: "", fulfilment_method:"collection", is_past_order:false, past_order_progress:"in_progress" });
+const emptyForm = (): Form => ({ catalogue_items:[], title: "", customer_name: "", customer_contact: "", source: "Social media", social_platform: "Facebook", custom_source: "", quantity: "1", order_date: displayDate(isoDate()), target_date: "", total_price: "", amount_paid: "", payment_channel: "", payment_date:displayDate(isoDate()), payment_reference: "", notes: "", image_uri: "", fulfilment_method:"collection", is_past_order:false, past_order_progress:"in_progress" });
 const statusLabel: Record<OrderStatus,string> = { new: "Pending", making: "Active", ready: "Ready", completed: "Completed", cancelled: "Stopped" };
 const statusIcon: Record<OrderStatus,keyof typeof Ionicons.glyphMap> = { new: "sparkles-outline", making: "construct-outline", ready: "checkmark-circle-outline", completed: "bag-check-outline", cancelled: "close-circle-outline" };
 const csvCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
 const newOrderId = () => globalThis.crypto?.randomUUID?.() ?? "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const n=Math.floor(Math.random()*16);return (c==="x"?n:(n&3)|8).toString(16)});
 
 type PaymentStage = "pending_deposit" | "deposit_paid" | "pending_final" | "full";
-function paymentStage(order: Pick<Order,"total_price"|"amount_paid"|"status">): PaymentStage {
-  const total=Number(order.total_price),paid=Number(order.amount_paid),deposit=total*.5;
+function paymentStage(order: Pick<Order,"total_price"|"amount_paid"|"status"|"business_id">): PaymentStage {
+  const total=Number(order.total_price),paid=Number(order.amount_paid),deposit=total*(order.business_id===VIAE_SHOP_ID?1:.5);
   if(total>0&&paid>=total) return "full";
   if(paid<deposit) return "pending_deposit";
   if(order.status==="ready"||order.status==="completed") return "pending_final";
@@ -91,7 +96,7 @@ type OpenStage = "Awaiting payment" | "To print / printing" | "Ready for collect
 const OPEN_STAGES:OpenStage[]=["Awaiting payment","To print / printing","Ready for collection"];
 function openStage(order:Order):OpenStage {
   if(order.status==="ready")return "Ready for collection";
-  return Number(order.total_price)>0 && Number(order.amount_paid)>=Number(order.total_price)*.5 ? "To print / printing" : "Awaiting payment";
+  return Number(order.total_price)>0 && Number(order.amount_paid)>=Number(order.total_price)*(order.business_id===VIAE_SHOP_ID?1:.5) ? "To print / printing" : "Awaiting payment";
 }
 const openStageTone:Record<OpenStage,{color:string;soft:string}>={"Awaiting payment":{color:C.ruby,soft:"#FAF0F2"},"To print / printing":{color:C.blue,soft:"#EEF3F8"},"Ready for collection":{color:C.green,soft:"#ECF5F0"}};
 
@@ -108,16 +113,18 @@ function dueInfo(order: Order) {
 
 export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOpened }: { businessId: string; locationId: string; initialOrderId?:string|null; onOrderOpened?:()=>void }) {
   const { width } = useWindowDimensions();
+  const isViae=businessId===VIAE_SHOP_ID;
+  const depositRate=isViae?1:.5;
   const [orders,setOrders] = useState<Order[]>([]);
   const [sources,setSources] = useState<Source[]>([]);
   const [loading,setLoading] = useState(true);
-  const [view,setView] = useState<"open" | "stopped" | "completed" | "all">("open");
+  const [view,setView] = useState<"open" | "stopped" | "completed" | "all" | "archived">("open");
   const [search,setSearch] = useState("");
   const [progressFilter,setProgressFilter] = useState<OpenStage|null>(null);
   const [editing,setEditing] = useState<Order | "new" | null>(null);
   const [form,setForm] = useState<Form>(emptyForm);
   const [saving,setSaving] = useState(false);
-  const [section,setSection]=useState<"orders"|"enquiries">("orders");
+  const [section,setSection]=useState<"orders"|"enquiries"|"outside">("orders");
   const [convertingLeadId,setConvertingLeadId]=useState<string|null>(null);
   const pendingNewId=useRef<string|null>(null);
 
@@ -133,10 +140,10 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
   useEffect(()=>{ void load(); },[load]);
 
   const counts = useMemo(()=>({
-    open: orders.filter(o=>!["completed","cancelled"].includes(o.status)).length,
+    open: orders.filter(o=>!o.archived_at&&!["completed","cancelled"].includes(o.status)).length,
   }),[orders]);
   const filtered = orders.filter(o => {
-    const statusOk = view === "all" || (view === "open" ? !["completed","cancelled"].includes(o.status) : view === "stopped" ? o.status === "cancelled" : o.status === "completed");
+    const statusOk = view==="archived"?!!o.archived_at:!o.archived_at&&(view === "all" || (view === "open" ? !["completed","cancelled"].includes(o.status) : view === "stopped" ? o.status === "cancelled" : o.status === "completed"));
     const q=search.trim().toLowerCase();
     const progressOk=view!=="open" || progressFilter===null || openStage(o)===progressFilter;
     return statusOk && progressOk && (!q || `${o.title} ${o.customer_name ?? ""} ${o.customer_contact ?? ""} ${o.order_number}`.toLowerCase().includes(q));
@@ -153,7 +160,7 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
   };
   const startEdit = (o: Order) => {
     const isSocial = SOCIAL_PLATFORMS.includes(o.source);
-    setForm({ title:o.title,customer_name:o.customer_name??"",customer_contact:o.customer_contact??"",source:isSocial?"Social media":ORDER_SOURCES.includes(o.source)?o.source:"Other",social_platform:isSocial?o.source:"Facebook",custom_source:!isSocial&&!ORDER_SOURCES.includes(o.source)?o.source:"",quantity:String(o.quantity),order_date:displayDate(o.order_date),target_date:displayDate(o.target_date),total_price:String(o.total_price),amount_paid:String(o.amount_paid),payment_channel:o.payment_channel??"",payment_date:displayDate(isoDate()),payment_reference:o.payment_reference??"",notes:o.notes??"",image_uri:o.image_url??"",fulfilment_method:o.fulfilment_method??"collection",is_past_order:o.is_past_order??false,past_order_progress:o.status==="completed"?"completed":"in_progress" });
+    setForm({ catalogue_items:o.catalogue_items??[],title:o.title,customer_name:o.customer_name??"",customer_contact:o.customer_contact??"",source:isSocial?"Social media":ORDER_SOURCES.includes(o.source)?o.source:"Other",social_platform:isSocial?o.source:"Facebook",custom_source:!isSocial&&!ORDER_SOURCES.includes(o.source)?o.source:"",quantity:String(o.quantity),order_date:displayDate(o.order_date),target_date:displayDate(o.target_date),total_price:String(o.total_price),amount_paid:String(o.amount_paid),payment_channel:o.payment_channel??"",payment_date:displayDate(isoDate()),payment_reference:o.payment_reference??"",notes:o.notes??"",image_uri:o.image_url??"",fulfilment_method:o.fulfilment_method??"collection",is_past_order:o.is_past_order??false,past_order_progress:o.status==="completed"?"completed":"in_progress" });
     setEditing(o);
   };
   useEffect(()=>{
@@ -177,6 +184,7 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
     const source=form.source==="Social media"
       ? (form.social_platform==="Other" ? form.custom_source.trim() || "Other social media" : form.social_platform)
       : form.source==="Other" ? form.custom_source.trim() || "Other" : form.source;
+    if(isViae&&form.catalogue_items.some(x=>!Number.isInteger(x.quantity)||x.quantity<1||!Number.isFinite(x.unit_price)||x.unit_price<0))return Alert.alert('Check catalogue items','Enter a valid quantity and unit price.');
     if(!form.title.trim()) return Alert.alert("Order name needed","Enter what the customer ordered.");
     if(!form.image_uri) return Alert.alert("Order photo needed","Add a photo so the team can see exactly what the customer ordered.");
     if(!orderDate) return Alert.alert("Order date needed","Enter the date as DD-MM-YYYY, for example 01-09-2026.");
@@ -210,7 +218,7 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
         return;
       }
     }
-    const payload={title:form.title.trim(),image_url:imageUrl,customer_name:form.customer_name.trim()||null,customer_contact:form.customer_contact.trim()||null,source,quantity,order_date:orderDate,target_date:pastCompleted?null:targetDate,total_price:total,amount_paid:paid,payment_status,payment_channel:paid>0?form.payment_channel.trim()||null:null,payment_reference:paid>0?form.payment_reference.trim()||null:null,notes:form.notes.trim()||null,fulfilment_method:form.fulfilment_method,is_past_order:form.is_past_order,...(form.is_past_order?{status:(pastCompleted?"completed":"new") as OrderStatus,fulfilled_at:pastCompleted?`${orderDate}T12:00:00+08:00`:null}:{})};
+    const payload={...(isViae?{catalogue_items:form.catalogue_items}:{}),title:form.title.trim(),image_url:imageUrl,customer_name:form.customer_name.trim()||null,customer_contact:form.customer_contact.trim()||null,source,quantity,order_date:orderDate,target_date:pastCompleted?null:targetDate,total_price:total,amount_paid:paid,payment_status,payment_channel:paid>0?form.payment_channel.trim()||null:null,payment_reference:paid>0?form.payment_reference.trim()||null:null,notes:form.notes.trim()||null,fulfilment_method:form.fulfilment_method,is_past_order:form.is_past_order,...(form.is_past_order?{status:(pastCompleted?"completed":"new") as OrderStatus,fulfilled_at:pastCompleted?`${orderDate}T12:00:00+08:00`:null}:{})};
     const method=form.payment_channel.toLowerCase()==="cash"?"cash":form.payment_channel.toLowerCase()==="gcash"?"gcash":form.payment_channel.toLowerCase().includes("bank")?"bank":form.payment_channel.toLowerCase().includes("online")?"online":"other";
     const {error:saveError}=await supabase.rpc("save_order_with_payment",{p_order_id:id,p_is_new:editing==="new",p_business_id:businessId,p_location_id:locationId,p_order:payload,p_payment_date:paymentDate,p_payment_method:paid>previousPaid?method:null});
     if(saveError){
@@ -229,13 +237,13 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
     if((form.source==="Other"||form.social_platform==="Other")&&!source.startsWith("Other")) await supabase.from("order_sources").upsert({business_id:businessId,name:source},{onConflict:"business_id,name"});
     if(editing==="new"&&convertingLeadId&&id) await supabase.from("order_enquiries").update({status:"converted",converted_order_id:id}).eq("id",convertingLeadId);
     setConvertingLeadId(null); setSaving(false); setEditing(null); await load();
-    Alert.alert("Order saved",pastCompleted?"The past order and full payment are recorded in Completed orders.":form.is_past_order?"The past order is active and will follow the normal order flow.":paid>=total?"Full payment is recorded.":paid>=total*.5?"The downpayment is recorded. The order is pending for printing.":`Waiting for downpayment. Printing cannot start until at least ${peso(total*.5)} is paid.`);
+    Alert.alert("Order saved",pastCompleted?"The past order and full payment are recorded in Completed orders.":form.is_past_order?"The past order is active and will follow the normal order flow.":paid>=total?"Full payment is recorded.":paid>=total*depositRate?"The downpayment is recorded. The order is pending for printing.":`Waiting for ${isViae?"full payment":"downpayment"}. Printing cannot start until ${peso(total*depositRate)} is paid.`);
   };
   const setStatus = async (o:Order,status:OrderStatus) => {
     if(Number(o.total_price)<=0)
       return Alert.alert("Price needed","Open this order and enter its full price before changing its status.");
-    if(status==="making" && Number(o.amount_paid)<Number(o.total_price)*.5)
-      return Alert.alert("50% downpayment needed",`Record at least ${peso(Number(o.total_price)*.5)} before printing.`);
+    if(status==="making" && Number(o.amount_paid)<Number(o.total_price)*depositRate)
+      return Alert.alert(isViae?"Full payment needed":"50% downpayment needed",`Record ${peso(Number(o.total_price)*depositRate)} before printing.`);
     if(status==="completed" && Number(o.amount_paid)<Number(o.total_price))
       return Alert.alert("Final payment needed",`Record the remaining ${peso(Number(o.total_price)-Number(o.amount_paid))} before completing this order.`);
     const action=async(extra:Record<string,unknown>={})=>{const {error}=await supabase.from("external_orders").update({status,...extra}).eq("id",o.id);if(error)return Alert.alert("Order not updated",error.message);const queueStatus=status==="making"?"printing":status==="ready"?"ready":status==="completed"?"done":null;if(queueStatus)await supabase.from("print_jobs").update({status:queueStatus}).eq("external_order_id",o.id);await load();};
@@ -262,18 +270,20 @@ export function OrdersScreen({ businessId, locationId, initialOrderId, onOrderOp
     const file=new File(Paths.cache,filename);file.create();file.write(csv);await Sharing.shareAsync(file.uri);
   };
 
-  if(editing) return <OrderForm form={form} setForm={setForm} saving={saving} editing={editing!=="new"} onBack={()=>{setEditing(null);setConvertingLeadId(null)}} onSave={save} onPhoto={choosePhoto}/>;
-  if(section==="enquiries") return <ScrollView contentContainerStyle={s.page}><View style={s.headingRow}><View style={s.headingCopy}><Text style={s.title}>Possible orders</Text><Text style={s.subtitle}>Customer enquiries that are not confirmed orders yet. They do not count as sales.</Text></View></View><View style={s.sectionSwitch}><Pressable style={s.sectionSwitchOff} onPress={()=>setSection("orders")}><Text style={s.sectionSwitchOffText}>Orders</Text></Pressable><View style={s.sectionSwitchOn}><Text style={s.sectionSwitchOnText}>Possible orders</Text></View></View><EnquiriesPanel businessId={businessId} locationId={locationId} onConvert={convertEnquiry}/></ScrollView>;
+  if(editing) return <OrderForm viae={isViae} form={form} setForm={setForm} saving={saving} editing={editing!=="new"} onBack={()=>{setEditing(null);setConvertingLeadId(null)}} onSave={save} onPhoto={choosePhoto}/>;
+  const sectionTabs=<View style={[s.sectionSwitch,{flexWrap:"wrap"}]}>{([["orders","Orders"],["enquiries","Possible orders"],...(businessId==="60d6c266-2596-4cb5-9444-0400896a2cbf"?[["outside","Outside Order"]]:[])] as Array<["orders"|"enquiries"|"outside",string]>).map(([key,label])=><Pressable key={key} style={section===key?s.sectionSwitchOn:s.sectionSwitchOff} onPress={()=>setSection(key)}><Text style={section===key?s.sectionSwitchOnText:s.sectionSwitchOffText}>{label}</Text></Pressable>)}</View>;
+  if(section==="outside")return <ScrollView contentContainerStyle={s.page}><Text style={s.title}>Outside Order</Text>{sectionTabs}<OutsideOrdersPanel businessId={businessId} locationId={locationId}/></ScrollView>;
+  if(section==="enquiries")return <ScrollView contentContainerStyle={s.page}><Text style={s.title}>Possible orders</Text>{sectionTabs}<EnquiriesPanel businessId={businessId} locationId={locationId} onConvert={convertEnquiry}/></ScrollView>;
   return <ScrollView contentContainerStyle={s.page}>
     <View style={[s.headingRow,width<520&&s.headingRowMobile]}><View style={s.headingCopy}><Text style={s.title}>Orders</Text><Text style={s.subtitle}>Payments, printing and collection</Text></View><Pressable style={[s.add,width<520&&s.addMobile]} onPress={startNew}><Ionicons name="add" size={25} color={C.white}/><Text style={s.addText}>New order</Text></Pressable></View>
-    <View style={s.sectionSwitch}><View style={s.sectionSwitchOn}><Text style={s.sectionSwitchOnText}>Orders</Text></View><Pressable style={s.sectionSwitchOff} onPress={()=>setSection("enquiries")}><Text style={s.sectionSwitchOffText}>Possible orders</Text></Pressable></View><Text style={s.sectionHint}>Possible orders are customer enquiries. They do not count as sales until confirmed.</Text>
+    {sectionTabs}<Text style={s.sectionHint}>Unpaid pending Orders and open Possible orders are archived after 7 days without updates. Paid and active orders are kept.</Text>
     {missingPrices>0?<Pressable style={s.priceWarning} onPress={()=>setView("all")}><Ionicons name="alert-circle" size={22} color={C.ruby}/><View style={{flex:1}}><Text style={s.priceWarningTitle}>{missingPrices} order{missingPrices===1?" needs":"s need"} a price</Text><Text style={s.priceWarningText}>Open each order and enter the full customer price. A ₱0 order cannot continue.</Text></View></Pressable>:null}
     <View style={[s.tabs,{flexDirection:"row",flexWrap:"wrap"}]}>
-      {([['open',`Open ${counts.open}`],['completed','Completed'],['all','All']] as const).map(([id,label])=><Pressable accessibilityRole="button" key={id} style={[s.tab,width<620&&{flexGrow:1,flexBasis:0,paddingHorizontal:7},view===id&&s.tabOn]} onPress={()=>setView(id)}><Text pointerEvents="none" style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
+      {([['open',`Open ${counts.open}`],['completed','Completed'],['all','All'],['archived','Archived']] as const).map(([id,label])=><Pressable accessibilityRole="button" key={id} style={[s.tab,width<620&&{flexGrow:1,flexBasis:0,paddingHorizontal:7},view===id&&s.tabOn]} onPress={()=>setView(id)}><Text pointerEvents="none" style={[s.tabText,view===id&&s.tabTextOn]}>{label}</Text></Pressable>)}
     </View>
     <View style={s.search}><Ionicons name="search" size={20} color={C.muted}/><TextInput style={s.searchInput} value={search} onChangeText={setSearch} placeholder="Search order or customer"/></View>
-    {view==="open"?<View style={{marginTop:16}}><Text style={{fontSize:13,fontWeight:"600",color:C.muted,marginBottom:8}}>Order progress</Text><View style={{flexDirection:"row",flexWrap:"wrap",gap:8}}>{OPEN_STAGES.map(stage=>{const count=orders.filter(o=>!["completed","cancelled"].includes(o.status)&&openStage(o)===stage).length;const tone=openStageTone[stage];const selected=progressFilter===stage;return <Pressable key={stage} accessibilityRole="button" accessibilityState={{selected}} accessibilityLabel={`${stage}, ${count} orders. Tap again to show all open orders.`} onPress={()=>setProgressFilter(current=>current===stage?null:stage)} style={{minHeight:42,paddingHorizontal:13,borderRadius:9,borderWidth:1,borderColor:tone.color,backgroundColor:selected?tone.color:tone.soft,flexDirection:"row",alignItems:"center",gap:8}}><Text style={{fontSize:13,fontWeight:"700",color:selected?C.white:tone.color}}>{stage}</Text><Text style={{fontSize:12,fontWeight:"700",color:selected?C.white:tone.color}}>{count}</Text></Pressable>})}</View></View>:null}
-    {loading?<ActivityIndicator size="large" color={C.navy}/>:filtered.length?<ToolGrid minCardWidth={410} maxColumns={width>=980?2:1}>{filtered.map(o=><OrderCard key={o.id} order={o} desktopGrid={width>=980} onEdit={()=>startEdit(o)} onDuplicate={()=>duplicate(o)} onStatus={(st)=>void setStatus(o,st)}/>)}</ToolGrid>:<View style={s.empty}><Ionicons name="file-tray-outline" size={34} color={C.navy}/><Text style={s.emptyTitle}>No orders here</Text><Text style={s.emptyHelp}>Tap New order for social media, walk-in, referral, marketplace or website orders.</Text></View>}
+    {view==="open"?<View style={{marginTop:16}}><Text style={{fontSize:13,fontWeight:"600",color:C.muted,marginBottom:8}}>Order progress</Text><View style={{flexDirection:"row",flexWrap:"wrap",gap:8}}>{OPEN_STAGES.map(stage=>{const count=orders.filter(o=>!o.archived_at&&!["completed","cancelled"].includes(o.status)&&openStage(o)===stage).length;const tone=openStageTone[stage];const selected=progressFilter===stage;return <Pressable key={stage} accessibilityRole="button" accessibilityState={{selected}} accessibilityLabel={`${stage}, ${count} orders. Tap again to show all open orders.`} onPress={()=>setProgressFilter(current=>current===stage?null:stage)} style={{minHeight:42,paddingHorizontal:13,borderRadius:9,borderWidth:1,borderColor:tone.color,backgroundColor:selected?tone.color:tone.soft,flexDirection:"row",alignItems:"center",gap:8}}><Text style={{fontSize:13,fontWeight:"700",color:selected?C.white:tone.color}}>{stage}</Text><Text style={{fontSize:12,fontWeight:"700",color:selected?C.white:tone.color}}>{count}</Text></Pressable>})}</View></View>:null}
+    {loading?<ActivityIndicator size="large" color={C.navy}/>:filtered.length?<ToolGrid minCardWidth={410} maxColumns={width>=980?2:1}>{filtered.map(o=><View key={o.id}>{o.archived_at?<Pressable style={s.export} onPress={async()=>{const {error}=await supabase.from("external_orders").update({archived_at:null,updated_at:new Date().toISOString()}).eq("id",o.id).eq("location_id",locationId);if(error)Alert.alert("Not restored",error.message);else await load()}}><Text>Restore order</Text></Pressable>:null}<OrderCard order={o} desktopGrid={width>=980} onEdit={()=>startEdit(o)} onDuplicate={()=>duplicate(o)} onStatus={(st)=>void setStatus(o,st)}/></View>)}</ToolGrid>:<View style={s.empty}><Ionicons name="file-tray-outline" size={34} color={C.navy}/><Text style={s.emptyTitle}>No orders here</Text><Text style={s.emptyHelp}>Tap New order for social media, walk-in, referral, marketplace or website orders.</Text></View>}
     <Pressable style={s.export} onPress={()=>void exportOrders()}><Ionicons name="download-outline" size={22} color={C.navy}/><Text style={s.exportText}>Export all orders for Excel</Text></Pressable>
   </ScrollView>;
 }
@@ -285,10 +295,11 @@ function OrderCard({order,desktopGrid,onEdit,onDuplicate,onStatus}:{order:Order;
   const detailsVisible=(!compact&&!desktopGrid)||showDetails;
   const priceMissing=Number(order.total_price)<=0;
   const due=dueInfo(order); const balance=Number(order.total_price)-Number(order.amount_paid);
-  const depositNeeded=Number(order.total_price)*.5;
+  const isViae=order.business_id===VIAE_SHOP_ID;
+  const depositNeeded=Number(order.total_price)*(isViae?1:.5);
   const depositPaid=Number(order.amount_paid)>=depositNeeded;
   const stage=paymentStage(order);
-  const displayStatus=order.status==="cancelled"?"Stopped":order.status==="completed"?(order.fulfilment_method==="delivery"?"Delivered":"Collected"):order.status==="ready"?(order.fulfilment_method==="delivery"?"Ready for delivery":"Ready for collection"):order.status==="making"?"Printing":depositPaid?"To print":"Awaiting downpayment";
+  const displayStatus=order.status==="cancelled"?"Stopped":order.status==="completed"?(order.fulfilment_method==="delivery"?"Delivered":"Collected"):order.status==="ready"?(order.fulfilment_method==="delivery"?"Ready for delivery":"Ready for collection"):order.status==="making"?"Printing":depositPaid?"To print":isViae?"Awaiting full payment":"Awaiting downpayment";
   const statusColor=order.status==="cancelled"?C.muted:order.status==="ready"||order.status==="completed"?C.green:order.status==="making"?C.blue:depositPaid?C.navy:C.ruby;
   const statusSoft=order.status==="cancelled"?"#F1F2F4":order.status==="ready"||order.status==="completed"?"#ECF5F0":order.status==="making"?"#EEF3F8":depositPaid?C.pale:"#FAF0F2";
   const stageColor=stage==="full"?C.green:stage==="deposit_paid"?C.navy:C.ruby;
@@ -298,6 +309,7 @@ function OrderCard({order,desktopGrid,onEdit,onDuplicate,onStatus}:{order:Order;
   const needsDetails=priceMissing||(!depositPaid&&next==="making")||(next==="completed"&&stage!=="full");
   const nextButtonColor=needsDetails?C.ruby:next==="making"?C.blue:next==="ready"||next==="completed"?C.green:C.navy;
   return <View style={[s.card,compact&&s.cardMobile]}>
+    <SaleReceipt kind="order" recordId={order.id} />
     <View style={s.cardTop}>{order.image_url?<Image source={{uri:order.image_url}} style={[s.photo,compact&&s.photoMobile]}/>:<Pressable style={[s.noPhoto,compact&&s.photoMobile]} onPress={onEdit}><Ionicons name="camera-outline" size={24} color={C.ruby}/></Pressable>}<View style={s.cardMain}><View style={s.numberRow}><Text style={s.number}>ORD-{order.order_number}</Text><View style={[s.status,{backgroundColor:statusSoft}]}><Ionicons name={statusIcon[order.status]} size={14} color={statusColor}/><Text style={[s.statusText,{color:statusColor}]}>{displayStatus}</Text></View></View><Text style={s.cardTitle} >{order.title}</Text><Text style={s.meta}>{order.customer_name||"No customer name"} · {order.source}</Text>{order.is_past_order?<View style={s.pastOrderTag}><Ionicons name="archive-outline" size={14} color={C.amber}/><Text style={s.pastOrderTagText}>PAST ORDER</Text></View>:null}</View></View>
     {priceMissing?<Pressable style={s.priceNeededTag} onPress={onEdit}><Ionicons name="alert-circle" size={17} color={C.ruby}/><Text style={s.priceNeededText}>Price needed · Tap to fix</Text></Pressable>:null}
     <View style={s.glanceRow}>
@@ -309,13 +321,14 @@ function OrderCard({order,desktopGrid,onEdit,onDuplicate,onStatus}:{order:Order;
       <View style={s.cardMoneyRow}><View style={s.cardMoneyCell}><Text style={s.cardMoneyLabel}>Paid</Text><Text style={[s.cardMoneyValue,{color:Number(order.amount_paid)>0?C.green:C.ink}]}>{peso(Number(order.amount_paid))}</Text></View><View style={s.cardMoneyCell}><Text style={s.cardMoneyLabel}>Still to collect</Text><Text style={[s.cardMoneyValue,{color:balance>0?C.ruby:C.green}]}>{peso(Math.max(0,balance))}</Text></View></View>
     </View>:null}
     {detailsVisible?<View style={s.detailsPanel}><Text style={s.paymentDetail}>{order.amount_paid>0?`Customer payment: ${order.payment_channel||"Method not recorded"}${latestPayment?` · Paid on ${displayDate(latestPayment.payment_date)}`:""}`:"No customer payment recorded"}</Text><Text style={s.orderDateDetail}>Order received: {displayDate(order.order_date)}{order.target_date?` · Needed by: ${displayDate(order.target_date)}`:""}</Text></View>:null}
+    {detailsVisible&&order.catalogue_items?.length?<View style={s.remarks}><Text style={s.factLabel}>CATALOGUE ITEMS</Text>{order.catalogue_items.map((item,i)=><Text key={i} style={s.remarksText}>{item.title} × {item.quantity} · Printed by VIAE</Text>)}</View>:null}
     {detailsVisible && order.notes?<View style={s.remarks}><Text style={s.factLabel}>REMARKS</Text><Text style={s.remarksText}>{order.notes}</Text></View>:null}
-    {next?<Pressable style={[s.next,{backgroundColor:nextButtonColor}]} onPress={()=>needsDetails?onEdit():onStatus(next)}><Text style={s.nextText}>{priceMissing?"Add price":next==="making"?(depositPaid?"Start printing":"Record downpayment"):next==="ready"?"Mark as ready":stage==="full"?(order.fulfilment_method==="delivery"?"Confirm delivered":"Confirm collected"):"Record final payment"}</Text><Ionicons name={needsDetails?"create-outline":"arrow-forward"} size={20} color={C.white}/></Pressable>:null}
+    {next?<Pressable style={[s.next,{backgroundColor:nextButtonColor}]} onPress={()=>needsDetails?onEdit():onStatus(next)}><Text style={s.nextText}>{priceMissing?"Add price":next==="making"?(depositPaid?"Start printing":isViae?"Record full payment":"Record downpayment"):next==="ready"?"Mark as ready":stage==="full"?(order.fulfilment_method==="delivery"?"Confirm delivered":"Confirm collected"):"Record final payment"}</Text><Ionicons name={needsDetails?"create-outline":"arrow-forward"} size={20} color={C.white}/></Pressable>:null}
     <View style={s.cardActions}>{compact||desktopGrid?<Pressable accessibilityRole="button" accessibilityState={{expanded:showDetails}} style={s.link} onPress={()=>setShowDetails(!showDetails)}><Text numberOfLines={1} style={s.linkText}>{showDetails?"Hide details":"More details"}</Text></Pressable>:null}<Pressable style={s.link} onPress={onEdit}><Text numberOfLines={1} style={s.linkText}>View / edit</Text></Pressable><Pressable style={s.link} onPress={onDuplicate}><Text numberOfLines={1} style={s.linkText}>Duplicate</Text></Pressable>{!["completed","cancelled"].includes(order.status)?<Pressable style={[s.link,s.stopLink]} onPress={()=>onStatus("cancelled")}><Text numberOfLines={1} style={s.cancelText}>Stop</Text></Pressable>:order.status==="cancelled"?<Pressable style={s.link} onPress={()=>onStatus("new")}><Text numberOfLines={1} style={s.linkText}>Resume</Text></Pressable>:null}</View>
   </View>;
 }
 
-function OrderForm({form,setForm,saving,editing,onBack,onSave,onPhoto}:{form:Form;setForm:Dispatch<SetStateAction<Form>>;saving:boolean;editing:boolean;onBack:()=>void;onSave:()=>void;onPhoto:()=>void}) {
+function OrderForm({viae=false,form,setForm,saving,editing,onBack,onSave,onPhoto}:{viae?:boolean;form:Form;setForm:Dispatch<SetStateAction<Form>>;saving:boolean;editing:boolean;onBack:()=>void;onSave:()=>void;onPhoto:()=>void}) {
   const { width } = useWindowDimensions();
   const narrow = width < 620;
   const update=(key:keyof Form,value:string)=>setForm(f=>({...f,[key]:value})); const total=Number(form.total_price||0),paid=Number(form.amount_paid||0);
@@ -323,6 +336,7 @@ function OrderForm({form,setForm,saving,editing,onBack,onSave,onPhoto}:{form:For
     <Pressable style={s.back} onPress={onBack}><Ionicons name="arrow-back" size={23} color={C.ink}/><Text style={s.backText}>{editing?"Edit order":"New order"}</Text></Pressable>
     <Text style={s.formLead}>{editing?"Update the project details.":"What did the customer order?"}</Text>
     <View style={s.requiredNote}><Ionicons name="information-circle-outline" size={21} color={C.navy}/><Text style={s.requiredNoteText}><Text style={s.requiredStrong}>Required:</Text> photo, order name, source, quantity, order date and total price. <Text style={s.requiredStrong}>Optional:</Text> customer details, date needed, payment reference and remarks.</Text></View>
+    {viae?<ViaeOrderCatalogue items={form.catalogue_items} onChange={items=>setForm(f=>({...f,catalogue_items:items,title:items.length?items.map(x=>`${x.title} × ${x.quantity}`).join(', '):f.title,image_uri:f.image_uri||items.find(x=>x.image_url)?.image_url||'',quantity:String(items.reduce((n,x)=>n+x.quantity,0)||1),total_price:String(items.reduce((n,x)=>n+x.quantity*x.unit_price,0))}))}/>:null}
     <FormSection number="1" title="What is the order?" help="Give it a name the team will recognise. Add a photo when the design is customised."/>
     <Pressable style={[s.photoPicker,!form.image_uri&&s.photoRequired]} onPress={onPhoto}>{form.image_uri?<Image source={{uri:form.image_uri}} style={s.formPhoto}/>:<><View style={s.photoCircle}><Ionicons name="camera-outline" size={28} color={C.white}/></View><Text style={s.photoTitle}>Add order photo · Required</Text><Text style={s.photoHelp}>The order cannot be saved without a photo</Text></>}</Pressable>
     <Field label="Order name · Required" value={form.title} onChangeText={v=>update("title",v)} placeholder="Example: Customised Gecko"/>
@@ -337,8 +351,8 @@ function OrderForm({form,setForm,saving,editing,onBack,onSave,onPhoto}:{form:For
     <View style={[s.two,narrow&&s.twoStack]}><View style={[s.half,narrow&&s.halfStack]}><Field label="Quantity · Required" value={form.quantity} onChangeText={v=>update("quantity",v)} keyboardType="number-pad"/></View><View style={[s.half,narrow&&s.halfStack]}><Field label="Total price · Required" value={form.total_price} onChangeText={v=>update("total_price",v)} keyboardType="decimal-pad" placeholder="₱0"/></View></View>
     <View style={[s.two,narrow&&s.twoStack]}>{form.is_past_order?<View style={[s.half,narrow&&s.halfStack]}><Field label="Date received · Required" value={form.order_date} onChangeText={v=>update("order_date",v)} placeholder="DD-MM-YYYY" maxLength={10}/></View>:<View style={[s.half,narrow&&s.halfStack,s.autoDateNote]}><Ionicons name="calendar-outline" size={19} color={C.navy}/><Text style={s.autoDateText}>Order date is saved automatically as {displayDate(form.order_date)}.</Text></View>}{(!form.is_past_order||form.past_order_progress==="in_progress")?<View style={[s.half,narrow&&s.halfStack]}><Field label="Customer needs it by · Optional" value={form.target_date} onChangeText={v=>update("target_date",v)} placeholder="DD-MM-YYYY" maxLength={10}/></View>:null}</View>
     <Text style={s.label}>How will the customer receive it?</Text><View style={s.wrap}>{([['collection','Customer collects'],['delivery','Deliver to customer']] as const).map(([id,label])=><Pressable key={id} style={[s.choice,form.fulfilment_method===id&&s.choiceOn]} onPress={()=>setForm(f=>({...f,fulfilment_method:id}))}><Text style={[s.choiceText,form.fulfilment_method===id&&s.choiceTextOn]}>{label}</Text></Pressable>)}</View>
-    <FormSection number="4" title="What has the customer paid?" help="Every payment needs the date received and payment method. Printing starts after the 50% downpayment."/>
-    <View style={s.paymentBox}><View style={s.paymentHead}><Ionicons name="card-outline" size={25} color={C.navy}/><View><Text style={s.paymentTitle}>Customer payment</Text><Text style={s.photoHelp}>No downpayment means no printing.</Text></View></View><Text style={s.label}>Quick payment</Text><View style={s.wrap}><Pressable style={[s.choice,paid===0&&s.choiceOn]} onPress={()=>setForm(f=>({...f,amount_paid:"0",payment_channel:"",payment_reference:""}))}><Text style={[s.choiceText,paid===0&&s.choiceTextOn]}>No downpayment</Text></Pressable><Pressable style={[s.choice,total>0&&paid===total*.5&&s.choiceOn]} onPress={()=>update("amount_paid",String(total*.5))}><Text style={[s.choiceText,total>0&&paid===total*.5&&s.choiceTextOn]}>Paid 50%</Text></Pressable><Pressable style={[s.choice,total>0&&paid===total&&s.choiceOn]} onPress={()=>update("amount_paid",String(total))}><Text style={[s.choiceText,total>0&&paid===total&&s.choiceTextOn]}>Full payment</Text></Pressable></View><Field label="Total paid so far" value={form.amount_paid} onChangeText={v=>update("amount_paid",v)} keyboardType="decimal-pad" placeholder="₱0"/><View style={s.paymentNumbers}><Text style={s.balance}>50% needed: {peso(total*.5)}</Text></View><Text style={s.balanceSmall}>Final balance: {peso(Math.max(0,total-paid))}</Text>{paid>0?<><Field label="Payment received date · Required" value={form.payment_date} onChangeText={v=>update("payment_date",v)} placeholder="DD-MM-YYYY" maxLength={10}/><Text style={s.fieldHint}>Use the date the customer actually paid.</Text></>:null}<Text style={s.label}>Payment method{paid>0?" · Required":""}</Text><View style={s.wrap}>{["Cash","GCash","Bank transfer","Facebook / online","Other"].map(x=><Pressable key={x} style={[s.choice,form.payment_channel===x&&s.choiceOn]} onPress={()=>update("payment_channel",x)}><Text style={[s.choiceText,form.payment_channel===x&&s.choiceTextOn]}>{x}</Text></Pressable>)}</View><Field label="Payment reference" value={form.payment_reference} onChangeText={v=>update("payment_reference",v)} placeholder="Optional receipt or reference"/></View>
+    <FormSection number="4" title="What has the customer paid?" help={viae?"Full payment is required before VIAE starts printing. Record the payment date and method.":"Every payment needs the date received and payment method. Printing starts after the 50% downpayment."}/>
+    <View style={s.paymentBox}><View style={s.paymentHead}><Ionicons name="card-outline" size={25} color={C.navy}/><View><Text style={s.paymentTitle}>Customer payment</Text><Text style={s.photoHelp}>{viae?"Full payment before printing.":"No downpayment means no printing."}</Text></View></View><Text style={s.label}>Quick payment</Text><View style={s.wrap}><Pressable style={[s.choice,paid===0&&s.choiceOn]} onPress={()=>setForm(f=>({...f,amount_paid:"0",payment_channel:"",payment_reference:""}))}><Text style={[s.choiceText,paid===0&&s.choiceTextOn]}>{viae?"Unpaid":"No downpayment"}</Text></Pressable>{!viae&&<Pressable style={[s.choice,total>0&&paid===total*.5&&s.choiceOn]} onPress={()=>update("amount_paid",String(total*.5))}><Text style={[s.choiceText,total>0&&paid===total*.5&&s.choiceTextOn]}>Paid 50%</Text></Pressable>}<Pressable style={[s.choice,total>0&&paid===total&&s.choiceOn]} onPress={()=>update("amount_paid",String(total))}><Text style={[s.choiceText,total>0&&paid===total&&s.choiceTextOn]}>Full payment</Text></Pressable></View><Field label="Total paid so far" value={form.amount_paid} onChangeText={v=>update("amount_paid",v)} keyboardType="decimal-pad" placeholder="₱0"/><View style={s.paymentNumbers}><Text style={s.balance}>{viae?"Full payment needed":"50% needed"}: {peso(total*(viae?1:.5))}</Text></View><Text style={s.balanceSmall}>Final balance: {peso(Math.max(0,total-paid))}</Text>{paid>0?<><Field label="Payment received date · Required" value={form.payment_date} onChangeText={v=>update("payment_date",v)} placeholder="DD-MM-YYYY" maxLength={10}/><Text style={s.fieldHint}>Use the date the customer actually paid.</Text></>:null}<Text style={s.label}>Payment method{paid>0?" · Required":""}</Text><View style={s.wrap}>{(viae?["Cash","Maya","PayPal","Wise","GCash","Bank transfer","Other"]:["Cash","GCash","Bank transfer","Facebook / online","Other"]).map(x=><Pressable key={x} style={[s.choice,form.payment_channel===x&&s.choiceOn]} onPress={()=>update("payment_channel",x)}><Text style={[s.choiceText,form.payment_channel===x&&s.choiceTextOn]}>{x}</Text></Pressable>)}</View><Field label="Payment reference" value={form.payment_reference} onChangeText={v=>update("payment_reference",v)} placeholder="Optional receipt or reference"/></View>
     <FormSection number="5" title="Anything else?" help="Add only information the person making or handing over the order needs to know."/>
     <Field label="Remarks · Optional" value={form.notes} onChangeText={v=>update("notes",v)} placeholder="Colour, size, design, delivery or anything important" multiline/>
     <FormActionBar><Pressable style={[s.save,saving&&{opacity:.6}]} onPress={onSave} disabled={saving}><Ionicons name="checkmark" size={22} color={C.white}/><Text style={s.saveText}>{saving?"Saving…":editing?"Save changes":"Save order"}</Text></Pressable></FormActionBar>
@@ -374,3 +388,4 @@ const s=StyleSheet.create({
   formSection:{marginTop:24,paddingTop:18,flexDirection:"row",alignItems:"flex-start",gap:11,borderTopWidth:1,borderTopColor:C.border},formSectionNumber:{width:31,height:31,alignItems:"center",justifyContent:"center",borderRadius:16,backgroundColor:C.navy},formSectionNumberText:{color:C.white,fontSize:13,fontWeight:"800"},formSectionTitle:{color:C.ink,fontSize:18,lineHeight:23,fontWeight:"700"},formSectionHelp:{marginTop:3,color:C.muted,fontSize:13,lineHeight:19},
   orderTimeChoices:{marginTop:8,gap:8},orderTimeChoice:{minHeight:64,padding:12,flexDirection:"row",alignItems:"center",gap:10,borderWidth:1,borderColor:C.border,borderRadius:12,backgroundColor:C.white},orderTimeChoiceOn:{borderColor:C.navy,backgroundColor:C.navy},orderTimeTitle:{color:C.ink,fontSize:14,fontWeight:"700"},orderTimeTextOn:{color:C.white},orderTimeHelp:{marginTop:2,color:C.muted,fontSize:12,lineHeight:17},orderTimeHelpOn:{color:"#DCE5EB"},autoDateNote:{minHeight:54,marginTop:15,paddingHorizontal:12,flexDirection:"row",alignItems:"center",gap:8,borderRadius:10,backgroundColor:C.pale},autoDateText:{flex:1,color:C.muted,fontSize:12,lineHeight:17,fontWeight:"600"},
 });
+import { SaleReceipt } from './SaleReceipt';

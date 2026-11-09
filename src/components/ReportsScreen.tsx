@@ -16,6 +16,7 @@ import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { supabase } from "@/src/lib/supabase";
 import { peso } from "@/src/lib/format";
+import { IncentiveReport } from "./IncentiveReport";
 
 const publicShopName = (value: string | null | undefined) =>
   value?.toLowerCase().includes("sebu") ? "Pixelbug" : value ?? "";
@@ -32,7 +33,9 @@ type SaleItem = {
 type SaleRecord = {
   id: string;
   receipt_number: number;
+  viae_receipt_number?: number | null;
   payment_method: "cash" | "gcash";
+  payment_channel?:string|null;listed_total?:number|null;total_override_reason?:string|null;
   total: number;
   status: "completed" | "voided";
   created_at: string;
@@ -170,12 +173,14 @@ function CalendarPicker({
 }
 
 export function ReportsScreen({
+  viae=false,
   locationId,
   hideTitle = false,
   correctionMode = false,
   onBack,
 }: {
   locationId: string;
+  viae?:boolean;
   hideTitle?: boolean;
   correctionMode?: boolean;
   onBack?: () => void;
@@ -219,9 +224,10 @@ export function ReportsScreen({
       supabase
         .from("sales")
         .select(
-          "id,receipt_number,payment_method,total,status,created_at,voided_at,payment_confirmed_at,payment_reference,staff:profiles!sales_created_by_fkey(display_name),sale_items(product_name,variant_name,selected_letters,quantity,unit_price,line_total)",
+          "id,receipt_number,viae_receipt_number,payment_method,payment_channel,listed_total,total_override_reason,total,status,created_at,voided_at,payment_confirmed_at,payment_reference,staff:profiles!sales_created_by_fkey(display_name),sale_items(product_name,variant_name,selected_letters,quantity,unit_price,line_total)",
         )
         .eq("location_id", locationId)
+        .is("archived_at",null)
         .gte("created_at", start)
         .lt("created_at", end)
         .order("created_at", { ascending: false }),
@@ -350,7 +356,7 @@ export function ReportsScreen({
         ["Total Expenses",expenseTotal],
         ["Money Received Minus Expenses",afterExpenses],
         ["Cash", cash],
-        ["GCash", gcash],
+        [viae?"Electronic payments":"GCash", gcash],
         ["Transactions", completed.length],
         ["Items Sold", itemsSold],
         ["Damaged Items", damaged],
@@ -382,7 +388,7 @@ export function ReportsScreen({
       const details = sales.flatMap((s) =>
         s.sale_items.length
           ? s.sale_items.map((i) => [
-              `SALE-${s.receipt_number}`,
+              `SALE-${(s.viae_receipt_number != null ? String(s.viae_receipt_number).padStart(3, "0") : s.receipt_number)}`,
               dateText(new Date(s.created_at)),
               new Date(s.created_at).toLocaleTimeString("en-PH", {
                 hour: "2-digit",
@@ -396,14 +402,14 @@ export function ReportsScreen({
               i.unit_price,
               i.line_total,
               s.total,
-              s.payment_method.toUpperCase(),
+              (s.payment_channel||s.payment_method).toUpperCase(),
               s.payment_confirmed_at ? "YES" : "",
               s.payment_reference ?? "",
               s.status.toUpperCase(),
             ])
           : [
               [
-                `SALE-${s.receipt_number}`,
+                `SALE-${(s.viae_receipt_number != null ? String(s.viae_receipt_number).padStart(3, "0") : s.receipt_number)}`,
                 dateText(new Date(s.created_at)),
                 new Date(s.created_at).toLocaleTimeString("en-PH", {
                   hour: "2-digit",
@@ -417,7 +423,7 @@ export function ReportsScreen({
                 0,
                 0,
                 s.total,
-                s.payment_method.toUpperCase(),
+                (s.payment_channel||s.payment_method).toUpperCase(),
                 s.payment_confirmed_at ? "YES" : "",
                 s.payment_reference ?? "",
                 s.status.toUpperCase(),
@@ -475,7 +481,7 @@ export function ReportsScreen({
             <Ionicons name="return-up-back" size={26} color="#FFF" />
             <View style={s.correctionGuideText}>
               <Text style={s.correctionGuideTitle}>Choose the wrong sale below</Text>
-              <Text style={s.correctionGuideHelp}>Tap “Remove / correct”, then confirm. Stock will be restored automatically and the change will remain in the activity history.</Text>
+              <Text style={s.correctionGuideHelp}>Tap “Remove / correct”, then confirm. The change remains in the activity history. Stock is restored for stocked products only.</Text>
             </View>
           </View>
         </>
@@ -585,7 +591,7 @@ export function ReportsScreen({
           <Text style={s.groupLabel}>PAYMENT METHODS</Text>
           <View style={s.grid}>
             <Stat label="Cash" value={peso(cash)} mobile={mobile} />
-            <Stat label="GCash" value={peso(gcash)} mobile={mobile} />
+            <Stat label={viae?"Electronic payments":"GCash"} value={peso(gcash)} mobile={mobile} />
           </View>
           <Text style={s.groupLabel}>SALES ACTIVITY</Text>
           <View style={s.grid}>
@@ -646,7 +652,9 @@ export function ReportsScreen({
             sales.map((sale) => (
               <View key={sale.id} style={s.sale}>
                 <View style={s.saleMain}>
-                  <Text style={s.saleName}>SALE-{sale.receipt_number}</Text>
+                  <Text style={s.saleName}>SALE-{(sale.viae_receipt_number != null ? String(sale.viae_receipt_number).padStart(3, "0") : sale.receipt_number)}</Text>
+                  <SaleReceipt kind="sale" recordId={sale.id} />
+                  {sale.total_override_reason?<Text style={s.rowSmall}>Product total {peso(Number(sale.listed_total))} · Final {peso(Number(sale.total))} · {sale.total_override_reason}</Text>:null}
                   <Text style={s.rowSmall}>
                     {dateTimeText(sale.created_at)} ·{" "}
                     {publicShopName(sale.staff?.display_name) || "Staff"}
@@ -663,7 +671,7 @@ export function ReportsScreen({
                 <View style={s.saleRight}>
                   <Text style={s.rowValue}>{peso(Number(sale.total))}</Text>
                   <Text style={s.rowSmall}>
-                    {sale.payment_method.toUpperCase()} ·{" "}
+                    {(sale.payment_channel||sale.payment_method).toUpperCase()} ·{" "}
                     {sale.status.toUpperCase()}
                   </Text>
                   {sale.status === "completed" ? (
@@ -684,12 +692,13 @@ export function ReportsScreen({
         <View style={s.modalShade}>
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>Correct this sale?</Text>
-            <Text style={s.modalHelp}>SALE-{voidTarget?.receipt_number} will be marked cancelled, removed from totals, and its stock restored. It will not be permanently deleted.</Text>
+            <Text style={s.modalHelp}>SALE-{(voidTarget?.viae_receipt_number != null ? String(voidTarget.viae_receipt_number).padStart(3, "0") : voidTarget?.receipt_number)} will be marked cancelled, removed from totals, and any tracked stock restored. It will not be permanently deleted.</Text>
             <Pressable style={s.confirmVoid} onPress={confirmVoid} disabled={voiding}><Text style={s.confirmVoidText}>{voiding ? "Correcting…" : "Confirm correction"}</Text></Pressable>
             <Pressable style={s.cancelVoid} onPress={() => setVoidTarget(null)}><Text style={s.cancelVoidText}>Keep sale</Text></Pressable>
           </View>
         </View>
       </Modal>
+      <IncentiveReport locationId={locationId} start={range.start.toISOString()} end={range.end.toISOString()} expenses={expenses}/>
     </ScrollView>
   );
 }
@@ -926,3 +935,4 @@ const s = StyleSheet.create({
     borderRadius: 17,
   },
 });
+import { SaleReceipt } from './SaleReceipt';
