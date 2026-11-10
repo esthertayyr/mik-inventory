@@ -6,7 +6,8 @@ type CatalogueFolder = FileSystemDirectoryHandle & {
   queryPermission(options: { mode: 'read' }): Promise<PermissionState>;
   requestPermission(options: { mode: 'read' }): Promise<PermissionState>;
 };
-type CatalogueEntry = { serial: string; zip?: string; generator?: string };
+type CatalogueDownload = { label: string; file: string };
+type CatalogueEntry = { serial: string; zip?: string; generator?: string; downloads?: CatalogueDownload[] };
 const bucket = 'viae-catalogue-files';
 const privateCopiesKey = 'mik-viae-private-copies';
 
@@ -50,14 +51,20 @@ async function folderSetting(value?: CatalogueFolder) {
   }
 }
 
-function assetPath(code: string, source: CatalogueEntry) {
-  const relative = source.zip || source.generator || '';
+function downloadFiles(source: CatalogueEntry): CatalogueDownload[] {
+  if (source.downloads?.length) return source.downloads;
+  const file = source.zip || source.generator || '';
+  return file ? [{ label: 'Print files', file }] : [];
+}
+
+function assetPath(code: string, relative: string, index = 0, multi = false) {
   const extension = relative.split('.').pop()?.toLowerCase();
   if (!extension || !['zip', 'html', '3mf', 'stl'].includes(extension)) return null;
   const parts = relative.split(/[\\/]/);
   if (parts.some(part => !part || part === '.' || part === '..' || part.includes(':'))) return null;
   const filename = parts.pop()!;
-  return { directories: parts, filename, key: `${code}/download.${extension}`, extension };
+  const key = multi ? `${code}/parts/${index + 1}-${filename}` : `${code}/download.${extension}`;
+  return { directories: parts, filename, key, extension };
 }
 
 async function localFile(folder: CatalogueFolder, asset: NonNullable<ReturnType<typeof assetPath>>) {
@@ -134,17 +141,23 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
       const copies = savedCopies();
       const failures: string[] = [];
       for (const item of items) {
-        if (!copies[item.serial]) continue;
-        const asset = assetPath(item.serial, item);
-        if (!asset) continue;
-        try {
-          const local = await localFile(folder, asset);
-          const version = fingerprint(local);
-          if (version === copies[item.serial]) continue;
-          await uploadPrivateFile(asset, local);
-          localStorage.setItem(privateCopiesKey, JSON.stringify({ ...savedCopies(), [item.serial]: version }));
-        } catch {
-          failures.push(item.serial);
+        const downloads = downloadFiles(item);
+        const multi = Boolean(item.downloads?.length);
+        for (let index = 0; index < downloads.length; index += 1) {
+          const download = downloads[index];
+          const copyKey = multi ? `${item.serial}::${index}` : item.serial;
+          if (!copies[copyKey]) continue;
+          const asset = assetPath(item.serial, download.file, index, multi);
+          if (!asset) continue;
+          try {
+            const local = await localFile(folder, asset);
+            const version = fingerprint(local);
+            if (version === copies[copyKey]) continue;
+            await uploadPrivateFile(asset, local);
+            localStorage.setItem(privateCopiesKey, JSON.stringify({ ...savedCopies(), [copyKey]: version }));
+          } catch {
+            failures.push(`${item.serial} ${download.label}`);
+          }
         }
       }
       if (failures.length) showMessage(`Private copies could not be refreshed: ${failures.join(', ')}.`);
@@ -167,8 +180,8 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
     };
   }, [connected, sync]);
 
-  async function download(code: string, source: CatalogueEntry) {
-    const asset = assetPath(code, source);
+  async function download(code: string, source: CatalogueEntry, file: string, index: number) {
+    const asset = assetPath(code, file, index, Boolean(source.downloads?.length));
     if (!asset) throw new Error('No downloadable file is linked to this item.');
     if (canEdit && connected && folder) {
       try {
@@ -189,12 +202,14 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
     return data.signedUrl;
   }
 
-  async function savePrivateCopy(code: string, source: CatalogueEntry) {
-    const asset = assetPath(code, source);
+  async function savePrivateCopy(code: string, source: CatalogueEntry, relativeFile: string, index: number) {
+    const multi = Boolean(source.downloads?.length);
+    const asset = assetPath(code, relativeFile, index, multi);
     if (!canEdit || !connected || !folder || !asset) throw new Error('Connect the VIAE folder and select an item with a linked file.');
-    const file = await localFile(folder, asset);
-    await uploadPrivateFile(asset, file);
-    localStorage.setItem(privateCopiesKey, JSON.stringify({ ...savedCopies(), [code]: fingerprint(file) }));
+    const local = await localFile(folder, asset);
+    await uploadPrivateFile(asset, local);
+    const copyKey = multi ? `${code}::${index}` : code;
+    localStorage.setItem(privateCopiesKey, JSON.stringify({ ...savedCopies(), [copyKey]: fingerprint(local) }));
   }
 
   return { supported: Boolean(picker), connected, reconnect: Boolean(folder), syncing, connect, sync, download, savePrivateCopy };
