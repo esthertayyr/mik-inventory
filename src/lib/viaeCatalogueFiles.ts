@@ -80,6 +80,7 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
   const [folder, setFolder] = useState<CatalogueFolder>();
   const [connected, setConnected] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const manifest = useRef('');
   const running = useRef(false);
 
@@ -169,6 +170,61 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
     }
   }, [canEdit, connected, folder, onSync, showMessage]);
 
+  const uploadAll = useCallback(async () => {
+    if (!canEdit || !connected || !folder || running.current) return;
+    running.current = true;
+    setSyncing(true);
+    try {
+      if (await folder.queryPermission({ mode: 'read' }) !== 'granted') {
+        setConnected(false);
+        throw new Error('Reconnect the VIAE folder to continue.');
+      }
+      const file = await (await folder.getFileHandle('Catalogue_Data.json')).getFile();
+      const { sets } = JSON.parse(await file.text());
+      if (!Array.isArray(sets) || !sets.length) throw new Error('Catalogue_Data.json has no entries.');
+      const aliases: Record<string, string> = { C099: 'G002', C101: 'G003' };
+      const items = sets.map((entry: CatalogueEntry) => ({ ...entry, serial: aliases[entry.serial] ?? entry.serial }));
+      const queue = items.flatMap((item: CatalogueEntry) => {
+        const downloads = downloadFiles(item);
+        const multi = Boolean(item.downloads?.length);
+        return downloads.map((download, index) => {
+          const asset = assetPath(item.serial, download.file, index, multi);
+          return asset ? { item, download, index, multi, asset, copyKey: multi ? `${item.serial}::${index}` : item.serial } : null;
+        }).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+      });
+      if (!queue.length) throw new Error('No linked STL, 3MF, ZIP or generator files were found.');
+      const copies = savedCopies();
+      let uploaded = 0;
+      let current = 0;
+      const failures: string[] = [];
+      for (let index = 0; index < queue.length; index += 1) {
+        const entry = queue[index];
+        setUploadProgress(`Saving files to MIK · ${index + 1} of ${queue.length} · ${entry.item.serial}`);
+        try {
+          const local = await localFile(folder, entry.asset);
+          const version = fingerprint(local);
+          if (copies[entry.copyKey] === version) { current += 1; continue; }
+          await uploadPrivateFile(entry.asset, local);
+          const next = { ...savedCopies(), [entry.copyKey]: version };
+          localStorage.setItem(privateCopiesKey, JSON.stringify(next));
+          copies[entry.copyKey] = version;
+          uploaded += 1;
+        } catch (error) {
+          failures.push(`${entry.item.serial} ${entry.download.label}: ${(error as Error).message}`);
+        }
+      }
+      await onSync();
+      const detail = failures.length ? ` ${failures.length} need attention: ${failures.slice(0, 4).join('; ')}${failures.length > 4 ? '; …' : ''}` : '';
+      showMessage(`MIK file library updated: ${uploaded} uploaded, ${current} already current, ${failures.length} missing or failed.${detail}`);
+    } catch (error) {
+      showMessage(`Could not save catalogue files to MIK. ${(error as Error).message}`);
+    } finally {
+      running.current = false;
+      setSyncing(false);
+      setUploadProgress('');
+    }
+  }, [canEdit, connected, folder, onSync, showMessage]);
+
   useEffect(() => {
     if (!connected) return;
     void sync();
@@ -227,5 +283,5 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
     localStorage.setItem(privateCopiesKey, JSON.stringify({ ...savedCopies(), [copyKey]: fingerprint(file) }));
   }
 
-  return { supported: Boolean(picker), connected, reconnect: Boolean(folder), syncing, connect, sync, download, savePrivateCopy, saveUploadedCopy };
+  return { supported: Boolean(picker), connected, reconnect: Boolean(folder), syncing, uploadProgress, connect, sync, uploadAll, download, savePrivateCopy, saveUploadedCopy };
 }

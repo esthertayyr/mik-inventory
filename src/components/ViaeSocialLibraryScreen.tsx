@@ -136,6 +136,30 @@ export function ViaeSocialLibraryScreen({ businessId, onBack, canManage }: { bus
     const result = await supabase.from('viae_social_prompts').delete().eq('id', item.id).eq('business_id', businessId);
     if (result.error) setMessage(result.error.message); else setPrompts(current => current.filter(row => row.id !== item.id));
   })(); });
+  const removeFolder = (folder: Folder) => {
+    const mediaCount = assets.filter(row => row.folder_id === folder.id).length;
+    const promptCount = prompts.filter(row => row.folder_id === folder.id).length;
+    confirm('Delete this folder?', `${folder.name}\n\n${mediaCount} media item(s) and ${promptCount} prompt(s) will be kept and moved to Unsorted.`, () => { void (async () => {
+      setBusy(true); setMessage('');
+      try {
+        if (mediaCount) {
+          const moved = await supabase.from('shop_social_images').update({ folder_id: null }).eq('business_id', businessId).eq('folder_id', folder.id);
+          if (moved.error) throw moved.error;
+        }
+        if (promptCount) {
+          const moved = await supabase.from('viae_social_prompts').update({ folder_id: null }).eq('business_id', businessId).eq('folder_id', folder.id);
+          if (moved.error) throw moved.error;
+        }
+        const deleted = await supabase.from('viae_social_folders').delete().eq('id', folder.id).eq('business_id', businessId);
+        if (deleted.error) throw deleted.error;
+        if (folderId === folder.id) setFolderId(null);
+        setMessage(`Folder “${folder.name}” deleted. Its media and prompts are in Unsorted.`);
+        await load();
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'The folder could not be deleted.');
+      } finally { setBusy(false); }
+    })(); });
+  };
   const moveAsset = async (item: Asset, targetFolderId: string | null) => {
     const result = await supabase.from('shop_social_images').update({ folder_id: targetFolderId }).eq('id', item.id).eq('business_id', businessId);
     if (result.error) setMessage(result.error.message);
@@ -156,7 +180,7 @@ export function ViaeSocialLibraryScreen({ businessId, onBack, canManage }: { bus
     <Text style={s.body}>Promotion images and reusable post prompts for Facebook and Instagram. This library is private to MIK and separate from product photos.</Text>
     <View style={s.panel}>
       <Text style={s.section}>Folders</Text>
-      <View style={s.chips}><Pressable style={[s.chip, !folderId && s.active]} onPress={() => setFolderId(null)}><Text style={!folderId ? s.activeText : s.chipText}>All media</Text></Pressable>{folders.map(folder => <Pressable key={folder.id} style={[s.chip, folderId === folder.id && s.active]} onPress={() => setFolderId(folder.id)}><Text style={folderId === folder.id ? s.activeText : s.chipText}>{folder.name}</Text></Pressable>)}</View>
+      <View style={s.chips}><Pressable style={[s.chip, !folderId && s.active]} onPress={() => setFolderId(null)}><Text style={!folderId ? s.activeText : s.chipText}>All media</Text></Pressable>{folders.map(folder => <View key={folder.id} style={s.folderPill}><Pressable style={[s.chip, folderId === folder.id && s.active]} onPress={() => setFolderId(folder.id)}><Text style={folderId === folder.id ? s.activeText : s.chipText}>{folder.name}</Text></Pressable>{canManage && <Pressable disabled={busy} accessibilityRole="button" accessibilityLabel={`Delete ${folder.name} folder`} onPress={() => removeFolder(folder)} style={s.folderDelete}><Text style={s.deleteText}>×</Text></Pressable>}</View>)}</View>
       {canManage && <View style={s.inline}><TextInput value={folderName} onChangeText={setFolderName} placeholder="New folder name" style={[s.input, s.grow]}/><Pressable disabled={busy || !folderName.trim()} onPress={() => void addFolder()} style={s.button}><Text style={s.buttonText}>Create folder</Text></Pressable></View>}
     </View>
     {canManage && <View style={s.panel}><Text style={s.section}>Add promotion image or video</Text><TextInput value={assetTitle} onChangeText={setAssetTitle} placeholder="Title" style={s.input}/><TextInput value={assetNote} onChangeText={setAssetNote} placeholder="Optional caption or prompt used for this media" multiline style={[s.input, s.multiline]}/><Text style={s.hint}>Save to folder</Text><View style={s.chips}><Pressable style={[s.chip, !assetFolderId && s.active]} onPress={() => setAssetFolderId(null)}><Text style={!assetFolderId ? s.activeText : s.chipText}>Unsorted</Text></Pressable>{folders.map(folder => <Pressable key={folder.id} style={[s.chip, assetFolderId === folder.id && s.active]} onPress={() => setAssetFolderId(folder.id)}><Text style={assetFolderId === folder.id ? s.activeText : s.chipText}>{folder.name}</Text></Pressable>)}</View><Pressable disabled={busy} onPress={() => void uploadMedia()} style={[s.button, s.self]}><Text style={s.buttonText}>{busy ? 'Saving…' : 'Choose and upload media'}</Text></Pressable><Text style={s.hint}>Images are compressed. Videos can be up to 20 MB and 90 seconds. Stored privately in MIK.</Text></View>}
@@ -177,6 +201,9 @@ const s = StyleSheet.create({
   hint: { fontSize: 13, color: '#666', lineHeight: 19 },
   panel: { padding: 18, gap: 12, borderWidth: 1, borderColor: '#dedede', borderRadius: 12, backgroundColor: '#fff' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  folderPill: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ccc', borderRadius: 18, backgroundColor: '#fff' },
+  folderDelete: { paddingHorizontal: 8, paddingVertical: 5 },
+  deleteText: { color: '#8a2632', fontSize: 18, fontWeight: '700', lineHeight: 20 },
   chip: { paddingVertical: 9, paddingHorizontal: 13, borderWidth: 1, borderColor: '#ccc', borderRadius: 18, backgroundColor: '#fff' },
   active: { backgroundColor: '#181818', borderColor: '#181818' },
   activeText: { color: '#fff', fontWeight: '700' },
