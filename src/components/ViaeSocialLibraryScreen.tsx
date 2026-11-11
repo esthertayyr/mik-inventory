@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { createElement, useCallback, useEffect, useState } from 'react';
 import { Alert, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -6,7 +6,7 @@ import { Text, TextInput } from './AppTypography';
 import { supabase } from '@/src/lib/supabase';
 
 type Folder = { id: string; name: string };
-type Asset = { id: string; title: string; storage_path: string; folder_id: string | null; prompt_text: string | null; image_url: string };
+type Asset = { id: string; title: string; storage_path: string; folder_id: string | null; prompt_text: string | null; media_type: 'image' | 'video'; image_url: string };
 type Prompt = { id: string; title: string; prompt_text: string; folder_id: string | null };
 const bucket = 'social-posters';
 export function ViaeSocialLibraryScreen({ businessId, onBack, canManage }: { businessId: string; onBack: () => void; canManage: boolean }) {
@@ -17,6 +17,7 @@ export function ViaeSocialLibraryScreen({ businessId, onBack, canManage }: { bus
   const [folderName, setFolderName] = useState('');
   const [assetTitle, setAssetTitle] = useState('');
   const [assetNote, setAssetNote] = useState('');
+  const [assetFolderId, setAssetFolderId] = useState<string | null>(null);
   const [promptTitle, setPromptTitle] = useState('');
   const [promptText, setPromptText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -27,7 +28,7 @@ export function ViaeSocialLibraryScreen({ businessId, onBack, canManage }: { bus
     setLoading(true);
     const [f, a, p] = await Promise.all([
       supabase.from('viae_social_folders').select('id,name').eq('business_id', businessId).order('name'),
-      supabase.from('shop_social_images').select('id,title,storage_path,folder_id,prompt_text').eq('business_id', businessId).order('created_at', { ascending: false }),
+      supabase.from('shop_social_images').select('id,title,storage_path,folder_id,prompt_text,media_type').eq('business_id', businessId).order('created_at', { ascending: false }),
       supabase.from('viae_social_prompts').select('id,title,prompt_text,folder_id').eq('business_id', businessId).order('created_at', { ascending: false }),
     ]);
     const error = f.error ?? a.error ?? p.error;
@@ -56,21 +57,35 @@ export function ViaeSocialLibraryScreen({ businessId, onBack, canManage }: { bus
     setBusy(false);
   };
 
-  const uploadImage = async () => {
+  const uploadMedia = async () => {
     if (!canManage || busy) return;
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { Alert.alert('Photo access needed', 'Allow MIK to choose a promotion image from this device.'); return; }
-    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 1, videoMaxDuration: 90 });
     if (picked.canceled) return;
     setBusy(true); setMessage('');
     let path = '';
     try {
       const asset = picked.assets[0];
-      const image = await ImageManipulator.manipulateAsync(asset.uri, [{ resize: { width: 1800 } }], { compress: 0.88, format: ImageManipulator.SaveFormat.JPEG });
-      const bytes = await (await fetch(image.uri)).arrayBuffer();
-      if (bytes.byteLength > 20 * 1024 * 1024) throw new Error('This image is larger than 20 MB after compression.');
-      path = `${businessId}/social/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-      const upload = await supabase.storage.from(bucket).upload(path, bytes, { contentType: 'image/jpeg', upsert: false });
+      const mediaType = asset.type === 'video' ? 'video' : 'image';
+      let uploadUri = asset.uri;
+      let contentType = asset.mimeType || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+      let extension = asset.fileName?.split('.').pop()?.toLowerCase();
+      if (mediaType === 'image') {
+        const image = await ImageManipulator.manipulateAsync(asset.uri, [{ resize: { width: 1800 } }], { compress: 0.88, format: ImageManipulator.SaveFormat.JPEG });
+        uploadUri = image.uri;
+        contentType = 'image/jpeg';
+        extension = 'jpg';
+      } else if (!['video/mp4', 'video/quicktime', 'video/webm'].includes(contentType)) {
+        const extType = extension === 'mov' ? 'video/quicktime' : extension === 'webm' ? 'video/webm' : extension === 'mp4' ? 'video/mp4' : '';
+        if (!extType) throw new Error('Choose an MP4, MOV, or WebM video.');
+        contentType = extType;
+      }
+      if (!extension || !/^[a-z0-9]{2,5}$/.test(extension)) extension = mediaType === 'video' ? 'mp4' : 'jpg';
+      const bytes = await (await fetch(uploadUri)).arrayBuffer();
+      if (bytes.byteLength > 20 * 1024 * 1024) throw new Error('This file is larger than 20 MB. Please choose a shorter or smaller video.');
+      path = `${businessId}/social/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+      const upload = await supabase.storage.from(bucket).upload(path, bytes, { contentType, upsert: false });
       if (upload.error) throw upload.error;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Please sign in again.');
@@ -78,16 +93,17 @@ export function ViaeSocialLibraryScreen({ businessId, onBack, canManage }: { bus
       if (signed.error) throw signed.error;
       const save = await supabase.from('shop_social_images').insert({
         business_id: businessId,
-        title: assetTitle.trim() || asset.fileName?.replace(/\.[^.]+$/, '') || 'Promotion image',
+        title: assetTitle.trim() || asset.fileName?.replace(/\.[^.]+$/, '') || (mediaType === 'video' ? 'Promotion video' : 'Promotion image'),
         image_url: signed.data.signedUrl,
         storage_path: path,
-        folder_id: folderId,
+        folder_id: assetFolderId,
+        media_type: mediaType,
         prompt_text: assetNote.trim() || null,
         created_by: user.id,
       });
       if (save.error) throw save.error;
       setAssetTitle(''); setAssetNote('');
-      setMessage('Promotion image saved to the VIAE library.');
+      setMessage(`Promotion ${mediaType} saved to the VIAE library.`);
       await load();
     } catch (e) {
       if (path) await supabase.storage.from(bucket).remove([path]);
@@ -120,8 +136,14 @@ export function ViaeSocialLibraryScreen({ businessId, onBack, canManage }: { bus
     const result = await supabase.from('viae_social_prompts').delete().eq('id', item.id).eq('business_id', businessId);
     if (result.error) setMessage(result.error.message); else setPrompts(current => current.filter(row => row.id !== item.id));
   })(); });
+  const moveAsset = async (item: Asset, targetFolderId: string | null) => {
+    const result = await supabase.from('shop_social_images').update({ folder_id: targetFolderId }).eq('id', item.id).eq('business_id', businessId);
+    if (result.error) setMessage(result.error.message);
+    else setAssets(current => current.map(row => row.id === item.id ? { ...row, folder_id: targetFolderId } : row));
+  };
   const download = async (item: Asset) => {
-    const result = await supabase.storage.from(bucket).createSignedUrl(item.storage_path, 300, { download: `${item.title.replace(/[^a-z0-9-_ ]/gi, '').trim() || 'viae-promotion'}.jpg` });
+    const extension = item.storage_path.split('.').pop() || (item.media_type === 'video' ? 'mp4' : 'jpg');
+    const result = await supabase.storage.from(bucket).createSignedUrl(item.storage_path, 300, { download: `${item.title.replace(/[^a-z0-9-_ ]/gi, '').trim() || 'viae-promotion'}.${extension}` });
     if (result.error || !result.data) { setMessage(result.error?.message ?? 'Could not prepare the download.'); return; }
     if (Platform.OS === 'web') { const a = document.createElement('a'); a.href = result.data.signedUrl; a.download = ''; a.click(); }
     else await Linking.openURL(result.data.signedUrl);
@@ -137,11 +159,11 @@ export function ViaeSocialLibraryScreen({ businessId, onBack, canManage }: { bus
       <View style={s.chips}><Pressable style={[s.chip, !folderId && s.active]} onPress={() => setFolderId(null)}><Text style={!folderId ? s.activeText : s.chipText}>All media</Text></Pressable>{folders.map(folder => <Pressable key={folder.id} style={[s.chip, folderId === folder.id && s.active]} onPress={() => setFolderId(folder.id)}><Text style={folderId === folder.id ? s.activeText : s.chipText}>{folder.name}</Text></Pressable>)}</View>
       {canManage && <View style={s.inline}><TextInput value={folderName} onChangeText={setFolderName} placeholder="New folder name" style={[s.input, s.grow]}/><Pressable disabled={busy || !folderName.trim()} onPress={() => void addFolder()} style={s.button}><Text style={s.buttonText}>Create folder</Text></Pressable></View>}
     </View>
-    {canManage && <View style={s.panel}><Text style={s.section}>Add promotion image</Text><TextInput value={assetTitle} onChangeText={setAssetTitle} placeholder="Image title" style={s.input}/><TextInput value={assetNote} onChangeText={setAssetNote} placeholder="Optional caption or prompt used for this image" multiline style={[s.input, s.multiline]}/><Pressable disabled={busy} onPress={() => void uploadImage()} style={[s.button, s.self]}><Text style={s.buttonText}>{busy ? 'Saving…' : 'Choose and upload image'}</Text></Pressable><Text style={s.hint}>Images are compressed and stored privately. Maximum 20 MB after compression.</Text></View>}
+    {canManage && <View style={s.panel}><Text style={s.section}>Add promotion image or video</Text><TextInput value={assetTitle} onChangeText={setAssetTitle} placeholder="Title" style={s.input}/><TextInput value={assetNote} onChangeText={setAssetNote} placeholder="Optional caption or prompt used for this media" multiline style={[s.input, s.multiline]}/><Text style={s.hint}>Save to folder</Text><View style={s.chips}><Pressable style={[s.chip, !assetFolderId && s.active]} onPress={() => setAssetFolderId(null)}><Text style={!assetFolderId ? s.activeText : s.chipText}>Unsorted</Text></Pressable>{folders.map(folder => <Pressable key={folder.id} style={[s.chip, assetFolderId === folder.id && s.active]} onPress={() => setAssetFolderId(folder.id)}><Text style={assetFolderId === folder.id ? s.activeText : s.chipText}>{folder.name}</Text></Pressable>)}</View><Pressable disabled={busy} onPress={() => void uploadMedia()} style={[s.button, s.self]}><Text style={s.buttonText}>{busy ? 'Saving…' : 'Choose and upload media'}</Text></Pressable><Text style={s.hint}>Images are compressed. Videos can be up to 20 MB and 90 seconds. Stored privately in MIK.</Text></View>}
     {canManage && <View style={s.panel}><Text style={s.section}>Saved prompts</Text><TextInput value={promptTitle} onChangeText={setPromptTitle} placeholder="Prompt title" style={s.input}/><TextInput value={promptText} onChangeText={setPromptText} placeholder="Reusable caption or image-generation prompt" multiline style={[s.input, s.multiline]}/><Pressable disabled={busy || !promptTitle.trim() || !promptText.trim()} onPress={() => void savePrompt()} style={[s.button, s.self]}><Text style={s.buttonText}>Save prompt</Text></Pressable></View>}
     {!!message && <Text accessibilityRole="alert" style={s.message}>{message}</Text>}
-    <Text style={s.section}>{folderId ? folders.find(row => row.id === folderId)?.name : 'Promotion images'}</Text>
-    {loading ? <Text style={s.body}>Loading library…</Text> : shownAssets.length === 0 ? <Text style={s.hint}>No promotion images in this folder yet.</Text> : <View style={s.grid}>{shownAssets.map(item => <View key={item.id} style={s.card}><Image source={{ uri: item.image_url }} resizeMode="contain" style={s.image}/><Text style={s.cardTitle}>{item.title}</Text>{item.prompt_text ? <Text selectable style={s.hint}>{item.prompt_text}</Text> : null}<View style={s.inline}><Pressable onPress={() => void download(item)} style={s.button}><Text style={s.buttonText}>Download</Text></Pressable>{canManage && <Pressable onPress={() => removeAsset(item)} style={s.secondary}><Text style={s.chipText}>Remove</Text></Pressable>}</View></View>)}</View>}
+    <Text style={s.section}>{folderId ? folders.find(row => row.id === folderId)?.name : 'Promotion media'}</Text>
+    {loading ? <Text style={s.body}>Loading library…</Text> : shownAssets.length === 0 ? <Text style={s.hint}>No promotion media in this folder yet.</Text> : <View style={s.grid}>{shownAssets.map(item => <View key={item.id} style={s.card}>{item.media_type === 'video' ? Platform.OS === 'web' ? createElement('video' as any, { src: item.image_url, controls: true, playsInline: true, style: { width: '100%', height: 250, backgroundColor: '#181818', borderRadius: 8, objectFit: 'contain' } }) : <Pressable onPress={() => void Linking.openURL(item.image_url)} style={[s.image, s.videoPreview]}><Text style={s.videoText}>▶  Play video</Text></Pressable> : <Image source={{ uri: item.image_url }} resizeMode="contain" style={s.image}/>}<Text style={s.cardTitle}>{item.title}</Text><Text style={s.hint}>{item.media_type === 'video' ? 'VIDEO' : 'IMAGE'}{item.prompt_text ? ` · ${item.prompt_text}` : ''}</Text>{canManage && <View style={s.inline}><Text style={s.hint}>Move to</Text><Pressable onPress={() => void moveAsset(item, null)} style={[s.chip, !item.folder_id && s.active]}><Text style={!item.folder_id ? s.activeText : s.chipText}>Unsorted</Text></Pressable>{folders.map(folder => <Pressable key={folder.id} onPress={() => void moveAsset(item, folder.id)} style={[s.chip, item.folder_id === folder.id && s.active]}><Text style={item.folder_id === folder.id ? s.activeText : s.chipText}>{folder.name}</Text></Pressable>)}</View>}<View style={s.inline}><Pressable onPress={() => void download(item)} style={s.button}><Text style={s.buttonText}>Download</Text></Pressable>{canManage && <Pressable onPress={() => removeAsset(item)} style={s.secondary}><Text style={s.chipText}>Remove</Text></Pressable>}</View></View>)}</View>}
     {shownPrompts.length > 0 && <View style={s.promptList}><Text style={s.section}>Reusable prompts</Text>{shownPrompts.map(item => <View key={item.id} style={s.promptCard}><View style={[s.inline, { justifyContent: 'space-between' }]}><Text style={s.cardTitle}>{item.title}</Text>{canManage && <Pressable onPress={() => removePrompt(item)}><Text style={s.link}>Delete</Text></Pressable>}</View><Text selectable style={s.body}>{item.prompt_text}</Text></View>)}</View>}
   </ScrollView>;
 }
@@ -171,6 +193,8 @@ const s = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   card: { width: '31%', minWidth: 235, flexGrow: 1, borderWidth: 1, borderColor: '#ddd', borderRadius: 12, padding: 12, gap: 10, backgroundColor: '#fff' },
   image: { width: '100%', height: 250, backgroundColor: '#f5f5f5', borderRadius: 8 },
+  videoPreview: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#181818' },
+  videoText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#222' },
   promptList: { marginTop: 12, gap: 10 },
   promptCard: { padding: 15, borderWidth: 1, borderColor: '#ddd', borderRadius: 10, gap: 8, backgroundColor: '#fff' },
