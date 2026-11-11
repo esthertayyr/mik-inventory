@@ -4,9 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 const BUSINESS = "3fe4c82d-a659-406b-b290-32d8a49f2bdf";
 function decode(value: string) { return Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), c => c.charCodeAt(0)); }
 function enc(bytes: Uint8Array) { return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
-async function seal(value: string) {
-  const raw = Deno.env.get("GOOGLE_TOKEN_ENCRYPTION_KEY");
-  if (!raw) throw new Error("Missing token encryption key.");
+async function seal(value: string, raw: string) {
   const key = await crypto.subtle.importKey("raw", decode(raw), "AES-GCM", false, ["encrypt"]);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   return `${enc(iv)}.${enc(new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(value))))}`;
@@ -52,7 +50,9 @@ Deno.serve(async request => {
       }
     }
     if (!folderId) throw new Error("Google Drive library folder could not be created.");
-    const { error: saveError } = await admin.from("viae_drive_connections").upsert({ business_id: BUSINESS, google_email: user.email || "Google account", drive_folder_id: folderId, encrypted_refresh_token: await seal(token.refresh_token), connected_by: flow.user_id, connected_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    const { data: encryptionKey, error: keyError } = await admin.rpc("viae_google_drive_encryption_key");
+    if (keyError || !encryptionKey) throw new Error("Private token storage is not ready. Contact MIK support.");
+    const { error: saveError } = await admin.from("viae_drive_connections").upsert({ business_id: BUSINESS, google_email: user.email || "Google account", drive_folder_id: folderId, encrypted_refresh_token: await seal(token.refresh_token, encryptionKey), connected_by: flow.user_id, connected_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     if (saveError) throw saveError;
     return redirect(returnTo, "connected");
   } catch (error) {

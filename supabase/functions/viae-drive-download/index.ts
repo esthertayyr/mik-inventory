@@ -4,9 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 const BUSINESS = "3fe4c82d-a659-406b-b290-32d8a49f2bdf";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 function decode(value: string) { return Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), c => c.charCodeAt(0)); }
-async function unseal(value: string) {
-  const raw = Deno.env.get("GOOGLE_TOKEN_ENCRYPTION_KEY");
-  if (!raw) throw new Error("Google Drive connector is not fully configured yet.");
+async function unseal(value: string, raw: string) {
   const [iv, cipher] = value.split(".");
   const key = await crypto.subtle.importKey("raw", decode(raw), "AES-GCM", false, ["decrypt"]);
   return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: decode(iv) }, key, decode(cipher)));
@@ -32,7 +30,9 @@ Deno.serve(async req => {
     ]);
     if (!file) return error("This file is not yet in the MIK Drive library.", 404);
     if (!connection) return error("Google Drive is not connected.", 409);
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: Deno.env.get("GOOGLE_CLIENT_ID")!, client_secret: Deno.env.get("GOOGLE_CLIENT_SECRET")!, refresh_token: await unseal(connection.encrypted_refresh_token), grant_type: "refresh_token" }) });
+    const { data: encryptionKey, error: keyError } = await admin.rpc("viae_google_drive_encryption_key");
+    if (keyError || !encryptionKey) return error("Private token storage is not ready. Contact MIK support.", 503);
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: Deno.env.get("GOOGLE_CLIENT_ID")!, client_secret: Deno.env.get("GOOGLE_CLIENT_SECRET")!, refresh_token: await unseal(connection.encrypted_refresh_token, encryptionKey), grant_type: "refresh_token" }) });
     const token = await tokenResponse.json();
     if (!tokenResponse.ok || !token.access_token) return error("Google Drive needs reconnecting. Ask the VIAE owner to reconnect it in MIK.", 503);
     const result = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.drive_file_id)}?alt=media`, { headers: { Authorization: `Bearer ${token.access_token}` } });

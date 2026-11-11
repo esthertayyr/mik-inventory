@@ -9,17 +9,13 @@ const fail = (message: string, status = 400) => json({ error: message }, status)
 function enc(bytes: Uint8Array) { return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
 function decode(value: string) { return Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), c => c.charCodeAt(0)); }
 async function digest(value: string) { return enc(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))); }
-async function seal(value: string) {
-  const raw = Deno.env.get("GOOGLE_TOKEN_ENCRYPTION_KEY");
-  if (!raw) throw new Error("Google Drive connector is not fully configured yet.");
+async function seal(value: string, raw: string) {
   const key = await crypto.subtle.importKey("raw", decode(raw), "AES-GCM", false, ["encrypt"]);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(value));
   return `${enc(iv)}.${enc(new Uint8Array(cipher))}`;
 }
-async function unseal(value: string) {
-  const raw = Deno.env.get("GOOGLE_TOKEN_ENCRYPTION_KEY");
-  if (!raw) throw new Error("Google Drive connector is not fully configured yet.");
+async function unseal(value: string, raw: string) {
   const [iv, cipher] = value.split(".");
   const key = await crypto.subtle.importKey("raw", decode(raw), "AES-GCM", false, ["decrypt"]);
   return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: decode(iv) }, key, decode(cipher)));
@@ -53,7 +49,7 @@ Deno.serve(async req => {
     if (!isOwner) return fail("Only a VIAE owner can connect Drive or upload files.", 403);
     if (action === "start") {
       const clientId = Deno.env.get("GOOGLE_CLIENT_ID");
-      if (!clientId || !Deno.env.get("GOOGLE_CLIENT_SECRET") || !Deno.env.get("GOOGLE_TOKEN_ENCRYPTION_KEY")) return fail("Google Drive setup is waiting for the secure Google OAuth settings in MIK.", 503);
+      if (!clientId || !Deno.env.get("GOOGLE_CLIENT_SECRET")) return fail("Google Drive setup is waiting for the secure Google OAuth settings in MIK.", 503);
       const state = enc(crypto.getRandomValues(new Uint8Array(32)));
       const verifier = enc(crypto.getRandomValues(new Uint8Array(48)));
       const returnTo = String(body.returnTo || "https://mik-inventory.vercel.app/");
@@ -68,7 +64,9 @@ Deno.serve(async req => {
     if (action === "access") {
       if (!connection) return fail("Connect Google Drive first.", 409);
       const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!, clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
-      const refreshToken = await unseal(connection.encrypted_refresh_token);
+      const { data: encryptionKey, error: keyError } = await admin.rpc("viae_google_drive_encryption_key");
+      if (keyError || !encryptionKey) throw new Error("Private token storage is not ready. Contact MIK support.");
+      const refreshToken = await unseal(connection.encrypted_refresh_token, encryptionKey);
       const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken, grant_type: "refresh_token" }) });
       const result = await response.json();
       if (!response.ok || !result.access_token) throw new Error("Google Drive could not refresh its short-lived connection. Reconnect Drive in MIK.");
