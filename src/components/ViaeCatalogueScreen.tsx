@@ -6,6 +6,7 @@ import {Text,TextInput} from './AppTypography';
 import {supabase} from '@/src/lib/supabase';
 
 import {useViaeCatalogueFiles} from '@/src/lib/viaeCatalogueFiles';
+import {useViaeGoogleDrive} from '@/src/lib/viaeGoogleDrive';
 
 type DownloadAsset={label:string;file:string};
 type ProductMedia={url:string;path:string;type:'image'|'video';title?:string;sort_order:number};
@@ -19,11 +20,22 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
  const load=useCallback(async()=>{setLoading(true);const result=await supabase.from('viae_design_catalogue').select('source_metadata,display_title,internal_only,reference_price_php,delivery_asset_metadata,id,catalogue_code,title,category,design_count,preview_url,media_assets,source_present,digital_enabled,printed_enabled,digital_price_php,printed_price_php,preparation_days,website_status,synced_at').eq('business_id',businessId).order('catalogue_code');if(result.error)setMessage(result.error.message);else setRows((result.data??[]).map(row=>({...row,title:row.display_title||row.title,media_assets:Array.isArray(row.media_assets)?row.media_assets:[]})));setLoading(false);},[businessId]);
  useEffect(()=>{void load();},[load]);
  const files=useViaeCatalogueFiles(canEdit,load,setMessage);
+ const drive=useViaeGoogleDrive(canEdit,setMessage);
  async function handleCatalogueFile(asset:DownloadAsset,index:number,saveCopy=false){
   if(!selected)return;
   setBusy(true);
   setMessage('');
   try {
+   const isMulti=Boolean(selected.source_metadata.downloads?.length);
+   const extension=asset.file.split('.').pop()?.toLowerCase()??'';
+   const parts=asset.file.split(/[\\/]/);const filename=parts.pop()??'';
+   const drivePath=extension&&['zip','html','3mf','stl'].includes(extension)&&!parts.some(part=>!part||part==='.'||part==='..'||part.includes(':'))
+    ?(isMulti?`${selected.catalogue_code}/parts/${index+1}-${filename}`:`${selected.catalogue_code}/download.${extension}`):'';
+   if(!saveCopy&&drivePath&&drive.fileMap.has(drivePath)){
+    await drive.download(drivePath);
+    setMessage(`${asset.label} downloaded from the VIAE Drive library.`);
+    return;
+   }
    if(saveCopy){
     await files.savePrivateCopy(selected.catalogue_code,selected.source_metadata,asset.file,index);
     setMessage(`${asset.label} saved privately for the VIAE team.`);
@@ -37,6 +49,8 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
      }else await Linking.openURL(url);
     }
    }
+  }catch(error){setMessage((error as Error).message);}finally{setBusy(false);}
+ }
 
  function uploadPrivateCatalogueFile(asset:DownloadAsset,index:number){
   if(!selected||!canEdit||Platform.OS!=='web')return;
@@ -55,8 +69,6 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
    finally{setBusy(false);}
   };
   input.click();
- }
-  }catch(error){setMessage((error as Error).message);}finally{setBusy(false);}
  }
 
  const open=(row:Design)=>{setSelected({...row,media_assets:row.media_assets?.length?row.media_assets:(row.preview_url?[{url:row.preview_url,path:'',type:'image',sort_order:0}]:[])});setRemovedMedia([]);setDigital((row.internal_only||(row.category==='Generator'&&!['G001','C103'].includes(row.catalogue_code))?row.reference_price_php:row.digital_price_php)?.toString()??'');setPrinted(row.printed_price_php?.toString()??'');setDays(row.preparation_days?.toString()??'');setMessage('');};
@@ -111,7 +123,8 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
   {files.connected&&<Pressable disabled={files.syncing||busy} style={s.button} onPress={()=>void files.uploadAll()}><Text style={s.white}>{files.syncing?'Saving to MIK…':'Save all linked files to MIK'}</Text></Pressable>}
   {files.connected&&<Text style={s.help}>Folder connected</Text>}
  </View>}
- {files.uploadProgress?<Text accessibilityRole="status" style={s.message}>{files.uploadProgress}</Text>:null}<Text style={s.help}>Connect your VIAE folder in Chrome or Edge. MIK checks for updates while this catalogue is open. Automatic sync keeps existing prices and publishing settings. Use “Save all linked files to MIK” to make every linked STL, 3MF, ZIP or generator file available from MIK’s private library. Files over 50 MB and missing source files are reported for follow-up.</Text><Text style={s.help}>Published items appear on the VIAE website. Title, prices, preview and customer details update on refresh. Unpriced items require a quote. Private files are not exposed by publishing.</Text></View>
+ {canEdit&&<View style={s.panel}><Text style={s.strong}>VIAE files in Google Drive</Text><Text style={s.help}>{drive.connected?`Connected · ${drive.email} · ${drive.files.length} files in the MIK library`:'Connect Google Drive once to keep VIAE files available to authorized MIK accounts on other computers.'}</Text><View style={s.row}><Pressable disabled={drive.busy} style={s.button} onPress={()=>void(drive.connected?drive.refresh():drive.connect())}><Text style={s.white}>{drive.busy?'Working…':drive.connected?'Refresh Drive status':'Connect Google Drive'}</Text></Pressable>{drive.connected&&drive.pickerSupported&&<Pressable disabled={drive.busy} style={s.button} onPress={()=>void drive.chooseFolder()}><Text style={s.white}>{drive.hasFolder?'VIAE folder selected':'Choose VIAE folder'}</Text></Pressable>}{drive.connected&&<Pressable disabled={drive.busy||!drive.hasFolder} style={s.button} onPress={()=>void drive.uploadAll()}><Text style={s.white}>{drive.busy?'Uploading…':'Upload linked catalogue files'}</Text></Pressable>}</View>{!!drive.progress&&<Text accessibilityRole="alert" style={s.message}>{drive.progress}</Text>}<Text style={s.help}>The sync uploads only the files linked in Catalogue_Data.json. It does not upload _history, workbench or customer-delivery folders. Select the VIAE folder on the computer that holds the originals. Existing files with the same catalogue path are replaced in Drive.</Text></View>}
+ {files.uploadProgress?<Text accessibilityRole="alert" style={s.message}>{files.uploadProgress}</Text>:null}<Text style={s.help}>Connect your VIAE folder in Chrome or Edge. MIK checks for updates while this catalogue is open. Automatic sync keeps existing prices and publishing settings. Use “Save all linked files to MIK” to make every linked STL, 3MF, ZIP or generator file available from MIK’s private library. Files over 50 MB and missing source files are reported for follow-up.</Text><Text style={s.help}>Published items appear on the VIAE website. Title, prices, preview and customer details update on refresh. Unpriced items require a quote. Private files are not exposed by publishing.</Text></View>
   {!!message&&<Text accessibilityRole="alert" style={s.message}>{message}</Text>}<TextInput style={s.input} placeholder="Search title or catalogue code" value={query} onChangeText={setQuery}/><View style={s.row}>{['All',...new Set(rows.map(r=>r.category))].map(value=><Pressable key={value} onPress={()=>setCategory(value)} style={[s.chip,category===value&&s.active]}><Text style={category===value?s.white:s.strong}>{labels[value]??value}</Text></Pressable>)}</View>
   {loading?<ActivityIndicator/>:visible.map(row=><Pressable key={row.id} onPress={()=>open(row)} style={s.item}>{row.media_assets?.[0]?.type==='video'&&Platform.OS==='web'?createElement('video',{src:row.media_assets[0].url,muted:true,preload:'metadata',style:{width:78,height:78,objectFit:'contain',backgroundColor:'#222',borderRadius:6}}):row.preview_url?<Image source={{uri:row.preview_url}} style={s.image}/>:<View style={[s.image,s.placeholder]}><Text style={s.help}>Add preview</Text></View>}<View style={s.flex}><Text style={s.strong}>{row.title}</Text><Text style={s.help}>{row.catalogue_code} · {labels[row.category]??row.category} · {row.design_count??'Set'} designs · {row.media_assets?.length??0} media</Text><Text style={s.help}>{row.internal_only?`Default price ${price(row.reference_price_php)}`:(row.category==='Generator'&&['C104','C105'].includes(row.catalogue_code))?`Price ${price(row.reference_price_php)}`:(row.category==='Generator'&&!['G001','C103'].includes(row.catalogue_code))?`Reference ${price(row.reference_price_php)}`:row.digital_enabled?`Digital ${price(row.digital_price_php)}`:'Digital off'} · {row.printed_enabled?`Printed ${price(row.printed_price_php)}`:'Printed off'}</Text><Text style={s.link}>{row.internal_only?'Internal only':row.source_present?row.website_status:'Missing from source'} · {canEdit?'Edit':'View'}</Text></View></Pressable>)}{!loading&&!visible.length&&<Text style={s.help}>No matching catalogue entries.</Text>}
   <Modal visible={!!selected} transparent animationType="fade" onRequestClose={()=>setSelected(null)}><View style={s.overlay}><Pressable accessibilityRole="button" accessibilityLabel="Close catalogue item preview" style={s.closeFloat} onPress={()=>setSelected(null)}><Text style={s.closeText}>×</Text></Pressable><ScrollView contentContainerStyle={s.dialog}>{selected&&<><Text style={s.heading}>{selected.catalogue_code}</Text><Text style={s.help}>Changes apply to the catalogue. Existing sales keep their recorded amounts.</Text>{selectedDownloads.length>0&&<View style={s.panel}>
