@@ -29,8 +29,33 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
     setMessage(`${asset.label} saved privately for the VIAE team.`);
    }else{
     const url=await files.download(selected.catalogue_code,selected.source_metadata,asset.file,index);
-    if(url)await Linking.openURL(url);
+    if(url){
+     if(Platform.OS==='web'){
+      // Linking.openURL can open a new tab and be blocked after the async lookup.
+      // Navigate in the current tab so Supabase's signed download response starts reliably.
+      window.location.assign(url);
+     }else await Linking.openURL(url);
+    }
    }
+
+ function uploadPrivateCatalogueFile(asset:DownloadAsset,index:number){
+  if(!selected||!canEdit||Platform.OS!=='web')return;
+  const extension=asset.file.split('.').pop()?.toLowerCase()??'';
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept=`.${extension}`;
+  input.onchange=async()=>{
+   const file=input.files?.[0];
+   if(!file)return;
+   setBusy(true);setMessage('');
+   try{
+    await files.saveUploadedCopy(selected.catalogue_code,selected.source_metadata,asset.file,index,file);
+    setMessage(`${asset.label} saved as a private MIK copy.`);
+   }catch(error){setMessage((error as Error).message);}
+   finally{setBusy(false);}
+  };
+  input.click();
+ }
   }catch(error){setMessage((error as Error).message);}finally{setBusy(false);}
  }
 
@@ -93,6 +118,7 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
  {selectedDownloads.map((asset,index)=><View key={`${asset.file}-${index}`} style={s.downloadRow}>
   <View style={s.flex}><Text style={s.strong}>{asset.label}</Text><Text style={s.help}>{asset.file.split(/[\\/]/).pop()}</Text></View>
   <Pressable disabled={busy} style={s.button} onPress={()=>void handleCatalogueFile(asset,index)}><Text style={s.white}>Download</Text></Pressable>
+  {canEdit&&Platform.OS==='web'&&<Pressable disabled={busy} onPress={()=>uploadPrivateCatalogueFile(asset,index)}><Text style={s.link}>Upload private copy</Text></Pressable>}
   {canEdit&&files.connected&&<Pressable disabled={busy} onPress={()=>void handleCatalogueFile(asset,index,true)}><Text style={s.link}>Save private copy</Text></Pressable>}
  </View>)}
  <Text style={s.help}>Download each plate or format separately from the connected PC, or save a private copy for the VIAE team.</Text>

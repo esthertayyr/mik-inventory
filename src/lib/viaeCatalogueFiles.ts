@@ -190,7 +190,10 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
         const link = document.createElement('a');
         link.href = url;
         link.download = asset.filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
         link.click();
+        link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
         return;
       } catch (error) {
@@ -212,5 +215,17 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
     localStorage.setItem(privateCopiesKey, JSON.stringify({ ...savedCopies(), [copyKey]: fingerprint(local) }));
   }
 
-  return { supported: Boolean(picker), connected, reconnect: Boolean(folder), syncing, connect, sync, download, savePrivateCopy };
+  async function saveUploadedCopy(code: string, source: CatalogueEntry, relativeFile: string, index: number, file: File) {
+    const multi = Boolean(source.downloads?.length);
+    const asset = assetPath(code, relativeFile, index, multi);
+    if (!canEdit || !asset) throw new Error('Choose an item with a linked private file.');
+    if (file.name.toLowerCase() !== asset.filename.toLowerCase()) {
+      throw new Error(`Choose the matching file: ${asset.filename}`);
+    }
+    await uploadPrivateFile(asset, file);
+    const copyKey = multi ? `${code}::${index}` : code;
+    localStorage.setItem(privateCopiesKey, JSON.stringify({ ...savedCopies(), [copyKey]: fingerprint(file) }));
+  }
+
+  return { supported: Boolean(picker), connected, reconnect: Boolean(folder), syncing, connect, sync, download, savePrivateCopy, saveUploadedCopy };
 }
