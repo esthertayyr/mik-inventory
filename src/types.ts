@@ -32,6 +32,7 @@ export type Screen =
   | "reseller_reports"
   | "viae_tax"
   | "viae_tasks"
+  | "viae_social_library"
   | "viae_commerce"
   | "reseller_sales"
   | "reseller_purchases"

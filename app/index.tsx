@@ -48,6 +48,7 @@ import { ResellerStockScreen } from "@/src/components/ResellerStockScreen";
 import { ResellerHomeScreen } from "@/src/components/ResellerHomeScreen";
 import { ViaeTasksScreen, VIAE_BUSINESS_ID } from "@/src/components/ViaeTasksScreen";
 import { ViaeTaxScreen } from "@/src/components/ViaeTaxScreen";
+import { ViaeSocialLibraryScreen } from "@/src/components/ViaeSocialLibraryScreen";
 import { Text, TextInput } from "@/src/components/AppTypography";
 import type {
   Business,
@@ -1146,8 +1147,8 @@ const screenModule=(value:Screen):ShopModule|null=>(["sell_start","sale","event_
     body = (resellerBusiness||isViae) && role === "owner"
       ? <WebsiteEnquiriesScreen businessId={business!.id} onBack={() => setScreen("home")} />
       : <ResellerHomeScreen businessId={business!.id} onOpen={setScreen} permissions={staffPermissions ?? []} />;
-  else if (screen === "suggested_images")
-    body = <SuggestedImages businessId={business!.id} canManage={role === "owner"} onBack={() => setScreen("home")} />;
+  else if (screen === "viae_social_library" && isViae)
+    body = <ViaeSocialLibraryScreen businessId={business.id} canManage={role === "owner"} onBack={() => setScreen("home")} />;
   else if (screen === "sell_start")
     body = <SellStart viae={isViae} onOpen={setScreen} />;
   else if (screen === "print_queue")
@@ -2406,73 +2407,6 @@ function SaleScreen({
   );
 }
 
-type SuggestedImage = {id:string;title:string;image_url:string;storage_path:string};
-
-function SuggestedImages({businessId,canManage,onBack}:{businessId:string;canManage:boolean;onBack:()=>void}) {
-  const {width}=useWindowDimensions();
-  const [images,setImages]=useState<SuggestedImage[]>([]);
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState("");
-  const load=useCallback(async()=>{
-    const {data,error:loadError}=await supabase.from("shop_social_images").select("id,title,image_url,storage_path").eq("business_id",businessId).order("created_at",{ascending:false});
-    setError(loadError?.message??"");
-    if(!loadError)setImages(data??[]);
-  },[businessId]);
-  useEffect(()=>{void load()},[load]);
-  const add=async()=>{
-    const permission=await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if(!permission.granted)return Alert.alert("Photo access needed","Allow MIK to choose a poster from this device.");
-    const chosen=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],quality:1});
-    if(chosen.canceled)return;
-    setBusy(true);
-    let path="";
-    try{
-      const asset=chosen.assets[0];
-      const resized=await ImageManipulator.manipulateAsync(asset.uri,[asset.width>=asset.height?{resize:{width:1350}}:{resize:{height:1350}}],{compress:.82,format:ImageManipulator.SaveFormat.JPEG});
-      const response=await fetch(resized.uri);
-      if(!response.ok)throw new Error("The poster could not be read.");
-      path=`${businessId}/social/${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
-      const {error:uploadError}=await supabase.storage.from("social-posters").upload(path,await response.arrayBuffer(),{contentType:"image/jpeg"});
-      if(uploadError)throw uploadError;
-      const {data:{user}}=await supabase.auth.getUser();
-      if(!user)throw new Error("Please sign in again.");
-      const image_url=supabase.storage.from("social-posters").getPublicUrl(path).data.publicUrl;
-      const {error:saveError}=await supabase.from("shop_social_images").insert({business_id:businessId,title:`Suggested poster · ${friendlyLocalDate()}`,image_url,storage_path:path,created_by:user.id});
-      if(saveError)throw saveError;
-      await load();
-    }catch(error:any){if(path)await supabase.storage.from("social-posters").remove([path]);Alert.alert("Poster not added",error?.message??"Please try again.")}
-    finally{setBusy(false)}
-  };
-  const download=async(item:SuggestedImage)=>{
-    try{
-      const response=await fetch(item.image_url);
-      if(!response.ok)throw new Error("The poster could not be downloaded.");
-      const bytes=await response.arrayBuffer();
-      if(Platform.OS==="web"){
-        const url=URL.createObjectURL(new Blob([bytes],{type:"image/jpeg"}));
-        const link=document.createElement("a");link.href=url;link.download="mik-facebook-poster.jpg";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-      }else{
-        const file=new File(Paths.cache,"mik-facebook-poster.jpg");file.create({overwrite:true});file.write(new Uint8Array(bytes));
-        await Sharing.shareAsync(file.uri,{mimeType:"image/jpeg"});
-      }
-    }catch(error:any){Alert.alert("Download failed",error?.message??"Please try again.")}
-  };
-  const remove=(item:SuggestedImage)=>confirmDestructive("Remove this poster?","It will no longer be available to download.","Remove",()=>{void(async()=>{
-    const {error:removeError}=await supabase.from("shop_social_images").delete().eq("id",item.id);
-    if(removeError)return Alert.alert("Could not remove poster",removeError.message);
-    setImages(current=>current.filter(image=>image.id!==item.id));
-    await supabase.storage.from("social-posters").remove([item.storage_path]);
-  })()});
-  return <ScrollView contentContainerStyle={s.quickScroll}>
-    <Back title="Home" onPress={onBack}/>
-    <View style={s.homeIntro}><Text style={s.pageTitle}>Suggested Images</Text><Text style={s.subtitle}>Ready-made posters for your shop to download and share.</Text></View>
-    <Text style={[s.quickSectionHelp,{marginTop:10}]}>For Facebook posts, 1080 × 1350 px (4:5) works well. MIK does not post automatically.</Text>
-    {canManage?<Pressable accessibilityRole="button" disabled={busy} onPress={()=>void add()} style={{alignSelf:"flex-start",marginTop:20,backgroundColor:SECTION.records.color,borderRadius:10,paddingVertical:12,paddingHorizontal:18}}><Text style={{color:C.white,fontWeight:"700"}}>{busy?"Adding poster…":"Add suggested poster"}</Text></Pressable>:null}
-    {error?<Text style={s.error}>{error}</Text>:images.length===0?<View style={{marginTop:28,padding:22,borderWidth:1,borderColor:C.border,borderRadius:14}}><Ionicons name="images-outline" size={29} color={SECTION.records.color}/><Text style={[s.quickSectionTitle,{marginTop:10}]}>No suggested images yet</Text><Text style={s.quickSectionHelp}>{canManage?"Add a finished poster so your team can download it here.":"Your shop owner can add posters for you to download here."}</Text></View>:null}
-    <View style={{flexDirection:"row",flexWrap:"wrap",gap:16,marginTop:22}}>{images.map(item=><View key={item.id} style={{width:width>=800?"31%":width>=520?"47%":"100%",minWidth:width>=520?220:undefined,borderWidth:1,borderColor:C.border,borderRadius:14,padding:12,backgroundColor:C.white}}><Image source={{uri:item.image_url}} resizeMode="contain" style={{width:"100%",height:width>=800?300:260,backgroundColor:"#F4F6F8",borderRadius:9}}/><Text style={[s.quickSectionTitle,{marginTop:12}]}>{item.title}</Text><View style={{flexDirection:"row",flexWrap:"wrap",gap:8,marginTop:12}}><Pressable accessibilityRole="button" onPress={()=>void download(item)} style={{backgroundColor:SECTION.records.color,borderRadius:9,paddingVertical:10,paddingHorizontal:14}}><Text style={{color:C.white,fontWeight:"700"}}>Download</Text></Pressable>{canManage?<Pressable accessibilityRole="button" onPress={()=>remove(item)} style={{borderWidth:1,borderColor:C.border,borderRadius:9,paddingVertical:10,paddingHorizontal:14}}><Text style={{color:C.ink,fontWeight:"600"}}>Remove</Text></Pressable>:null}</View></View>)}</View>
-  </ScrollView>;
-}
-
 function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibleModules }: { businessId:string; locationId: string; sales:Sale[]; onOpen: (screen: Screen) => void; permissions:StaffPermission[]|null; visibleModules:ShopModule[] }) {
   const { width } = useWindowDimensions();
   const [clockNow,setClockNow]=useState(new Date());
@@ -2549,6 +2483,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
     {
       title: isViae?"Catalogue & website":"Stock & products", help: isViae?"Manage designs and customer enquiries.":"Check stock, products and prices.", ...SECTION.stock, actions: isViae?[
         {title:'Catalogue',help:'Digital files, printed prices and custom orders',icon:'pricetags',screen:'sourcing'},
+        {title:'Social Media Library',help:'Store promotion images in folders and save post prompts',icon:'images',screen:'viae_social_library'},
         ...(!permissions?[{title:'Website',help:'Offers and published content',icon:'globe' as Icon,screen:'website' as Screen},{title:'Website enquiries',help:'Customer requests from the storefront',icon:'mail' as Icon,screen:'website_inquiries' as Screen},{title:'Customers & licences',help:'Accounts, promo codes and licences',icon:'people' as Icon,screen:'viae_commerce' as Screen},{title:'Tax tracker',help:'Quarterly sales and filings',icon:'calculator' as Icon,screen:'viae_tax' as Screen}]:[]),
         {title:'Tasks',help:'Assign and follow up on work',icon:'checkbox',screen:'viae_tasks'},
       ]:[
@@ -2592,7 +2527,7 @@ function QuickStart({ businessId, locationId, sales, onOpen, permissions, visibl
     (["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":
     screen==="viae_tasks"?"orders":screen==="calendar"?"calendar":"settings";
   const moduleFor=(screen:Screen):ShopModule|null=>(["sell_start","sale","event_sale","missed","dashboard","monthly_sales","correct"] as Screen[]).includes(screen)?"sales":screen==="orders"?"orders":(["sourcing","reseller_packages","preorders","reseller_reports","reseller_sales","reseller_purchases","reseller_stock"] as Screen[]).includes(screen)?"sourcing":(["stock_start","inventory","alphabet_inventory","products","price_list"] as Screen[]).includes(screen)?"stock":(["print_queue","price_calculator","printers","filaments"] as Screen[]).includes(screen)?"production":(["reports","expenses","calendar"] as Screen[]).includes(screen)?"reports":null;
-  const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>{const module=moduleFor(action.screen);return ((isViae&&["sourcing","viae_tasks","website","website_inquiries","viae_commerce"].includes(action.screen))||!module||visibleModules.includes(module))&&(action.screen==="suggested_images"||!permissions||permissions.includes(permissionFor(action.screen)));})})).filter(group=>group.actions.length);
+  const visibleGroups=groups.map(group=>({...group,actions:group.actions.filter(action=>{const module=moduleFor(action.screen);return ((isViae&&["sourcing","viae_tasks","viae_social_library","website","website_inquiries","viae_commerce"].includes(action.screen))||!module||visibleModules.includes(module))&&(action.screen==="suggested_images"||action.screen==="viae_social_library"||!permissions||permissions.includes(permissionFor(action.screen)));})})).filter(group=>group.actions.length);
   const overviewTone=overviewPeriod==="today"?SECTION.sales:{color:"#283D70",soft:"#E8EDF7",border:"#BCCAE4"};
   const overviewCardStyle=[s.overviewMetric,{borderColor:overviewTone.border,backgroundColor:overviewTone.soft}];
   const overviewLabelStyle=[s.overviewMetricLabel,{color:overviewTone.color}];
