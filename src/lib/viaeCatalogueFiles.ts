@@ -99,17 +99,33 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
 
   async function connect() {
     if (!picker) return;
+    setUploadProgress('Opening folder selection…');
     try {
-      const next = folder && !connected ? folder : await picker.call(window);
-      if (await next.requestPermission({ mode: 'read' }) !== 'granted') return;
+      // Open the picker immediately during the click gesture. A stale saved
+      // handle can be denied silently, and awaiting permission first can also
+      // consume the browser gesture needed to open the native folder picker.
+      const next = await picker.call(window);
+      if (await next.requestPermission({ mode: 'read' }) !== 'granted') {
+        setUploadProgress('Folder access was not granted. Choose the VIAE folder and allow access to continue.');
+        return;
+      }
       await next.getFileHandle('Catalogue_Data.json');
       manifest.current = '';
       if (!folder || !await next.isSameEntry(folder)) localStorage.removeItem(privateCopiesKey);
       setFolder(next);
       setConnected(true);
       await folderSetting(next);
+      setUploadProgress('VIAE source folder connected.');
     } catch (error) {
-      if ((error as Error).name !== 'AbortError') showMessage('Choose your VIAE folder containing Catalogue_Data.json.');
+      if ((error as Error).name === 'AbortError') {
+        setUploadProgress('Folder selection canceled. Choose the VIAE folder to continue.');
+      } else {
+        const detail = (error as Error).name === 'NotFoundError'
+          ? 'That folder does not contain Catalogue_Data.json.'
+          : (error as Error).message;
+        setUploadProgress(`Could not connect the source folder. ${detail}`);
+        showMessage(`Could not connect the source folder. ${detail}`);
+      }
     }
   }
 
