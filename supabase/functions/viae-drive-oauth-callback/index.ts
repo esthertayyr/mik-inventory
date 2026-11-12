@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const BUSINESS = "3fe4c82d-a659-406b-b290-32d8a49f2bdf";
+const ALLOWED_GOOGLE_EMAIL = "viaeph@gmail.com";
 function decode(value: string) { return Uint8Array.from(atob(value.replaceAll("-", "+").replaceAll("_", "/")), c => c.charCodeAt(0)); }
 function enc(bytes: Uint8Array) { return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
 async function seal(value: string, raw: string) {
@@ -38,6 +39,7 @@ Deno.serve(async request => {
     const token = await googleJson("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: Deno.env.get("GOOGLE_CLIENT_ID")!, client_secret: Deno.env.get("GOOGLE_CLIENT_SECRET")!, code, code_verifier: flow.code_verifier, redirect_uri: redirectUri, grant_type: "authorization_code" }) });
     if (!token.refresh_token) throw new Error("Google did not provide offline access. Try connecting again and approve the requested access.");
     const user = await googleJson("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${token.access_token}` } });
+    if (String(user.email || "").toLowerCase() !== ALLOWED_GOOGLE_EMAIL) throw new Error(`Connect Google Drive using ${ALLOWED_GOOGLE_EMAIL}.`);
     const old = await admin.from("viae_drive_connections").select("drive_folder_id,google_email").eq("business_id", BUSINESS).maybeSingle();
     if (old.data?.google_email && user.email && old.data.google_email.toLowerCase() !== user.email.toLowerCase()) throw new Error("This MIK library is connected to a different Google account. Reconnect using the same account.");
     let folderId = old.data?.drive_folder_id as string | undefined;

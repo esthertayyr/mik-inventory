@@ -65,7 +65,7 @@ Deno.serve(async request => {
       headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: "VIAE Enquiries <onboarding@resend.dev>",
-        to: ["viae.ph@gmail.com"],
+        to: ["viaeph@gmail.com"],
         subject: `[VIAE] New enquiry from ${String(enquiry.name).slice(0, 100)}`,
         text: lines,
       }),
