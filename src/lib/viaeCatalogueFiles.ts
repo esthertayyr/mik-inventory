@@ -130,14 +130,26 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
       const items = sets.map((entry: CatalogueEntry) => ({ ...entry, serial: aliases[entry.serial] ?? entry.serial }));
       if (manifest.current !== contents) {
         setSyncing(true);
-        const { data, error } = await supabase.rpc('import_viae_design_catalogue', {
-          p_items: items,
-          p_reconcile_missing: false,
-        });
-        if (error) throw new Error(error.message);
+        // The private download-library manifest intentionally contains only
+        // serials, names, and download paths. Do not import it as the full
+        // catalogue: missing category data would turn hosted generators into
+        // "Other" and can violate the published-item database guard.
+        const hasFullCatalogueData = items.every((entry: CatalogueEntry & { main?: string; preview?: string }) =>
+          typeof entry.main === 'string' && entry.main.trim().length > 0 &&
+          typeof entry.preview === 'string' && entry.preview.trim().length > 0,
+        );
+        if (hasFullCatalogueData) {
+          const { data, error } = await supabase.rpc('import_viae_design_catalogue', {
+            p_items: items,
+            p_reconcile_missing: false,
+          });
+          if (error) throw new Error(error.message);
+          await onSync();
+          showMessage(`${data} catalogue entries synced from the VIAE folder.`);
+        } else {
+          showMessage('Private file-library manifest detected. Catalogue records were left unchanged; linked files are ready to upload to MIK.');
+        }
         manifest.current = contents;
-        await onSync();
-        showMessage(`${data} catalogue entries synced from the VIAE folder.`);
       }
       const copies = savedCopies();
       const failures: string[] = [];
