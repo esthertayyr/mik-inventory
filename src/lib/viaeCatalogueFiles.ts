@@ -105,8 +105,11 @@ export function useViaeCatalogueFiles(canEdit: boolean, onSync: () => Promise<vo
       // handle can be denied silently, and awaiting permission first can also
       // consume the browser gesture needed to open the native folder picker.
       const next = await picker.call(window);
-      if (await next.requestPermission({ mode: 'read' }) !== 'granted') {
-        setUploadProgress('Folder access was not granted. Choose the VIAE folder and allow access to continue.');
+      // Selecting a folder in the browser picker grants read access for this
+      // handle. Avoid a second permission prompt, which can be dismissed and
+      // was being misreported as a canceled folder selection.
+      if (await next.queryPermission({ mode: 'read' }) !== 'granted') {
+        setUploadProgress('The folder was selected, but browser read access is not active. Select it again and allow access if prompted.');
         return;
       }
       await next.getFileHandle('Catalogue_Data.json');
