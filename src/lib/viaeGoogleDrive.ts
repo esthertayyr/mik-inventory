@@ -11,14 +11,14 @@ const BUSINESS = '3fe4c82d-a659-406b-b290-32d8a49f2bdf';
 function listDownloads(entry: Entry) { return entry.downloads?.length ? entry.downloads : (entry.zip || entry.generator) ? [{ label: 'Print files', file: entry.zip || entry.generator! }] : []; }
 function asset(code: string, relative: string, index: number, multi: boolean): Asset | null {
   const extension = relative.split('.').pop()?.toLowerCase();
-  if (!extension || !['zip', 'html', '3mf', 'stl'].includes(extension)) return null;
+  if (!extension || !['html', '3mf', 'stl'].includes(extension)) return null;
   const parts = relative.split(/[\\/]/);
   if (parts.some(part => !part || part === '.' || part === '..' || part.includes(':'))) return null;
   const filename = parts.pop()!;
   const driveName = multi ? `${index + 1}-${filename}` : `download.${extension}`;
   return { sourceDirectories: parts, driveDirectories: [code, ...(multi ? ['parts'] : [])], filename, driveName, key: multi ? `${code}/parts/${index + 1}-${filename}` : `${code}/download.${extension}` };
 }
-function mime(name: string) { const ext = name.split('.').pop()?.toLowerCase(); return ext === 'zip' ? 'application/zip' : ext === 'html' ? 'text/html' : 'application/octet-stream'; }
+function mime(name: string) { const ext = name.split('.').pop()?.toLowerCase(); return ext === 'html' ? 'text/html' : 'application/octet-stream'; }
 
 export function useViaeGoogleDrive(canEdit: boolean, showMessage: (message: string) => void) {
   const [connected, setConnected] = useState(false), [email, setEmail] = useState(''), [rootId, setRootId] = useState('');
@@ -29,7 +29,15 @@ export function useViaeGoogleDrive(canEdit: boolean, showMessage: (message: stri
 
   const call = useCallback(async (action: string, extra: Record<string, unknown> = {}) => {
     const { data, error } = await supabase.functions.invoke('viae-drive-connector', { body: { action, ...extra } });
-    if (error) throw new Error(data?.error || error.message);
+    if (error) {
+      let message = data?.error || error.message;
+      const context = (error as typeof error & { context?: Response }).context;
+      if (context) {
+        const response = await context.clone().json().catch(() => null) as { error?: string; message?: string } | null;
+        message = response?.error || response?.message || message;
+      }
+      throw new Error(message);
+    }
     if (data?.error) throw new Error(data.error);
     return data;
   }, []);
@@ -85,7 +93,7 @@ export function useViaeGoogleDrive(canEdit: boolean, showMessage: (message: stri
         const fileAsset = asset(entry.serial, download.file, index, Boolean(entry.downloads?.length));
         return fileAsset ? { entry, download, index, multi: Boolean(entry.downloads?.length), fileAsset } : null;
       }).filter((item): item is NonNullable<typeof item> => Boolean(item)));
-      if (!queue.length) throw new Error('No linked STL, 3MF, ZIP or HTML files were found.');
+      if (!queue.length) throw new Error('No linked STL, 3MF or generator HTML files were found.');
       const { accessToken, folderId } = await call('access');
       const dirCache = new Map<string, string>([['', folderId]]);
       const google = async (url: string, init: RequestInit = {}) => {

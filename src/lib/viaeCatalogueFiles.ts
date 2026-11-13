@@ -17,7 +17,7 @@ function savedCopies(): Record<string, string> {
 
 async function uploadPrivateFile(asset: NonNullable<ReturnType<typeof assetPath>>, file: File) {
   if (file.size > 50_000_000) throw new Error('This file exceeds the 50 MB private upload limit. Download it from the connected PC.');
-  const contentType = asset.extension === 'html' ? 'text/html' : asset.extension === 'zip' ? 'application/zip' : 'application/octet-stream';
+  const contentType = asset.extension === 'html' ? 'text/html' : 'application/octet-stream';
   const { error } = await supabase.storage.from(bucket).upload(asset.key, file.slice(0, file.size, contentType), {
     upsert: true,
     contentType,
@@ -59,7 +59,7 @@ function downloadFiles(source: CatalogueEntry): CatalogueDownload[] {
 
 function assetPath(code: string, relative: string, index = 0, multi = false) {
   const extension = relative.split('.').pop()?.toLowerCase();
-  if (!extension || !['zip', 'html', '3mf', 'stl'].includes(extension)) return null;
+  if (!extension || !['html', '3mf', 'stl'].includes(extension)) return null;
   const parts = relative.split(/[\\/]/);
   if (parts.some(part => !part || part === '.' || part === '..' || part.includes(':'))) return null;
   const filename = parts.pop()!;
