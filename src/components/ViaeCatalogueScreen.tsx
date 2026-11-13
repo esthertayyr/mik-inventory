@@ -8,7 +8,7 @@ import {supabase} from '@/src/lib/supabase';
 import {useViaeCatalogueFiles} from '@/src/lib/viaeCatalogueFiles';
 import {useViaeGoogleDrive} from '@/src/lib/viaeGoogleDrive';
 
-type DownloadAsset={label:string;file:string};
+type DownloadAsset={label:string;file:string;drivePath?:string};
 type ProductMedia={url:string;path:string;type:'image'|'video';title?:string;sort_order:number};
 type Design={source_metadata:{serial:string;zip?:string;generator?:string;downloads?:DownloadAsset[]};display_title:string|null;internal_only:boolean;reference_price_php:number|null;delivery_asset_metadata:Record<string,unknown>;id:string;catalogue_code:string;title:string;category:string;design_count:number|null;preview_url:string|null;media_assets:ProductMedia[];source_present:boolean;digital_enabled:boolean;printed_enabled:boolean;digital_price_php:number|null;printed_price_php:number|null;preparation_days:number|null;website_status:string;synced_at:string};
 const labels:Record<string,string>={Charm:'Charms',Font:'Fonts & Letters',Keycaps:'Keycaps',Keychains:'Keychains',Generator:'Generators'};
@@ -29,8 +29,12 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
    const isMulti=Boolean(selected.source_metadata.downloads?.length);
    const extension=asset.file.split('.').pop()?.toLowerCase()??'';
    const parts=asset.file.split(/[\\/]/);const filename=parts.pop()??'';
-   const drivePath=extension&&['zip','html','3mf','stl'].includes(extension)&&!parts.some(part=>!part||part==='.'||part==='..'||part.includes(':'))
+   const expectedDrivePath=extension&&['zip','html','3mf','stl'].includes(extension)&&!parts.some(part=>!part||part==='.'||part==='..'||part.includes(':'))
     ?(isMulti?`${selected.catalogue_code}/parts/${index+1}-${filename}`:`${selected.catalogue_code}/download.${extension}`):'';
+   const normalizedName=(value:string)=>value.replace(/^\d+-/,'').toLocaleLowerCase();
+   const codeFiles=drive.files.filter(file=>file.relative_path.startsWith(`${selected.catalogue_code}/`));
+   const exactName=codeFiles.find(file=>normalizedName(file.file_name)===normalizedName(filename));
+   const drivePath=asset.drivePath||(drive.fileMap.has(expectedDrivePath)?expectedDrivePath:exactName?.relative_path||(codeFiles.length===1?codeFiles[0].relative_path:''));
    if(!saveCopy&&drivePath&&drive.fileMap.has(drivePath)){
     await drive.download(drivePath);
     setMessage(`${asset.label} downloaded from the VIAE Drive library.`);
@@ -115,7 +119,21 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
  function removeMedia(media:ProductMedia){setSelected(current=>current?{...current,media_assets:current.media_assets.filter(item=>item.path!==media.path)}:current);setRemovedMedia(current=>media.path?[...current,media.path]:current);}
  const activeRows=rows.filter(row=>row.website_status!=='archived');
  const visible=(category==='Archived'?rows.filter(row=>row.website_status==='archived'):activeRows.filter(row=>category==='All'||row.category===category)).filter(row=>`${row.title} ${row.catalogue_code}`.toLowerCase().includes(query.toLowerCase()));
- const selectedDownloads=selected?(selected.source_metadata.downloads?.length?selected.source_metadata.downloads:[{label:'Print files',file:selected.source_metadata.zip||selected.source_metadata.generator||''}].filter(asset=>Boolean(asset.file))):[];
+ const selectedDownloads=selected?(()=>{
+  const source=selected.source_metadata.downloads?.length?selected.source_metadata.downloads:[{label:'Print files',file:selected.source_metadata.zip||selected.source_metadata.generator||''}].filter(asset=>Boolean(asset.file));
+  const codeFiles=drive.files.filter(file=>file.relative_path.startsWith(`${selected.catalogue_code}/`));
+  const normalizedName=(value:string)=>value.replace(/^\d+-/,'').toLocaleLowerCase();
+  const matched=new Set<string>();
+  const linked=source.map((asset,index)=>{
+   const filename=asset.file.split(/[\\/]/).pop()?.toLocaleLowerCase()??'';
+   const expected=selected.source_metadata.downloads?.length?`${selected.catalogue_code}/parts/${index+1}-${asset.file.split(/[\\/]/).pop()}`:'';
+   const file=codeFiles.find(item=>item.relative_path===expected)||codeFiles.find(item=>normalizedName(item.file_name)===normalizedName(filename))||(codeFiles.length===1?codeFiles[0]:undefined);
+   if(file)matched.add(file.relative_path);
+   return {...asset,drivePath:file?.relative_path};
+  });
+  const extra=codeFiles.filter(file=>!matched.has(file.relative_path)).map(file=>({label:'File in MIK library',file:file.file_name,drivePath:file.relative_path}));
+  return [...linked,...extra];
+ })():[];
   return <ScrollView contentContainerStyle={s.page}><View style={s.row}><Pressable onPress={onBack}><Text style={s.link}>Back</Text></Pressable><Text style={s.heading}>VIAE Catalogue</Text></View>
  <View style={s.panel}><Text style={s.strong}>{activeRows.length} catalogue entries · {activeRows.filter(r=>r.website_status==='published').length} published</Text><Text style={s.help}>Last sync · {rows[0]?.synced_at?new Date(rows.reduce((latest,row)=>row.synced_at>latest?row.synced_at:latest,rows[0].synced_at)).toLocaleString():'Not synced'}</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.actionRow}><Pressable disabled={busy||!canEdit} style={s.button} onPress={importFile}><Text style={s.white}>Sync catalogue JSON</Text></Pressable>{canEdit&&files.supported&&<Pressable disabled={files.syncing||busy} style={[s.button,files.connected&&s.secondaryButton]} onPress={files.connected?files.sync:files.connect}><Text style={files.connected?s.strong:s.white}>{files.syncing?'Syncing…':files.connected?'Sync VIAE folder':'Connect VIAE folder'}</Text></Pressable>}<View style={s.actionSpacer}/><Pressable onPress={()=>Linking.openURL('https://ecommerce-ai-store.vercel.app/')}><Text style={s.link}>Open website</Text></Pressable></ScrollView>
   {canEdit&&<Pressable style={s.fileManagementLink} onPress={()=>setShowFileManagement(true)}><Text style={s.link}>File library and uploads</Text><Text style={s.help}>{drive.connected?`Connected · ${drive.email} · ${drive.files.length} files`:'Manage shared files and storage'}</Text></Pressable>}
