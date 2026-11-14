@@ -56,6 +56,15 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
   }catch(error){setMessage((error as Error).message);}finally{setBusy(false);}
  }
 
+ function openDriveFile(asset:DownloadAsset){
+  const drivePath=asset.drivePath;
+  const file=drivePath?drive.fileMap.get(drivePath):undefined;
+  if(!file?.drive_file_id){setMessage('This file is not currently linked in Google Drive.');return;}
+  const url=`https://drive.google.com/file/d/${encodeURIComponent(file.drive_file_id)}/view`;
+  if(Platform.OS==='web')window.open(url,'_blank','noopener,noreferrer');
+  else void Linking.openURL(url);
+ }
+
  function uploadPrivateCatalogueFile(asset:DownloadAsset,index:number){
   if(!selected||!canEdit||Platform.OS!=='web')return;
   const extension=asset.file.split('.').pop()?.toLowerCase()??'';
@@ -150,6 +159,7 @@ export function ViaeCatalogueScreen({businessId,onBack,canEdit}:{businessId:stri
  {selectedDownloads.map((asset,index)=><View key={`${asset.file}-${index}`} style={s.downloadRow}>
   <View style={s.flex}><Text style={s.strong}>{asset.label}</Text><Text style={s.help}>{asset.file.split(/[\\/]/).pop()}</Text></View>
   <Pressable disabled={busy} style={s.button} onPress={()=>void handleCatalogueFile(asset,index)}><Text style={s.white}>Download</Text></Pressable>
+   {asset.drivePath&&drive.fileMap.has(asset.drivePath)&&<Pressable disabled={busy} style={[s.button,s.secondaryButton]} onPress={()=>openDriveFile(asset)}><Text style={s.strong}>Open in Google Drive</Text></Pressable>}
   {canEdit&&Platform.OS==='web'&&<Pressable disabled={busy} onPress={()=>uploadPrivateCatalogueFile(asset,index)}><Text style={s.link}>Upload private copy</Text></Pressable>}
   {canEdit&&files.connected&&<Pressable disabled={busy} onPress={()=>void handleCatalogueFile(asset,index,true)}><Text style={s.link}>Save private copy</Text></Pressable>}
  </View>)}
