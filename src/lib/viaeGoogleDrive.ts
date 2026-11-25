@@ -2,20 +2,23 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
-type DriveFile = { relative_path: string; drive_file_id: string; file_name: string; mime_type: string; size_bytes: number; updated_at: string };
+type DriveFile = { relative_path: string; drive_file_id: string; file_name: string; mime_type: string; size_bytes: number; source_last_modified: number | string | null; updated_at: string };
 type FolderHandle = FileSystemDirectoryHandle & { queryPermission(options: { mode: 'read' }): Promise<PermissionState>; requestPermission(options: { mode: 'read' }): Promise<PermissionState> };
 type Download = { label: string; file: string };
-type Entry = { serial: string; zip?: string; generator?: string; downloads?: Download[] };
+type Entry = { serial: string; name?: string; zip?: string; generator?: string; downloads?: Download[] };
 type Asset = { sourceDirectories: string[]; driveDirectories: string[]; filename: string; driveName: string; key: string };
 const BUSINESS = '3fe4c82d-a659-406b-b290-32d8a49f2bdf';
 function listDownloads(entry: Entry) { return entry.downloads?.length ? entry.downloads : (entry.zip || entry.generator) ? [{ label: 'Print files', file: entry.zip || entry.generator! }] : []; }
-function asset(code: string, relative: string, index: number, multi: boolean): Asset | null {
+function safeFileStem(value: string) {
+  return value.normalize('NFKC').replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').replace(/[. ]+$/g, '').trim().slice(0, 150);
+}
+function asset(code: string, relative: string, index: number, multi: boolean, title?: string): Asset | null {
   const extension = relative.split('.').pop()?.toLowerCase();
   if (!extension || !['html', '3mf', 'stl'].includes(extension)) return null;
   const parts = relative.split(/[\\/]/);
   if (parts.some(part => !part || part === '.' || part === '..' || part.includes(':'))) return null;
   const filename = parts.pop()!;
-  const driveName = multi ? `${index + 1}-${filename}` : `download.${extension}`;
+  const driveName = safeFileStem(filename);
   return { sourceDirectories: parts, driveDirectories: [code, ...(multi ? ['parts'] : [])], filename, driveName, key: multi ? `${code}/parts/${index + 1}-${filename}` : `${code}/download.${extension}` };
 }
 function mime(name: string) { const ext = name.split('.').pop()?.toLowerCase(); return ext === 'html' ? 'text/html' : 'application/octet-stream'; }
@@ -90,12 +93,17 @@ export function useViaeGoogleDrive(canEdit: boolean, showMessage: (message: stri
       const aliases: Record<string, string> = { C099: 'G002', C101: 'G003' };
       const entries: Entry[] = parsed.sets.map((entry: Entry) => ({ ...entry, serial: aliases[entry.serial] || entry.serial }));
       const queue = entries.flatMap(entry => listDownloads(entry).map((download, index) => {
-        const fileAsset = asset(entry.serial, download.file, index, Boolean(entry.downloads?.length));
+        const fileAsset = asset(entry.serial, download.file, index, Boolean(entry.downloads?.length), entry.name);
         return fileAsset ? { entry, download, index, multi: Boolean(entry.downloads?.length), fileAsset } : null;
       }).filter((item): item is NonNullable<typeof item> => Boolean(item)));
       if (!queue.length) throw new Error('No linked STL, 3MF or generator HTML files were found.');
+      const currentStatus = await call('status');
+      const currentFiles = (currentStatus.files || []) as DriveFile[];
+      setFiles(currentFiles);
+      const currentFileMap = new Map(currentFiles.map(file => [file.relative_path, file]));
       const { accessToken, folderId } = await call('access');
       const dirCache = new Map<string, string>([['', folderId]]);
+      const summary = { added: 0, updated: 0, unchanged: 0 };
       const google = async (url: string, init: RequestInit = {}) => {
         const response = await fetch(url, { ...init, headers: { Authorization: `Bearer ${accessToken}`, ...(init.headers || {}) } });
         const data = await response.json().catch(() => ({}));
@@ -117,14 +125,28 @@ export function useViaeGoogleDrive(canEdit: boolean, showMessage: (message: stri
       };
       for (let i = 0; i < queue.length; i++) {
         const item = queue[i], label = `${item.entry.serial} · ${item.download.label}`;
-        setProgress(`Uploading ${i + 1} of ${queue.length} · ${label}`);
+        setProgress(`Checking ${i + 1} of ${queue.length} · ${label}`);
         let directory: FileSystemDirectoryHandle = folder;
         for (const part of item.fileAsset.sourceDirectories) directory = await directory.getDirectoryHandle(part);
         const local = await (await directory.getFileHandle(item.fileAsset.filename)).getFile();
+        const mappedFile = currentFileMap.get(item.fileAsset.key);
+        const recordedModified = mappedFile?.source_last_modified == null ? null : Number(mappedFile.source_last_modified);
+        const hasRecordedModified = recordedModified !== null && Number.isFinite(recordedModified);
+        const legacyRecordIsCurrent = mappedFile && !hasRecordedModified && Date.parse(mappedFile.updated_at) >= local.lastModified;
+        const unchanged = Boolean(mappedFile && mappedFile.size_bytes === local.size && (hasRecordedModified ? recordedModified === local.lastModified : legacyRecordIsCurrent));
+        if (unchanged && mappedFile) {
+          if (!hasRecordedModified) {
+            const { data: registered, error: registerError } = await supabase.functions.invoke('viae-drive-connector', { body: { action: 'register', path: item.fileAsset.key, fileId: mappedFile.drive_file_id, fileName: mappedFile.file_name, mimeType: mappedFile.mime_type, sizeBytes: local.size, sourceLastModified: local.lastModified } });
+            if (registerError || registered?.error) throw new Error(registered?.error || registerError?.message || 'MIK could not save the file record.');
+          }
+          summary.unchanged++;
+          continue;
+        }
+        setProgress(`Uploading ${i + 1} of ${queue.length} · ${label}`);
         const parent = await getDirectory(item.fileAsset.driveDirectories);
         const q = `name='${item.fileAsset.driveName.replaceAll("'", "\\'")}' and '${parent}' in parents and trashed=false`;
-        const found = await google(`https://www.googleapis.com/drive/v3/files?fields=files(id)&pageSize=100&q=${encodeURIComponent(q)}`);
-        const existingId = found.files?.[0]?.id;
+        const found = mappedFile ? null : await google(`https://www.googleapis.com/drive/v3/files?fields=files(id)&pageSize=100&q=${encodeURIComponent(q)}`);
+        const existingId = mappedFile?.drive_file_id || found?.files?.[0]?.id;
         const metadata = { name: item.fileAsset.driveName, mimeType: mime(item.fileAsset.driveName), ...(existingId ? {} : { parents: [parent] }) };
         const startUrl = `https://www.googleapis.com/upload/drive/v3/files${existingId ? `/${existingId}` : ''}?uploadType=resumable&fields=id,name,mimeType,size`;
         const initiated = await fetch(startUrl, { method: existingId ? 'PATCH' : 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': metadata.mimeType }, body: JSON.stringify(metadata) });
@@ -142,10 +164,12 @@ export function useViaeGoogleDrive(canEdit: boolean, showMessage: (message: stri
         }
         if (local.size === 0) { const response = await fetch(uploadUrl, { method: 'PUT', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Range': 'bytes */0' } }); if (response.ok) uploadedFile = await response.json(); }
         if (!uploadedFile?.id) throw new Error(`Google Drive did not confirm ${local.name}. Please retry the sync.`);
-        const { data: registered, error: registerError } = await supabase.functions.invoke('viae-drive-connector', { body: { action: 'register', path: item.fileAsset.key, fileId: uploadedFile.id, fileName: uploadedFile.name || item.fileAsset.filename, mimeType: uploadedFile.mimeType || metadata.mimeType, sizeBytes: local.size } });
+        const { data: registered, error: registerError } = await supabase.functions.invoke('viae-drive-connector', { body: { action: 'register', path: item.fileAsset.key, fileId: uploadedFile.id, fileName: uploadedFile.name || item.fileAsset.filename, mimeType: uploadedFile.mimeType || metadata.mimeType, sizeBytes: local.size, sourceLastModified: local.lastModified } });
         if (registerError || registered?.error) throw new Error(registered?.error || registerError?.message || 'MIK could not save the file record.');
+        if (mappedFile || existingId) summary.updated++;
+        else summary.added++;
       }
-      await refresh(); showMessage(`${queue.length} linked catalogue files are now in the private VIAE Drive library.`);
+      await refresh(); showMessage(`Drive sync complete: ${summary.added} new, ${summary.updated} updated, ${summary.unchanged} unchanged.`);
     } catch (error) { showMessage(`Drive upload stopped. ${(error as Error).message}`); }
     finally { setBusy(false); setProgress(''); }
   }, [busy, call, canEdit, connected, folder, refresh, showMessage]);

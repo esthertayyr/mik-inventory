@@ -43,7 +43,7 @@ Deno.serve(async req => {
     const { data: connection } = await admin.from("viae_drive_connections").select("google_email,drive_folder_id,encrypted_refresh_token,connected_at").eq("business_id", BUSINESS).maybeSingle();
     if (action === "status") {
       if (!connection) return json({ connected: false, canConnect: isOwner });
-      const { data: files } = await admin.from("viae_drive_files").select("relative_path,drive_file_id,file_name,mime_type,size_bytes,updated_at").eq("business_id", BUSINESS);
+      const { data: files } = await admin.from("viae_drive_files").select("relative_path,drive_file_id,file_name,mime_type,size_bytes,source_last_modified,updated_at").eq("business_id", BUSINESS);
       return json({ connected: true, canConnect: isOwner, email: connection.google_email, folderId: connection.drive_folder_id, connectedAt: connection.connected_at, files: files || [] });
     }
     if (!isOwner) return fail("Only a VIAE owner can connect Drive or upload files.", 403);
@@ -77,7 +77,10 @@ Deno.serve(async req => {
       if (!path || path.length > 700 || path.split(/[\\/]/).some((part: string) => !part || part === "." || part === ".." || part.includes(":"))) return fail("Invalid VIAE library path.");
       const fileId = String(body.fileId || ""), fileName = String(body.fileName || "");
       if (!/^[A-Za-z0-9_-]{10,}$/.test(fileId) || !fileName || fileName.length > 255) return fail("Invalid Google Drive file details.");
-      const { error } = await admin.from("viae_drive_files").upsert({ business_id: BUSINESS, relative_path: path, drive_file_id: fileId, file_name: fileName, mime_type: String(body.mimeType || "application/octet-stream").slice(0, 120), size_bytes: Math.max(0, Number(body.sizeBytes) || 0), updated_at: new Date().toISOString() });
+      const record: Record<string, unknown> = { business_id: BUSINESS, relative_path: path, drive_file_id: fileId, file_name: fileName, mime_type: String(body.mimeType || "application/octet-stream").slice(0, 120), size_bytes: Math.max(0, Number(body.sizeBytes) || 0), updated_at: new Date().toISOString() };
+      const sourceLastModified = Number(body.sourceLastModified);
+      if (Number.isFinite(sourceLastModified) && sourceLastModified >= 0) record.source_last_modified = Math.trunc(sourceLastModified);
+      const { error } = await admin.from("viae_drive_files").upsert(record);
       if (error) throw error;
       return json({ saved: true });
     }
